@@ -1,0 +1,1131 @@
+<!doctype html>
+<html lang="de">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>WerkstattAI – Dashboard</title>
+  <style>
+    :root{
+      --bg:#0b1220;
+      --card:#0f1a2e;
+      --panel:#0e1730;
+      --muted:#9aa4b2;
+      --text:#e6eaf0;
+      --line:rgba(255,255,255,.08);
+      --ok:#22c55e;
+      --warn:#f59e0b;
+      --info:#60a5fa;
+      --danger:#ef4444;
+      --shadow: 0 10px 30px rgba(0,0,0,.35);
+      --r:18px;
+    }
+
+    *{box-sizing:border-box}
+
+    body{
+      margin:0;
+      font-family: system-ui, -apple-system, Segoe UI, Roboto, Arial, sans-serif;
+      background:
+        radial-gradient(1200px 600px at 20% -10%, #1d3a8a33, transparent 60%),
+        radial-gradient(1000px 500px at 90% 0%, #0ea5e933, transparent 60%),
+        var(--bg);
+      color:var(--text);
+    }
+
+    .wrap{
+      max-width:1380px;
+      margin:0 auto;
+      padding:22px;
+    }
+
+    .top{
+      display:flex;
+      gap:14px;
+      flex-wrap:wrap;
+      align-items:center;
+      justify-content:space-between;
+      margin-bottom:14px;
+    }
+
+    .brand{
+      display:flex;
+      flex-direction:column;
+      gap:6px;
+    }
+
+    .brand h1{
+      margin:0;
+      font-size:20px;
+      letter-spacing:.2px;
+    }
+
+    .brand .sub{
+      color:var(--muted);
+      font-size:12px;
+    }
+
+    .chip{
+      display:inline-flex;
+      align-items:center;
+      gap:8px;
+      padding:8px 12px;
+      border-radius:999px;
+      background:rgba(255,255,255,.06);
+      border:1px solid var(--line);
+      color:var(--muted);
+      font-size:12px;
+    }
+
+    .switches{
+      display:flex;
+      gap:10px;
+      flex-wrap:wrap;
+      align-items:center;
+    }
+
+    .nav-btn{
+      display:inline-flex;
+      align-items:center;
+      gap:8px;
+      padding:10px 12px;
+      border-radius:14px;
+      border:1px solid var(--line);
+      background: rgba(255,255,255,.06);
+      color:var(--text);
+      text-decoration:none;
+      font-weight:800;
+    }
+
+    .nav-btn.active{
+      background: rgba(96,165,250,.16);
+      border-color: rgba(96,165,250,.35);
+    }
+
+    .grid{
+      display:grid;
+      grid-template-columns: 1fr;
+      gap:14px;
+    }
+
+    .cards{
+      display:grid;
+      grid-template-columns: repeat(6, minmax(160px,1fr));
+      gap:12px;
+    }
+
+    .card{
+      background: linear-gradient(180deg, rgba(255,255,255,.06), rgba(255,255,255,.03));
+      border:1px solid var(--line);
+      border-radius: var(--r);
+      box-shadow: var(--shadow);
+      padding:14px 16px;
+    }
+
+    .kpi .label{
+      color:var(--muted);
+      font-size:12px;
+      text-transform:uppercase;
+      letter-spacing:.08em;
+    }
+
+    .kpi .value{
+      font-size:28px;
+      margin-top:8px;
+      font-weight:700;
+    }
+
+    .kpi .hint{
+      margin-top:6px;
+      color:var(--muted);
+      font-size:12px;
+    }
+
+    .toolbar{
+      display:flex;
+      gap:10px;
+      flex-wrap:wrap;
+      align-items:center;
+      padding:12px;
+      background: rgba(255,255,255,.04);
+      border:1px solid var(--line);
+      border-radius: var(--r);
+    }
+
+    .toolbar form{
+      display:flex;
+      gap:10px;
+      flex-wrap:wrap;
+      align-items:center;
+      width:100%;
+    }
+
+    input, select, button{
+      padding:10px 12px;
+      border-radius:14px;
+      border:1px solid var(--line);
+      background: rgba(15,26,46,.7);
+      color: var(--text);
+      outline:none;
+    }
+
+    input::placeholder{
+      color:#7f8aa0;
+    }
+
+    button{
+      background: linear-gradient(180deg, rgba(96,165,250,.22), rgba(96,165,250,.10));
+      cursor:pointer;
+      font-weight:600;
+    }
+
+    .btn-secondary{
+      background: rgba(255,255,255,.06);
+      text-decoration:none;
+      display:inline-flex;
+      align-items:center;
+      padding:10px 12px;
+      border-radius:14px;
+      border:1px solid var(--line);
+      color:var(--text);
+    }
+
+    .table{
+      overflow:hidden;
+      border-radius: var(--r);
+      border:1px solid var(--line);
+      background: rgba(15,26,46,.55);
+      box-shadow: var(--shadow);
+    }
+
+    table{
+      width:100%;
+      border-collapse:collapse;
+    }
+
+    th, td{
+      padding:12px 14px;
+      border-bottom:1px solid var(--line);
+      vertical-align:top;
+    }
+
+    th{
+      color: var(--muted);
+      font-size:12px;
+      text-transform: uppercase;
+      letter-spacing:.08em;
+      background: rgba(255,255,255,.03);
+    }
+
+    tr:hover td{
+      background: rgba(255,255,255,.03);
+    }
+
+    .muted{
+      color:var(--muted);
+      font-size:12px;
+    }
+
+    .status{
+      display:inline-flex;
+      align-items:center;
+      gap:8px;
+      padding:4px 10px;
+      border-radius:999px;
+      border:1px solid var(--line);
+      background: rgba(255,255,255,.04);
+      font-size:12px;
+      font-weight:600;
+      text-transform:capitalize;
+    }
+
+    .dot{
+      width:8px;
+      height:8px;
+      border-radius:999px;
+    }
+
+    .s-offen .dot{background:var(--warn)}
+    .s-in_bearbeitung .dot{background:var(--info)}
+    .s-erledigt .dot{background:var(--ok)}
+    .s-archiviert .dot{background:#94a3b8}
+
+    .priority{
+      display:inline-flex;
+      align-items:center;
+      gap:6px;
+      padding:4px 10px;
+      border-radius:999px;
+      border:1px solid var(--line);
+      font-size:12px;
+      font-weight:800;
+      text-transform:uppercase;
+      letter-spacing:.04em;
+      margin-top:8px;
+    }
+
+    .p-niedrig{
+      background: rgba(34,197,94,.12);
+      border-color: rgba(34,197,94,.24);
+      color:#bbf7d0;
+    }
+
+    .p-normal{
+      background: rgba(255,255,255,.04);
+      color:#dbe6f5;
+    }
+
+    .p-hoch{
+      background: rgba(239,68,68,.14);
+      border-color: rgba(239,68,68,.28);
+      color:#fecaca;
+    }
+
+    .request-type{
+      display:inline-flex;
+      align-items:center;
+      gap:6px;
+      padding:4px 10px;
+      border-radius:999px;
+      border:1px solid var(--line);
+      background: rgba(96,165,250,.10);
+      color:#cfe3ff;
+      font-size:11px;
+      font-weight:800;
+      text-transform:uppercase;
+      letter-spacing:.04em;
+      margin-top:8px;
+    }
+
+    .rt-service{
+      background: rgba(34,197,94,.10);
+      border-color: rgba(34,197,94,.22);
+      color:#bbf7d0;
+    }
+
+    .rt-diagnose{
+      background: rgba(96,165,250,.10);
+      border-color: rgba(96,165,250,.22);
+      color:#cfe3ff;
+    }
+
+    .rt-notfall{
+      background: rgba(245,158,11,.14);
+      border-color: rgba(245,158,11,.28);
+      color:#ffd39a;
+    }
+
+    .new{
+      margin-left:8px;
+      padding:2px 8px;
+      border-radius:999px;
+      border:1px solid var(--line);
+      background: rgba(245,158,11,.12);
+      color:#ffd39a;
+      font-size:11px;
+      font-weight:700;
+      letter-spacing:.04em;
+    }
+
+    .id{
+      margin-top:6px;
+    }
+
+    .open{
+      display:inline-flex;
+      align-items:center;
+      justify-content:center;
+      gap:8px;
+      padding:10px 12px;
+      border-radius:14px;
+      border:1px solid var(--line);
+      background: rgba(255,255,255,.06);
+      text-decoration:none;
+      font-weight:700;
+      white-space:nowrap;
+      color: var(--text);
+    }
+
+    .open:hover{
+      background: rgba(255,255,255,.10);
+    }
+
+    .tel a{
+      color:var(--text);
+      text-decoration:none;
+      font-weight:700;
+    }
+
+    .tel a:hover{
+      text-decoration:underline;
+    }
+
+    .actions{
+      display:flex;
+      gap:10px;
+      justify-content:flex-end;
+      align-items:center;
+      flex-wrap:wrap;
+    }
+
+    .quick{
+      display:flex;
+      gap:8px;
+      justify-content:flex-end;
+      align-items:center;
+    }
+
+    .quick select{
+      padding:8px 10px;
+    }
+
+    .quick button{
+      padding:8px 10px;
+    }
+
+    .archive-form{
+      display:flex;
+      align-items:center;
+    }
+
+    .archive-btn{
+      padding:10px 12px;
+      border-radius:14px;
+      border:1px solid rgba(239,68,68,.28);
+      background: rgba(239,68,68,.14);
+      color:#fecaca;
+      font-weight:800;
+      cursor:pointer;
+    }
+
+    .archive-btn:hover{
+      background: rgba(239,68,68,.22);
+    }
+
+    .right{
+      text-align:right;
+    }
+
+    .details-btn{
+      padding:10px 12px;
+      border-radius:14px;
+      border:1px solid var(--line);
+      background: rgba(255,255,255,.06);
+      font-weight:800;
+      cursor:pointer;
+    }
+
+    .details-btn:hover{
+      background: rgba(255,255,255,.10);
+    }
+
+    .modal-backdrop{
+      position:fixed;
+      inset:0;
+      background: rgba(3, 8, 20, .76);
+      backdrop-filter: blur(4px);
+      display:none;
+      align-items:center;
+      justify-content:center;
+      padding:16px;
+      z-index:50;
+    }
+
+    .modal{
+      width:min(960px, 100%);
+      background: #0d172b;
+      border:1px solid rgba(255,255,255,.12);
+      border-radius:18px;
+      box-shadow: 0 24px 60px rgba(0,0,0,.55);
+      overflow:hidden;
+    }
+
+    .modal-header{
+      display:flex;
+      justify-content:space-between;
+      gap:12px;
+      align-items:center;
+      padding:14px 16px;
+      border-bottom:1px solid rgba(255,255,255,.10);
+      background: #101d36;
+    }
+
+    .modal-title{
+      margin:0;
+      font-size:14px;
+      letter-spacing:.02em;
+      font-weight:900;
+      color:#f1f5f9;
+    }
+
+    .modal-close{
+      padding:8px 10px;
+      border-radius:12px;
+      border:1px solid rgba(255,255,255,.12);
+      background: rgba(255,255,255,.07);
+      cursor:pointer;
+      font-weight:900;
+    }
+
+    .modal-body{
+      padding:16px;
+      display:grid;
+      gap:14px;
+      background:#0d172b;
+    }
+
+    .modal-body .muted{
+      color:#b7c0cf;
+    }
+
+    .mini-card{
+      border:1px solid rgba(255,255,255,.10);
+      border-radius:16px;
+      padding:14px 16px;
+      background: #13213d;
+    }
+
+    .mini-card h3{
+      margin:0 0 10px 0;
+      font-size:13px;
+      font-weight:900;
+      color:#f1f5f9;
+    }
+
+    .kv{
+      display:grid;
+      grid-template-columns:160px 1fr;
+      gap:8px 12px;
+    }
+
+    .kv b{
+      color:#e2e8f0;
+    }
+
+    .debug-grid{
+      display:grid;
+      grid-template-columns: repeat(2, minmax(240px, 1fr));
+      gap:12px;
+    }
+
+    .debug-item{
+      padding:12px;
+      border-radius:14px;
+      border:1px solid rgba(255,255,255,.08);
+      background:#0f1b33;
+    }
+
+    .debug-label{
+      font-size:11px;
+      text-transform:uppercase;
+      letter-spacing:.08em;
+      color:#94a3b8;
+      margin-bottom:6px;
+      font-weight:800;
+    }
+
+    .debug-value{
+      color:#e5edf8;
+      font-size:13px;
+      line-height:1.5;
+      word-break:break-word;
+    }
+
+    .debug-list{
+      margin:0;
+      padding-left:18px;
+      color:#dbe6f5;
+      line-height:1.5;
+      font-size:13px;
+    }
+
+    .debug-list li + li{
+      margin-top:4px;
+    }
+
+    pre{
+      white-space: pre-wrap;
+      word-break: break-word;
+      overflow:auto;
+      max-height:340px;
+      background: #0a1222;
+      border:1px solid rgba(255,255,255,.10);
+      border-radius:14px;
+      padding:12px;
+      margin:0;
+      color:#dbe6f5;
+      line-height:1.5;
+      font-size:13px;
+    }
+
+    details{
+      border:1px solid rgba(255,255,255,.10);
+      border-radius:14px;
+      background: #13213d;
+      overflow:hidden;
+    }
+
+    summary{
+      cursor:pointer;
+      padding:10px 12px;
+      font-weight:900;
+      list-style:none;
+      color:#f1f5f9;
+      background:#101d36;
+    }
+
+    summary::-webkit-details-marker{
+      display:none;
+    }
+
+    .raw{
+      padding:12px;
+      border-top:1px solid rgba(255,255,255,.08);
+      background:#13213d;
+    }
+
+    .copy-btn{
+      padding:8px 10px;
+      border-radius:12px;
+      border:1px solid var(--line);
+      background: rgba(255,255,255,.06);
+      color: var(--text);
+      font-weight:900;
+      font-size:12px;
+      cursor:pointer;
+    }
+
+    .copy-btn:hover{
+      background: rgba(255,255,255,.10);
+    }
+
+    .copy-row{
+      display:flex;
+      gap:8px;
+      align-items:center;
+      flex-wrap:wrap;
+    }
+
+    .toast{
+      position: fixed;
+      right: 18px;
+      bottom: 18px;
+      padding: 10px 12px;
+      border-radius: 14px;
+      border: 1px solid var(--line);
+      background: rgba(0,0,0,.55);
+      color: var(--text);
+      box-shadow: var(--shadow);
+      font-weight: 900;
+      font-size: 12px;
+      opacity: 0;
+      transform: translateY(10px);
+      transition: opacity .18s ease, transform .18s ease;
+      pointer-events:none;
+      z-index:60;
+    }
+
+    .toast.show{
+      opacity:1;
+      transform: translateY(0);
+    }
+
+    @media (max-width: 1100px){
+      .cards{
+        grid-template-columns: repeat(3, minmax(160px,1fr));
+      }
+    }
+
+    @media (max-width: 980px){
+      th:nth-child(5), td:nth-child(5){
+        display:none;
+      }
+      .debug-grid{
+        grid-template-columns:1fr;
+      }
+    }
+
+    @media (max-width: 760px){
+      .cards{
+        grid-template-columns: repeat(2, minmax(160px,1fr));
+      }
+    }
+
+    @media (max-width: 600px){
+      .cards{
+        grid-template-columns:1fr;
+      }
+      th:nth-child(4), td:nth-child(4){
+        display:none;
+      }
+      .quick,
+      .actions{
+        justify-content:flex-start;
+      }
+      .kv{
+        grid-template-columns:1fr;
+      }
+    }
+  </style>
+</head>
+<body>
+  <div class="wrap">
+    <div class="top">
+      <div class="brand">
+        <h1>
+          {% if archive_mode %}
+            WerkstattAI – Archiv
+          {% else %}
+            WerkstattAI – Dashboard
+          {% endif %}
+        </h1>
+        <div class="sub">
+          {% if archive_mode %}
+            Archivierte Aufträge und Historie
+          {% else %}
+            Schnell. Übersichtlich. Für echte Werkstatt-Prozesse.
+          {% endif %}
+        </div>
+      </div>
+
+      <div class="switches">
+        <a class="nav-btn {% if not archive_mode %}active{% endif %}" href="/dashboard">Aktive Tickets</a>
+        <a class="nav-btn {% if archive_mode %}active{% endif %}" href="/dashboard/archive">Archiv</a>
+        <div class="chip">🔒 Intern • <span class="muted">MVP v1</span></div>
+      </div>
+    </div>
+
+    <div class="grid">
+      <div class="cards">
+        <div class="card kpi">
+          <div class="label">Offen</div>
+          <div class="value">{{ stats.offen or 0 }}</div>
+          <div class="hint">Neue / unbehandelte Anfragen</div>
+        </div>
+        <div class="card kpi">
+          <div class="label">In Bearbeitung</div>
+          <div class="value">{{ stats.in_bearbeitung or 0 }}</div>
+          <div class="hint">Mechaniker arbeitet dran</div>
+        </div>
+        <div class="card kpi">
+          <div class="label">Erledigt</div>
+          <div class="value">{{ stats.erledigt or 0 }}</div>
+          <div class="hint">Fertig / abgeschlossen</div>
+        </div>
+        <div class="card kpi">
+          <div class="label">Hohe Priorität</div>
+          <div class="value">{{ stats.hoch or 0 }}</div>
+          <div class="hint">Schnell prüfen</div>
+        </div>
+        <div class="card kpi">
+          <div class="label">Notfall-Typ</div>
+          <div class="value">{{ stats.notfall or 0 }}</div>
+          <div class="hint">Kritische Art der Anfrage</div>
+        </div>
+        <div class="card kpi">
+          <div class="label">Alle</div>
+          <div class="value">{{ stats.all or 0 }}</div>
+          <div class="hint">Gesamt in der Liste</div>
+        </div>
+      </div>
+
+      <div class="toolbar">
+        <form method="get" action="{% if archive_mode %}/dashboard/archive{% else %}/dashboard{% endif %}">
+          <select name="status">
+            <option value="all" {% if filters.status=="all" %}selected{% endif %}>Status: alle</option>
+            <option value="offen" {% if filters.status=="offen" %}selected{% endif %}>offen</option>
+            <option value="in_bearbeitung" {% if filters.status=="in_bearbeitung" %}selected{% endif %}>in bearbeitung</option>
+            <option value="erledigt" {% if filters.status=="erledigt" %}selected{% endif %}>erledigt</option>
+          </select>
+
+          <input type="text" name="q" placeholder="Suche: Fahrzeug, Problem, Telefon, ID, Priorität, Typ…" value="{{ filters.q }}" style="min-width:260px; flex:1" />
+
+          <select name="sort">
+            <option value="newest" {% if filters.sort=="newest" %}selected{% endif %}>Sort: neueste</option>
+            <option value="oldest" {% if filters.sort=="oldest" %}selected{% endif %}>Sort: älteste</option>
+            <option value="updated" {% if filters.sort=="updated" %}selected{% endif %}>Sort: zuletzt aktualisiert</option>
+            <option value="priority" {% if filters.sort=="priority" %}selected{% endif %}>Sort: Priorität</option>
+          </select>
+
+          <button type="submit">Anwenden</button>
+          <a class="btn-secondary" href="{% if archive_mode %}/dashboard/archive{% else %}/dashboard{% endif %}">Reset</a>
+        </form>
+      </div>
+
+      <div class="table">
+        <table>
+          <thead>
+            <tr>
+              <th>Status</th>
+              <th>Priorität</th>
+              <th>Fahrzeug</th>
+              <th>Problem</th>
+              <th>Telefon</th>
+              <th>Erstellt</th>
+              <th class="right">Aktion</th>
+            </tr>
+          </thead>
+          <tbody>
+            {% for t in tickets %}
+            <tr>
+              <td>
+                <span class="status s-{{ t.status_ui }}">
+                  <span class="dot"></span>
+                  {{ (t.status_ui or "-") | replace("_", " ") }}
+                </span>
+                {% if t.is_new and not archive_mode %}<span class="new">NEW</span>{% endif %}
+                <div class="muted id">ID: {{ t._id }}</div>
+              </td>
+
+              <td>
+                <span class="priority p-{{ t.priority or 'normal' }}">
+                  {{ t.priority or "normal" }}
+                </span>
+                <div>
+                  <span class="request-type rt-{{ t.request_type or 'diagnose' }}">
+                    {{ t.request_type or "diagnose" }}
+                  </span>
+                </div>
+              </td>
+
+              <td>
+                <div style="font-weight:800;">{{ t.fahrzeug or "-" }}</div>
+                <div class="muted">Kunde: {{ t.kunde_name or "-" }}</div>
+                <div class="muted">Baujahr: {{ t.baujahr or "-" }}</div>
+              </td>
+
+              <td>{{ t.problem or "-" }}</td>
+
+              <td class="tel">
+                {% if t.telefon %}
+                  <a href="tel:{{ t.telefon }}">{{ t.telefon }}</a>
+                {% else %}-{% endif %}
+              </td>
+
+              <td class="muted">{{ t.created_at }}</td>
+
+              <td class="right">
+                <div class="actions">
+                  <a class="open" href="/dashboard/ticket/{{ t._id }}">Öffnen →</a>
+
+                  <button
+                    class="details-btn"
+                    type="button"
+                    data-details='{{ t._details | tojson }}'
+                  >
+                    Details
+                  </button>
+
+                  {% if not archive_mode %}
+                  <form class="quick" method="post" action="/dashboard/ticket/{{ t._id }}/status_quick">
+                    <select name="status">
+                      <option value="offen" {% if t.status_ui=="offen" %}selected{% endif %}>offen</option>
+                      <option value="in_bearbeitung" {% if t.status_ui=="in_bearbeitung" %}selected{% endif %}>in bearbeitung</option>
+                      <option value="erledigt" {% if t.status_ui=="erledigt" %}selected{% endif %}>erledigt</option>
+                    </select>
+                    <button type="submit">Speichern</button>
+                  </form>
+
+                  {% if t.status_ui == "erledigt" %}
+                  <form
+                    class="archive-form"
+                    method="post"
+                    action="/dashboard/ticket/{{ t._id }}/archive"
+                    onsubmit="return confirm('Dieses Ticket wirklich archivieren?');"
+                  >
+                    <button class="archive-btn" type="submit">Archivieren</button>
+                  </form>
+                  {% endif %}
+                  {% endif %}
+                </div>
+              </td>
+            </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+
+        {% if tickets|length == 0 %}
+          <div style="padding:14px;" class="muted">
+            {% if archive_mode %}
+              Keine archivierten Tickets gefunden.
+            {% else %}
+              Keine Tickets gefunden (Filter/Suche?).
+            {% endif %}
+          </div>
+        {% endif %}
+      </div>
+    </div>
+  </div>
+
+  <div id="modalBackdrop" class="modal-backdrop" aria-hidden="true">
+    <div class="modal" role="dialog" aria-modal="true" aria-labelledby="modalTitle">
+      <div class="modal-header">
+        <div>
+          <div class="modal-title" id="modalTitle">Ticket Details</div>
+          <div class="muted" id="modalSubtitle"></div>
+        </div>
+        <button class="modal-close" type="button" id="modalClose">✕</button>
+      </div>
+
+      <div class="modal-body">
+        <div class="mini-card">
+          <h3>Kontakt</h3>
+          <div class="kv">
+            <b>Kunde</b><div class="muted" id="mKunde">-</div>
+            <b>Telefon</b>
+            <div class="copy-row">
+              <span class="muted" id="mTelefon">-</span>
+              <button class="copy-btn" type="button" data-copy="#mTelefon">Kopieren</button>
+            </div>
+            <b>Ticket-ID</b>
+            <div class="copy-row">
+              <span class="muted" id="mId">-</span>
+              <button class="copy-btn" type="button" data-copy="#mId">Kopieren</button>
+            </div>
+          </div>
+        </div>
+
+        <div class="mini-card">
+          <h3>Fahrzeug & Problem</h3>
+          <div class="kv">
+            <b>Fahrzeug</b><div class="muted" id="mFahrzeug">-</div>
+            <b>Baujahr</b><div class="muted" id="mBaujahr">-</div>
+            <b>Status</b><div class="muted" id="mStatus">-</div>
+            <b>Priorität</b><div class="muted" id="mPriority">-</div>
+            <b>Typ</b><div class="muted" id="mRequestType">-</div>
+            <b>Problem</b><div class="muted" id="mProblem">-</div>
+          </div>
+        </div>
+
+        <div class="mini-card">
+          <h3>Debug Übersicht</h3>
+          <div class="debug-grid">
+            <div class="debug-item">
+              <div class="debug-label">Backend Status</div>
+              <div class="debug-value" id="dStatusBackend">-</div>
+            </div>
+            <div class="debug-item">
+              <div class="debug-label">Priorität</div>
+              <div class="debug-value" id="dPriority">-</div>
+            </div>
+            <div class="debug-item">
+              <div class="debug-label">Request Type</div>
+              <div class="debug-value" id="dRequestType">-</div>
+            </div>
+            <div class="debug-item">
+              <div class="debug-label">Fahrbereit</div>
+              <div class="debug-value" id="dFahrbereit">-</div>
+            </div>
+            <div class="debug-item">
+              <div class="debug-label">Abschleppdienst</div>
+              <div class="debug-value" id="dAbschleppdienst">-</div>
+            </div>
+            <div class="debug-item">
+              <div class="debug-label">Kilometerstand</div>
+              <div class="debug-value" id="dKilometerstand">-</div>
+            </div>
+            <div class="debug-item">
+              <div class="debug-label">Interne ID</div>
+              <div class="debug-value" id="dInternalId">-</div>
+            </div>
+          </div>
+        </div>
+
+        <div class="mini-card">
+          <h3>Zeit & Workflow</h3>
+          <div class="debug-grid">
+            <div class="debug-item">
+              <div class="debug-label">Erstellt</div>
+              <div class="debug-value" id="dCreatedAt">-</div>
+            </div>
+            <div class="debug-item">
+              <div class="debug-label">Aktualisiert</div>
+              <div class="debug-value" id="dUpdatedAt">-</div>
+            </div>
+            <div class="debug-item">
+              <div class="debug-label">Follow-up Fragen</div>
+              <div class="debug-value" id="dFollowupQuestions">-</div>
+            </div>
+            <div class="debug-item">
+              <div class="debug-label">Follow-up Antworten</div>
+              <div class="debug-value" id="dFollowupAnswers">-</div>
+            </div>
+          </div>
+        </div>
+
+        <details>
+          <summary>Vollständiges Raw JSON anzeigen</summary>
+          <div class="raw">
+            <pre id="mRaw">{}</pre>
+          </div>
+        </details>
+      </div>
+    </div>
+  </div>
+
+  <div id="toast" class="toast">✅ Kopiert!</div>
+
+  <script>
+    const backdrop = document.getElementById("modalBackdrop");
+    const closeBtn = document.getElementById("modalClose");
+
+    function openModal() {
+      backdrop.style.display = "flex";
+      backdrop.setAttribute("aria-hidden", "false");
+    }
+
+    function closeModal() {
+      backdrop.style.display = "none";
+      backdrop.setAttribute("aria-hidden", "true");
+    }
+
+    backdrop.addEventListener("click", (e) => {
+      if (e.target === backdrop) closeModal();
+    });
+
+    closeBtn.addEventListener("click", closeModal);
+
+    document.addEventListener("keydown", (e) => {
+      if (e.key === "Escape") closeModal();
+    });
+
+    function setText(id, val) {
+      const el = document.getElementById(id);
+      el.textContent = (val === undefined || val === null || val === "") ? "-" : String(val);
+    }
+
+    function prettyStatus(val) {
+      if (val === undefined || val === null || val === "") return "-";
+      return String(val).replaceAll("_", " ");
+    }
+
+    function prettyValue(val) {
+      if (val === undefined || val === null || val === "") return "-";
+      if (typeof val === "boolean") return val ? "Ja" : "Nein";
+      return String(val);
+    }
+
+    function renderList(id, arr) {
+      const el = document.getElementById(id);
+
+      if (!Array.isArray(arr) || arr.length === 0) {
+        el.textContent = "-";
+        return;
+      }
+
+      const ul = document.createElement("ul");
+      ul.className = "debug-list";
+
+      arr.forEach((item) => {
+        const li = document.createElement("li");
+        li.textContent = item === undefined || item === null || item === "" ? "-" : String(item);
+        ul.appendChild(li);
+      });
+
+      el.innerHTML = "";
+      el.appendChild(ul);
+    }
+
+    async function copyText(text) {
+      try {
+        if (navigator.clipboard && window.isSecureContext) {
+          await navigator.clipboard.writeText(text);
+          return true;
+        }
+      } catch (e) {}
+
+      try {
+        const ta = document.createElement("textarea");
+        ta.value = text;
+        ta.style.position = "fixed";
+        ta.style.left = "-9999px";
+        ta.style.top = "-9999px";
+        document.body.appendChild(ta);
+        ta.focus();
+        ta.select();
+        const ok = document.execCommand("copy");
+        document.body.removeChild(ta);
+        return ok;
+      } catch (e) {
+        return false;
+      }
+    }
+
+    function showToast(msg) {
+      const t = document.getElementById("toast");
+      t.textContent = msg;
+      t.classList.add("show");
+      setTimeout(() => t.classList.remove("show"), 1100);
+    }
+
+    document.addEventListener("click", async (e) => {
+      const detailsBtn = e.target.closest("button[data-details]");
+      if (detailsBtn) {
+        let data;
+        try {
+          data = JSON.parse(detailsBtn.getAttribute("data-details"));
+        } catch (err) {
+          showToast("❌ Details konnten nicht geladen werden");
+          return;
+        }
+
+        setText("modalSubtitle", "ID: " + (data._id || data.id || data.ticket_id || "-"));
+        setText("mId", data._id || data.id || data.ticket_id || "-");
+        setText("mKunde", data.kunde_name || data.name || "-");
+        setText("mTelefon", data.telefon || "-");
+        setText("mFahrzeug", data.fahrzeug || "-");
+        setText("mBaujahr", data.baujahr || "-");
+        setText("mStatus", prettyStatus(data.status_ui || data.status || "-"));
+        setText("mPriority", prettyValue(data.priority || "-"));
+        setText("mRequestType", prettyValue(data.request_type || "-"));
+        setText("mProblem", data.problem || "-");
+
+        setText("dStatusBackend", prettyValue(data.status || "-"));
+        setText("dPriority", prettyValue(data.priority || "-"));
+        setText("dRequestType", prettyValue(data.request_type || "-"));
+        setText("dFahrbereit", prettyValue(data.fahrbereit || "-"));
+        setText("dAbschleppdienst", prettyValue(data.abschleppdienst || "-"));
+        setText("dKilometerstand", prettyValue(data.kilometerstand || "-"));
+        setText("dInternalId", prettyValue(data._id || data.id || data.ticket_id || "-"));
+        setText("dCreatedAt", prettyValue(data.created_at || "-"));
+        setText("dUpdatedAt", prettyValue(data.updated_at || "-"));
+
+        renderList("dFollowupQuestions", data.followup_questions);
+        renderList("dFollowupAnswers", data.followup_answers);
+
+        document.getElementById("mRaw").textContent = JSON.stringify(data, null, 2);
+
+        openModal();
+        return;
+      }
+
+      const copyBtn = e.target.closest("button[data-copy]");
+      if (copyBtn) {
+        const selector = copyBtn.getAttribute("data-copy");
+        const el = document.querySelector(selector);
+        const text = (el ? el.textContent : "").trim();
+
+        if (!text || text === "-") {
+          showToast("⚠️ Nichts zum Kopieren");
+          return;
+        }
+
+        const ok = await copyText(text);
+        showToast(ok ? "✅ Kopiert!" : "❌ Kopieren fehlgeschlagen");
+      }
+    });
+
+    const AUTO_REFRESH_MS = 15000;
+
+    setInterval(() => {
+      if (document.hidden) return;
+      if (backdrop.style.display === "flex") return;
+
+      const active = document.activeElement;
+      const tag = active ? active.tagName : "";
+      if (tag === "INPUT" || tag === "TEXTAREA" || tag === "SELECT") return;
+
+      window.location.reload();
+    }, AUTO_REFRESH_MS);
+  </script>
+</body>
+</html>

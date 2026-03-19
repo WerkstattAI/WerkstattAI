@@ -1,0 +1,672 @@
+<!doctype html>
+<html lang="de">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>WerkstattAI – Kundenchat</title>
+  <style>
+    :root{
+      --bg:#0b1220;
+      --panel:#0f1a2e;
+      --panel-2:#13213d;
+      --line:rgba(255,255,255,.08);
+      --text:#e6eaf0;
+      --muted:#9aa4b2;
+      --accent:#60a5fa;
+      --accent-soft:rgba(96,165,250,.14);
+      --user:#1d4ed8;
+      --bot:#18253f;
+      --shadow:0 10px 30px rgba(0,0,0,.35);
+      --r:20px;
+    }
+
+    *{box-sizing:border-box}
+
+    body{
+      margin:0;
+      font-family:system-ui,-apple-system,Segoe UI,Roboto,Arial,sans-serif;
+      background:
+        radial-gradient(1200px 600px at 20% -10%, #1d3a8a33, transparent 60%),
+        radial-gradient(1000px 500px at 90% 0%, #0ea5e933, transparent 60%),
+        var(--bg);
+      color:var(--text);
+      min-height:100vh;
+    }
+
+    .wrap{
+      max-width:1100px;
+      margin:0 auto;
+      padding:24px;
+    }
+
+    .top{
+      display:flex;
+      justify-content:space-between;
+      align-items:center;
+      gap:14px;
+      flex-wrap:wrap;
+      margin-bottom:18px;
+    }
+
+    .brand h1{
+      margin:0;
+      font-size:22px;
+      letter-spacing:.2px;
+    }
+
+    .brand .sub{
+      margin-top:6px;
+      color:var(--muted);
+      font-size:13px;
+    }
+
+    .top-actions{
+      display:flex;
+      gap:10px;
+      flex-wrap:wrap;
+      align-items:center;
+    }
+
+    .link-btn{
+      display:inline-flex;
+      align-items:center;
+      gap:8px;
+      padding:10px 12px;
+      border-radius:14px;
+      border:1px solid var(--line);
+      background:rgba(255,255,255,.06);
+      color:var(--text);
+      text-decoration:none;
+      font-weight:800;
+    }
+
+    .shell{
+      display:grid;
+      grid-template-columns: 320px 1fr;
+      gap:16px;
+      align-items:start;
+    }
+
+    .card{
+      background:linear-gradient(180deg, rgba(255,255,255,.06), rgba(255,255,255,.03));
+      border:1px solid var(--line);
+      border-radius:var(--r);
+      box-shadow:var(--shadow);
+    }
+
+    .side{
+      padding:16px;
+    }
+
+    .side h2{
+      margin:0 0 12px 0;
+      font-size:15px;
+    }
+
+    .hint-box{
+      padding:12px;
+      border-radius:16px;
+      background:#13213d;
+      border:1px solid rgba(255,255,255,.08);
+      margin-bottom:12px;
+    }
+
+    .hint-title{
+      font-size:12px;
+      font-weight:900;
+      text-transform:uppercase;
+      letter-spacing:.08em;
+      color:#9fb3cc;
+      margin-bottom:8px;
+    }
+
+    .hint-text{
+      font-size:13px;
+      color:#d7deea;
+      line-height:1.5;
+    }
+
+    .session-box{
+      margin-top:14px;
+      padding:12px;
+      border-radius:16px;
+      background:#0f1b33;
+      border:1px solid rgba(255,255,255,.08);
+    }
+
+    .session-label{
+      font-size:12px;
+      color:#9fb3cc;
+      font-weight:800;
+      text-transform:uppercase;
+      letter-spacing:.08em;
+      margin-bottom:8px;
+    }
+
+    .session-id{
+      font-family:ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+      font-size:12px;
+      line-height:1.5;
+      word-break:break-word;
+      color:#e5edf8;
+    }
+
+    .chat-card{
+      min-height:720px;
+      display:flex;
+      flex-direction:column;
+      overflow:hidden;
+    }
+
+    .chat-header{
+      display:flex;
+      justify-content:space-between;
+      align-items:center;
+      gap:12px;
+      padding:16px 18px;
+      border-bottom:1px solid var(--line);
+      background:#101d36;
+    }
+
+    .chat-header h2{
+      margin:0;
+      font-size:15px;
+    }
+
+    .chat-header .muted{
+      color:var(--muted);
+      font-size:12px;
+    }
+
+    .chat-status{
+      display:inline-flex;
+      align-items:center;
+      gap:8px;
+      padding:8px 12px;
+      border-radius:999px;
+      border:1px solid var(--line);
+      background:rgba(255,255,255,.05);
+      font-size:12px;
+      font-weight:800;
+      color:#dbe6f5;
+    }
+
+    .chat-status .dot{
+      width:8px;
+      height:8px;
+      border-radius:999px;
+      background:#22c55e;
+    }
+
+    .messages{
+      flex:1;
+      padding:18px;
+      overflow:auto;
+      display:flex;
+      flex-direction:column;
+      gap:12px;
+      background:rgba(0,0,0,.08);
+    }
+
+    .message-row{
+      display:flex;
+      width:100%;
+    }
+
+    .message-row.bot{
+      justify-content:flex-start;
+    }
+
+    .message-row.user{
+      justify-content:flex-end;
+    }
+
+    .bubble{
+      max-width:min(78%, 720px);
+      padding:12px 14px;
+      border-radius:18px;
+      line-height:1.55;
+      font-size:14px;
+      white-space:pre-wrap;
+      word-break:break-word;
+      box-shadow:0 8px 22px rgba(0,0,0,.18);
+      border:1px solid rgba(255,255,255,.06);
+    }
+
+    .message-row.bot .bubble{
+      background:var(--bot);
+      color:#e8eef9;
+      border-top-left-radius:8px;
+    }
+
+    .message-row.user .bubble{
+      background:linear-gradient(180deg, rgba(37,99,235,.95), rgba(29,78,216,.9));
+      color:white;
+      border-top-right-radius:8px;
+    }
+
+    .meta{
+      margin-top:6px;
+      font-size:11px;
+      color:#97a6bb;
+    }
+
+    .composer{
+      border-top:1px solid var(--line);
+      background:#101d36;
+      padding:14px;
+    }
+
+    .composer-form{
+      display:flex;
+      gap:10px;
+      align-items:flex-end;
+    }
+
+    .input-wrap{
+      flex:1;
+      display:flex;
+      flex-direction:column;
+      gap:8px;
+    }
+
+    textarea{
+      width:100%;
+      min-height:58px;
+      max-height:180px;
+      resize:vertical;
+      padding:14px 14px;
+      border-radius:16px;
+      border:1px solid var(--line);
+      background:#0f1a2e;
+      color:var(--text);
+      font:inherit;
+      outline:none;
+    }
+
+    textarea::placeholder{
+      color:#7f8aa0;
+    }
+
+    .helper{
+      display:flex;
+      justify-content:space-between;
+      gap:10px;
+      flex-wrap:wrap;
+      font-size:12px;
+      color:var(--muted);
+    }
+
+    .send-btn, .ghost-btn{
+      padding:12px 16px;
+      border-radius:16px;
+      border:1px solid var(--line);
+      font-weight:800;
+      cursor:pointer;
+      color:var(--text);
+    }
+
+    .send-btn{
+      background:linear-gradient(180deg, rgba(96,165,250,.25), rgba(96,165,250,.12));
+      min-width:110px;
+    }
+
+    .ghost-btn{
+      background:rgba(255,255,255,.06);
+    }
+
+    .done-box{
+      margin-top:10px;
+      padding:12px 14px;
+      border-radius:16px;
+      border:1px solid rgba(34,197,94,.22);
+      background:rgba(34,197,94,.12);
+      color:#d9ffe7;
+      font-size:13px;
+      line-height:1.6;
+      display:none;
+      white-space:pre-wrap;
+    }
+
+    .typing{
+      display:none;
+      align-items:center;
+      gap:10px;
+      color:#a8b5c7;
+      font-size:12px;
+      padding:0 18px 10px 18px;
+      background:rgba(0,0,0,.08);
+    }
+
+    .typing-dots{
+      display:inline-flex;
+      gap:5px;
+    }
+
+    .typing-dots span{
+      width:7px;
+      height:7px;
+      border-radius:999px;
+      background:#8ea4bf;
+      opacity:.55;
+      animation:blink 1.2s infinite ease-in-out;
+    }
+
+    .typing-dots span:nth-child(2){animation-delay:.15s}
+    .typing-dots span:nth-child(3){animation-delay:.30s}
+
+    @keyframes blink{
+      0%, 80%, 100%{transform:scale(.7); opacity:.4}
+      40%{transform:scale(1); opacity:1}
+    }
+
+    @media (max-width: 920px){
+      .shell{
+        grid-template-columns:1fr;
+      }
+
+      .chat-card{
+        min-height:680px;
+      }
+    }
+
+    @media (max-width: 640px){
+      .wrap{
+        padding:14px;
+      }
+
+      .messages{
+        padding:14px;
+      }
+
+      .bubble{
+        max-width:88%;
+      }
+
+      .composer-form{
+        flex-direction:column;
+        align-items:stretch;
+      }
+
+      .send-btn, .ghost-btn{
+        width:100%;
+      }
+    }
+  </style>
+</head>
+<body>
+  <div class="wrap">
+    <div class="top">
+      <div class="brand">
+        <h1>WerkstattAI – Kundenchat</h1>
+        <div class="sub">Testumgebung für den Werkstatt-Assistenten</div>
+      </div>
+
+      <div class="top-actions">
+        <a class="link-btn" href="/dashboard">Zum Dashboard</a>
+        <a class="link-btn" href="/docs">Swagger</a>
+      </div>
+    </div>
+
+    <div class="shell">
+      <div class="card side">
+        <h2>Hinweise</h2>
+
+        <div class="hint-box">
+          <div class="hint-title">Was diese Seite macht</div>
+          <div class="hint-text">
+            Hier kannst du den Kundenchat so testen, wie ihn später ein echter Kunde nutzen würde.
+            Jede Nachricht geht an dein bestehendes <code>/chat</code>-Backend.
+          </div>
+        </div>
+
+        <div class="hint-box">
+          <div class="hint-title">Am besten testen</div>
+          <div class="hint-text">
+            Schreib einfach natürlich, zum Beispiel:
+            <br><br>
+            „Mercedes C180 2014 180000 km“
+            <br>
+            „Auto springt nicht mehr an“
+          </div>
+        </div>
+
+        <div class="hint-box">
+          <div class="hint-title">Ergebnis</div>
+          <div class="hint-text">
+            Wenn der Chat fertig ist, wird automatisch ein Ticket erstellt und erscheint im Dashboard.
+          </div>
+        </div>
+
+        <div class="session-box">
+          <div class="session-label">Session-ID</div>
+          <div class="session-id" id="sessionIdBox">-</div>
+        </div>
+      </div>
+
+      <div class="card chat-card">
+        <div class="chat-header">
+          <div>
+            <h2>Kundenchat</h2>
+            <div class="muted">WerkstattAI fragt Schritt für Schritt die Daten ab.</div>
+          </div>
+
+          <div class="chat-status">
+            <span class="dot"></span>
+            Online
+          </div>
+        </div>
+
+        <div class="messages" id="messages"></div>
+
+        <div class="typing" id="typing">
+          <span>WerkstattAI schreibt</span>
+          <span class="typing-dots">
+            <span></span><span></span><span></span>
+          </span>
+        </div>
+
+        <div class="composer">
+          <form class="composer-form" id="chatForm">
+            <div class="input-wrap">
+              <textarea
+                id="messageInput"
+                placeholder="Nachricht eingeben..."
+                required
+              ></textarea>
+
+              <div class="helper">
+                <span>Enter = senden • Shift+Enter = neue Zeile</span>
+                <span id="charCount">0 Zeichen</span>
+              </div>
+            </div>
+
+            <button class="ghost-btn" type="button" id="resetBtn">Neu starten</button>
+            <button class="send-btn" type="submit" id="sendBtn">Senden</button>
+          </form>
+
+          <div class="done-box" id="doneBox"></div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    const messagesEl = document.getElementById("messages");
+    const formEl = document.getElementById("chatForm");
+    const inputEl = document.getElementById("messageInput");
+    const sendBtn = document.getElementById("sendBtn");
+    const resetBtn = document.getElementById("resetBtn");
+    const typingEl = document.getElementById("typing");
+    const doneBoxEl = document.getElementById("doneBox");
+    const charCountEl = document.getElementById("charCount");
+    const sessionIdBox = document.getElementById("sessionIdBox");
+
+    function createSessionId() {
+      return "session-" + Math.random().toString(36).slice(2) + "-" + Date.now();
+    }
+
+    let sessionId = localStorage.getItem("werkstattai_session_id") || createSessionId();
+    localStorage.setItem("werkstattai_session_id", sessionId);
+    sessionIdBox.textContent = sessionId;
+
+    function scrollToBottom() {
+      messagesEl.scrollTop = messagesEl.scrollHeight;
+    }
+
+    function addMessage(role, text, meta = "") {
+      const row = document.createElement("div");
+      row.className = `message-row ${role}`;
+
+      const inner = document.createElement("div");
+
+      const bubble = document.createElement("div");
+      bubble.className = "bubble";
+      bubble.textContent = text;
+
+      const metaEl = document.createElement("div");
+      metaEl.className = "meta";
+      metaEl.textContent = meta || (role === "user" ? "Du" : "WerkstattAI");
+
+      inner.appendChild(bubble);
+      inner.appendChild(metaEl);
+      row.appendChild(inner);
+      messagesEl.appendChild(row);
+
+      scrollToBottom();
+    }
+
+    function setLoading(isLoading) {
+      sendBtn.disabled = isLoading;
+      inputEl.disabled = isLoading;
+      resetBtn.disabled = isLoading;
+      typingEl.style.display = isLoading ? "flex" : "none";
+      if (!isLoading) {
+        inputEl.focus();
+      }
+    }
+
+    function updateCount() {
+      charCountEl.textContent = `${inputEl.value.length} Zeichen`;
+    }
+
+    async function sendToBackend(message, isStart = false) {
+      const response = await fetch("/chat", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          session_id: sessionId,
+          message: isStart ? null : message
+        }),
+      });
+
+      if (!response.ok) {
+        throw new Error("Serverfehler beim Senden der Nachricht.");
+      }
+
+      return response.json();
+    }
+
+    function renderDoneBox(data) {
+      const ticketId = data?.data?.ticket_id || "-";
+      const requestType = data?.data?.request_type || "-";
+      const priority = data?.data?.priority || "-";
+
+      doneBoxEl.style.display = "block";
+      doneBoxEl.textContent =
+        "Der Vorgang wurde abgeschlossen.\n" +
+        `Ticket-ID: ${ticketId}\n` +
+        `Typ: ${requestType}\n` +
+        `Priorität: ${priority}\n\n` +
+        "Das Ticket sollte jetzt im Dashboard sichtbar sein.";
+    }
+
+    async function startConversation() {
+      messagesEl.innerHTML = "";
+      doneBoxEl.style.display = "none";
+      doneBoxEl.textContent = "";
+
+      setLoading(true);
+
+      try {
+        const data = await sendToBackend(null, true);
+        if (data.reply) {
+          addMessage("bot", data.reply, "WerkstattAI");
+        }
+      } catch (error) {
+        addMessage(
+          "bot",
+          "Der Chat konnte nicht gestartet werden. Bitte Seite neu laden.",
+          "System"
+        );
+      } finally {
+        setLoading(false);
+      }
+    }
+
+    async function sendMessage(message) {
+      setLoading(true);
+
+      try {
+        const data = await sendToBackend(message);
+
+        if (data.reply) {
+          addMessage("bot", data.reply, "WerkstattAI");
+        }
+
+        if (data.done) {
+          renderDoneBox(data);
+        }
+      } catch (error) {
+        addMessage(
+          "bot",
+          "Es ist ein Fehler aufgetreten. Bitte versuche es erneut.",
+          "System"
+        );
+      } finally {
+        setLoading(false);
+      }
+    }
+
+    async function resetChat() {
+      sessionId = createSessionId();
+      localStorage.setItem("werkstattai_session_id", sessionId);
+      sessionIdBox.textContent = sessionId;
+
+      inputEl.value = "";
+      updateCount();
+
+      await startConversation();
+    }
+
+    formEl.addEventListener("submit", async (e) => {
+      e.preventDefault();
+
+      const message = inputEl.value.trim();
+      if (!message) return;
+
+      addMessage("user", message, "Du");
+      inputEl.value = "";
+      updateCount();
+
+      await sendMessage(message);
+    });
+
+    inputEl.addEventListener("input", updateCount);
+
+    inputEl.addEventListener("keydown", (e) => {
+      if (e.key === "Enter" && !e.shiftKey) {
+        e.preventDefault();
+        formEl.requestSubmit();
+      }
+    });
+
+    resetBtn.addEventListener("click", resetChat);
+
+    updateCount();
+    startConversation();
+  </script>
+</body>
+</html>

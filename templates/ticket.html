@@ -1,0 +1,640 @@
+<!doctype html>
+<html lang="de">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>Ticket</title>
+  <style>
+    :root{
+      --bg:#0b1220;
+      --card:#0f1a2e;
+      --muted:#9aa4b2;
+      --text:#e6eaf0;
+      --line:rgba(255,255,255,.08);
+      --shadow: 0 10px 30px rgba(0,0,0,.35);
+      --r:18px;
+      --warn:#f59e0b;
+      --info:#60a5fa;
+      --ok:#22c55e;
+      --danger:#ef4444;
+    }
+
+    *{box-sizing:border-box}
+
+    body{
+      margin:0;
+      font-family: system-ui, -apple-system, Segoe UI, Roboto, Arial, sans-serif;
+      background:
+        radial-gradient(1200px 600px at 20% -10%, #1d3a8a33, transparent 60%),
+        radial-gradient(1000px 500px at 90% 0%, #0ea5e933, transparent 60%),
+        var(--bg);
+      color:var(--text);
+    }
+
+    .wrap{
+      max-width:1100px;
+      margin:0 auto;
+      padding:22px;
+    }
+
+    a{
+      color:var(--text);
+      text-decoration:none;
+      font-weight:700;
+    }
+
+    a:hover{text-decoration:underline}
+
+    .muted{
+      color:var(--muted);
+      font-size:12px;
+    }
+
+    .card{
+      background: linear-gradient(180deg, rgba(255,255,255,.06), rgba(255,255,255,.03));
+      border:1px solid var(--line);
+      border-radius: var(--r);
+      box-shadow: var(--shadow);
+      padding:14px 16px;
+    }
+
+    .top{
+      display:flex;
+      justify-content:space-between;
+      gap:12px;
+      flex-wrap:wrap;
+      align-items:center;
+      margin-bottom:12px;
+    }
+
+    .title{
+      margin:0;
+      font-size:18px;
+    }
+
+    .title-row{
+      display:flex;
+      gap:10px;
+      align-items:center;
+      flex-wrap:wrap;
+    }
+
+    .grid{
+      display:grid;
+      grid-template-columns: repeat(3, minmax(220px, 1fr));
+      gap:12px;
+    }
+
+    .row{
+      margin-top:12px;
+      display:grid;
+      grid-template-columns: 1fr;
+      gap:12px;
+    }
+
+    .status{
+      display:inline-flex;
+      align-items:center;
+      gap:8px;
+      padding:4px 10px;
+      border-radius:999px;
+      border:1px solid var(--line);
+      background: rgba(255,255,255,.04);
+      font-size:12px;
+      font-weight:800;
+      text-transform:capitalize;
+    }
+
+    .dot{
+      width:8px;
+      height:8px;
+      border-radius:999px;
+    }
+
+    .s-offen .dot{background:var(--warn)}
+    .s-in_bearbeitung .dot{background:var(--info)}
+    .s-erledigt .dot{background:var(--ok)}
+    .s-archiviert .dot{background:#94a3b8}
+    .s-geschlossen .dot{background:var(--ok)} /* fallback */
+
+    .badge-row{
+      display:flex;
+      gap:8px;
+      flex-wrap:wrap;
+      margin-top:8px;
+    }
+
+    .priority{
+      display:inline-flex;
+      align-items:center;
+      gap:6px;
+      padding:4px 10px;
+      border-radius:999px;
+      border:1px solid var(--line);
+      font-size:12px;
+      font-weight:800;
+      text-transform:uppercase;
+      letter-spacing:.04em;
+    }
+
+    .p-niedrig{
+      background: rgba(34,197,94,.12);
+      border-color: rgba(34,197,94,.24);
+      color:#bbf7d0;
+    }
+
+    .p-normal{
+      background: rgba(255,255,255,.04);
+      color:#dbe6f5;
+    }
+
+    .p-hoch{
+      background: rgba(239,68,68,.14);
+      border-color: rgba(239,68,68,.28);
+      color:#fecaca;
+    }
+
+    .request-type{
+      display:inline-flex;
+      align-items:center;
+      gap:6px;
+      padding:4px 10px;
+      border-radius:999px;
+      border:1px solid var(--line);
+      font-size:12px;
+      font-weight:800;
+      text-transform:uppercase;
+      letter-spacing:.04em;
+    }
+
+    .rt-service{
+      background: rgba(34,197,94,.10);
+      border-color: rgba(34,197,94,.22);
+      color:#bbf7d0;
+    }
+
+    .rt-diagnose{
+      background: rgba(96,165,250,.10);
+      border-color: rgba(96,165,250,.22);
+      color:#cfe3ff;
+    }
+
+    .rt-notfall{
+      background: rgba(245,158,11,.14);
+      border-color: rgba(245,158,11,.28);
+      color:#ffd39a;
+    }
+
+    input, select, button{
+      padding:10px 12px;
+      border-radius:14px;
+      border:1px solid var(--line);
+      background: rgba(15,26,46,.7);
+      color:var(--text);
+    }
+
+    button{
+      cursor:pointer;
+      font-weight:700;
+    }
+
+    .copy-btn{
+      padding:8px 10px;
+      border-radius:12px;
+      border:1px solid var(--line);
+      background: rgba(255,255,255,.06);
+      color: var(--text);
+      font-weight:800;
+      font-size:12px;
+    }
+
+    .copy-btn:hover{
+      background: rgba(255,255,255,.10);
+    }
+
+    .archive-btn{
+      padding:10px 12px;
+      border-radius:14px;
+      border:1px solid rgba(239,68,68,.28);
+      background: rgba(239,68,68,.14);
+      color:#fecaca;
+      font-weight:800;
+    }
+
+    .archive-btn:hover{
+      background: rgba(239,68,68,.22);
+    }
+
+    .copy-wrap{
+      display:inline-flex;
+      gap:8px;
+      align-items:center;
+    }
+
+    .mini{
+      font-size:12px;
+      color: var(--muted);
+      font-weight:700;
+    }
+
+    .actions{
+      display:flex;
+      gap:10px;
+      flex-wrap:wrap;
+      align-items:flex-end;
+    }
+
+    details{
+      margin-top:12px;
+      border:1px solid rgba(255,255,255,.10);
+      border-radius:14px;
+      background: #13213d;
+      overflow:hidden;
+    }
+
+    summary{
+      cursor:pointer;
+      padding:10px 12px;
+      font-weight:800;
+      list-style:none;
+      color:#f1f5f9;
+      background:#101d36;
+    }
+
+    summary::-webkit-details-marker{
+      display:none;
+    }
+
+    .raw{
+      padding:12px;
+      border-top:1px solid rgba(255,255,255,.08);
+      background:#13213d;
+    }
+
+    pre{
+      white-space: pre-wrap;
+      word-break: break-word;
+      overflow:auto;
+      max-height:360px;
+      background: #0a1222;
+      border:1px solid rgba(255,255,255,.10);
+      border-radius:14px;
+      padding:12px;
+      margin:0;
+      color:#dbe6f5;
+      line-height:1.5;
+      font-size:13px;
+    }
+
+    .kv{
+      display:grid;
+      grid-template-columns:160px 1fr;
+      gap:8px 12px;
+      margin-top:10px;
+    }
+
+    .kv b{
+      color:#cfd6e3;
+    }
+
+    .divider{
+      height:1px;
+      background:var(--line);
+      margin:12px 0;
+    }
+
+    .debug-grid{
+      display:grid;
+      grid-template-columns: repeat(2, minmax(240px, 1fr));
+      gap:12px;
+      margin-top:12px;
+    }
+
+    .debug-item{
+      padding:12px;
+      border-radius:14px;
+      border:1px solid rgba(255,255,255,.08);
+      background:#0f1b33;
+    }
+
+    .debug-label{
+      font-size:11px;
+      text-transform:uppercase;
+      letter-spacing:.08em;
+      color:#94a3b8;
+      margin-bottom:6px;
+      font-weight:800;
+    }
+
+    .debug-value{
+      color:#e5edf8;
+      font-size:13px;
+      line-height:1.5;
+      word-break:break-word;
+    }
+
+    .debug-list{
+      margin:0;
+      padding-left:18px;
+      color:#dbe6f5;
+      line-height:1.5;
+      font-size:13px;
+    }
+
+    .debug-list li + li{
+      margin-top:4px;
+    }
+
+    .toast{
+      position:fixed;
+      right:18px;
+      bottom:18px;
+      padding:10px 12px;
+      border-radius:14px;
+      border:1px solid var(--line);
+      background: rgba(0,0,0,.55);
+      color:var(--text);
+      box-shadow: var(--shadow);
+      font-weight:800;
+      font-size:12px;
+      opacity:0;
+      transform: translateY(10px);
+      transition: opacity .18s ease, transform .18s ease;
+      pointer-events:none;
+    }
+
+    .toast.show{
+      opacity:1;
+      transform: translateY(0);
+    }
+
+    @media (max-width: 900px){
+      .grid{
+        grid-template-columns: 1fr;
+      }
+
+      .kv{
+        grid-template-columns: 1fr;
+      }
+
+      .debug-grid{
+        grid-template-columns:1fr;
+      }
+    }
+  </style>
+</head>
+<body>
+  <div class="wrap">
+    <div class="top">
+      <div>
+        <a href="/dashboard">← Zurück</a>
+
+        <div class="title-row">
+          <h1 class="title">Ticket <span id="ticketIdText">{{ ticket._id }}</span></h1>
+
+          <div class="copy-wrap">
+            <button class="copy-btn" type="button" data-copy="#ticketIdText">Kopieren</button>
+            <span class="mini">ID</span>
+          </div>
+        </div>
+
+        <div class="muted">Übersicht und Status-Management</div>
+      </div>
+
+      <div class="card">
+        <div class="muted">Status</div>
+        <div style="margin-top:6px;">
+          <span class="status s-{{ ticket.status_ui }}">
+            <span class="dot"></span>
+            {{ (ticket.status_ui or "-") | replace("_", " ") }}
+          </span>
+        </div>
+
+        <div class="badge-row">
+          <span class="priority p-{{ ticket.priority or 'normal' }}">
+            {{ ticket.priority or "-" }}
+          </span>
+          <span class="request-type rt-{{ ticket.request_type or 'diagnose' }}">
+            {{ ticket.request_type or "-" }}
+          </span>
+        </div>
+      </div>
+    </div>
+
+    <div class="grid">
+      <div class="card">
+        <div class="muted">Fahrzeug</div>
+        <div style="font-size:18px; font-weight:900; margin-top:6px;">{{ ticket.fahrzeug or "-" }}</div>
+        <div class="muted" style="margin-top:6px;">Baujahr: {{ ticket.baujahr or "-" }}</div>
+        <div class="muted" style="margin-top:6px;">Kilometerstand: {{ ticket.kilometerstand or "-" }}</div>
+      </div>
+
+      <div class="card">
+        <div class="muted">Kontakt</div>
+
+        <div class="kv">
+          <b>Kunde</b>
+          <div class="muted">{{ ticket.kunde_name or ticket.name or "-" }}</div>
+
+          <b>Telefon</b>
+          <div style="display:flex; gap:10px; align-items:center; flex-wrap:wrap;">
+            {% if ticket.telefon %}
+              <a href="tel:{{ ticket.telefon }}" id="phoneText">{{ ticket.telefon }}</a>
+              <button class="copy-btn" type="button" data-copy="#phoneText">Kopieren</button>
+            {% else %}
+              <span class="muted" id="phoneText">-</span>
+              <button class="copy-btn" type="button" data-copy="#phoneText" disabled style="opacity:.5; cursor:not-allowed;">Kopieren</button>
+            {% endif %}
+          </div>
+
+          <b>Session</b>
+          <div class="muted">{{ ticket.session_id or "-" }}</div>
+        </div>
+      </div>
+
+      <div class="card">
+        <div class="muted">Zeit</div>
+        <div style="margin-top:10px;" class="kv">
+          <b>Erstellt</b>
+          <div class="muted">{{ ticket.created_at or "-" }}</div>
+          <b>Aktualisiert</b>
+          <div class="muted">{{ ticket.updated_at or "-" }}</div>
+        </div>
+      </div>
+    </div>
+
+    <div class="row">
+      <div class="card">
+        <div class="muted">Problem</div>
+        <div style="font-size:20px; font-weight:900; margin-top:6px;">{{ ticket.problem or "-" }}</div>
+      </div>
+
+      <div class="card">
+        <div class="actions">
+          <form method="post" action="/dashboard/ticket/{{ ticket._id }}/status" style="display:flex; gap:10px; flex-wrap:wrap; align-items:flex-end; flex:1;">
+            <div style="min-width:260px; flex:1;">
+              <div class="muted">Status ändern</div>
+              <select name="status" style="margin-top:6px; width:100%;">
+                <option value="offen" {% if ticket.status_ui=="offen" %}selected{% endif %}>offen</option>
+                <option value="in_bearbeitung" {% if ticket.status_ui=="in_bearbeitung" %}selected{% endif %}>in bearbeitung</option>
+                <option value="erledigt" {% if ticket.status_ui=="erledigt" %}selected{% endif %}>erledigt</option>
+              </select>
+            </div>
+            <div>
+              <button type="submit">Speichern</button>
+            </div>
+          </form>
+
+          {% if ticket.status_ui == "erledigt" %}
+          <form
+            method="post"
+            action="/dashboard/ticket/{{ ticket._id }}/archive"
+            onsubmit="return confirm('Dieses Ticket wirklich archivieren?');"
+          >
+            <button class="archive-btn" type="submit">Archivieren</button>
+          </form>
+          {% endif %}
+        </div>
+
+        <div class="divider"></div>
+
+        <div class="muted">Daten</div>
+
+        <div class="kv">
+          <b>Kunde</b><div class="muted">{{ ticket.kunde_name or ticket.name or "-" }}</div>
+          <b>Fahrzeug</b><div class="muted">{{ ticket.fahrzeug or "-" }}</div>
+          <b>Baujahr</b><div class="muted">{{ ticket.baujahr or "-" }}</div>
+          <b>Kilometerstand</b><div class="muted">{{ ticket.kilometerstand or "-" }}</div>
+          <b>Telefon</b><div class="muted">{{ ticket.telefon or "-" }}</div>
+          <b>Priorität</b><div class="muted">{{ ticket.priority or "-" }}</div>
+          <b>Typ</b><div class="muted">{{ ticket.request_type or "-" }}</div>
+        </div>
+
+        <div class="debug-grid">
+          <div class="debug-item">
+            <div class="debug-label">Backend Status</div>
+            <div class="debug-value">{{ ticket.status or "-" }}</div>
+          </div>
+          <div class="debug-item">
+            <div class="debug-label">Priorität</div>
+            <div class="debug-value">{{ ticket.priority or "-" }}</div>
+          </div>
+          <div class="debug-item">
+            <div class="debug-label">Request Type</div>
+            <div class="debug-value">{{ ticket.request_type or "-" }}</div>
+          </div>
+          <div class="debug-item">
+            <div class="debug-label">Fahrbereit</div>
+            <div class="debug-value">{{ ticket.fahrbereit or "-" }}</div>
+          </div>
+          <div class="debug-item">
+            <div class="debug-label">Abschleppdienst</div>
+            <div class="debug-value">{{ ticket.abschleppdienst or "-" }}</div>
+          </div>
+          <div class="debug-item">
+            <div class="debug-label">Kilometerstand</div>
+            <div class="debug-value">{{ ticket.kilometerstand or "-" }}</div>
+          </div>
+          <div class="debug-item">
+            <div class="debug-label">Ticket-ID</div>
+            <div class="debug-value">{{ ticket._id or "-" }}</div>
+          </div>
+        </div>
+
+        <div class="debug-grid">
+          <div class="debug-item">
+            <div class="debug-label">Follow-up Fragen</div>
+            <div class="debug-value">
+              {% if ticket.followup_questions %}
+                <ul class="debug-list">
+                  {% for item in ticket.followup_questions %}
+                    <li>{{ item or "-" }}</li>
+                  {% endfor %}
+                </ul>
+              {% else %}
+                -
+              {% endif %}
+            </div>
+          </div>
+
+          <div class="debug-item">
+            <div class="debug-label">Follow-up Antworten</div>
+            <div class="debug-value">
+              {% if ticket.followup_answers %}
+                <ul class="debug-list">
+                  {% for item in ticket.followup_answers %}
+                    <li>{{ item or "-" }}</li>
+                  {% endfor %}
+                </ul>
+              {% else %}
+                -
+              {% endif %}
+            </div>
+          </div>
+        </div>
+
+        <details>
+          <summary>Vollständige Raw Daten anzeigen</summary>
+          <div class="raw">
+            <pre>{{ ticket | tojson(indent=2) }}</pre>
+          </div>
+        </details>
+      </div>
+    </div>
+  </div>
+
+  <div id="toast" class="toast">✅ Kopiert!</div>
+
+  <script>
+    async function copyText(text) {
+      try {
+        if (navigator.clipboard && window.isSecureContext) {
+          await navigator.clipboard.writeText(text);
+          return true;
+        }
+      } catch (e) {
+      }
+
+      try {
+        const ta = document.createElement("textarea");
+        ta.value = text;
+        ta.style.position = "fixed";
+        ta.style.left = "-9999px";
+        ta.style.top = "-9999px";
+        document.body.appendChild(ta);
+        ta.focus();
+        ta.select();
+        const ok = document.execCommand("copy");
+        document.body.removeChild(ta);
+        return ok;
+      } catch (e) {
+        return false;
+      }
+    }
+
+    function showToast(msg) {
+      const t = document.getElementById("toast");
+      t.textContent = msg;
+      t.classList.add("show");
+      setTimeout(() => t.classList.remove("show"), 1100);
+    }
+
+    document.addEventListener("click", async (e) => {
+      const btn = e.target.closest("button[data-copy]");
+      if (!btn || btn.disabled) return;
+
+      const selector = btn.getAttribute("data-copy");
+      const el = document.querySelector(selector);
+      const text = (el ? el.textContent : "").trim();
+
+      if (!text || text === "-") {
+        showToast("⚠️ Nichts zum Kopieren");
+        return;
+      }
+
+      const ok = await copyText(text);
+      showToast(ok ? "✅ Kopiert!" : "❌ Kopieren fehlgeschlagen");
+    });
+  </script>
+</body>
+</html>
