@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import json
 from datetime import datetime
 from typing import Any
 
@@ -148,7 +149,9 @@ def _matches_query(t: dict, q: str) -> bool:
     hay = " ".join(
         [
             str(t.get("_id", "")).lower(),
+            str(t.get("id", "")).lower(),
             str(t.get("ticket_id", "")).lower(),
+            str(t.get("ticket_view_id", "")).lower(),
             str(t.get("kunde_name", "")).lower(),
             str(t.get("fahrzeug", "")).lower(),
             str(t.get("problem", "")).lower(),
@@ -166,6 +169,7 @@ def _details_payload(t: dict) -> dict:
     safe = dict(t)
     safe.pop("created_dt", None)
     safe.pop("updated_dt", None)
+    safe.pop("details_json", None)
     return safe
 
 
@@ -174,7 +178,7 @@ def _prepare_tickets(limit: int) -> list[dict]:
     tickets = [_as_dict(t) for t in raw]
 
     for t in tickets:
-        t["_id"] = _ticket_id(t)
+        t["ticket_view_id"] = _ticket_id(t)
         t["status"] = _normalize_status(t.get("status"))
         t["status_ui"] = _ui_status(t.get("status"))
         t["priority"] = _normalize_priority(t.get("priority"))
@@ -183,13 +187,27 @@ def _prepare_tickets(limit: int) -> list[dict]:
         t["updated_dt"] = _parse_iso(t.get("updated_at"))
         t["is_new"] = (t.get("created_at") == t.get("updated_at"))
         t["kunde_name"] = _extract_name(t)
-        t["_details"] = _details_payload(t)
 
         notes = t.get("notes") if isinstance(t.get("notes"), list) else []
         last_note = notes[-1] if notes else {}
 
-        t["last_note_text"] = str(last_note.get("text", "")).strip() if isinstance(last_note, dict) else ""
-        t["last_note_created_at"] = str(last_note.get("created_at", "")).strip() if isinstance(last_note, dict) else ""
+        t["last_note_text"] = (
+            str(last_note.get("text", "")).strip()
+            if isinstance(last_note, dict)
+            else ""
+        )
+        t["last_note_created_at"] = (
+            str(last_note.get("created_at", "")).strip()
+            if isinstance(last_note, dict)
+            else ""
+        )
+
+        t["details_payload"] = _details_payload(t)
+        t["details_json"] = json.dumps(
+            t["details_payload"],
+            ensure_ascii=False,
+            default=str,
+        )
 
     return tickets
 
@@ -332,7 +350,7 @@ def ticket_detail(request: Request, ticket_id: str):
         return HTMLResponse("Ticket nicht gefunden", status_code=404)
 
     t = _as_dict(ticket)
-    t["_id"] = _ticket_id(t) or ticket_id
+    t["ticket_view_id"] = _ticket_id(t) or ticket_id
     t["status"] = _normalize_status(t.get("status"))
     t["status_ui"] = _ui_status(t.get("status"))
     t["priority"] = _normalize_priority(t.get("priority"))

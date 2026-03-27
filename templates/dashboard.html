@@ -1088,7 +1088,7 @@
                     <div><span class="new">NEW</span></div>
                   {% endif %}
 
-                  <div class="muted id">ID: {{ t._id }}</div>
+                  <div class="muted id">ID: {{ t.ticket_view_id }}</div>
                 </td>
 
                 <td>
@@ -1150,18 +1150,18 @@
 
                 <td class="right">
                   <div class="actions">
-                    <a class="open" href="/dashboard/ticket/{{ t._id }}">Ticket öffnen</a>
+                    <a class="open" href="/dashboard/ticket/{{ t.ticket_view_id }}">Ticket öffnen</a>
 
                     <button
                       class="details-btn"
                       type="button"
-                      data-details='{{ t._details | tojson }}'
+                      data-details='{{ t.details_json | safe }}'
                     >
                       Schnellansicht
                     </button>
 
                     {% if not archive_mode %}
-                    <form class="quick" method="post" action="/dashboard/ticket/{{ t._id }}/status_quick">
+                    <form class="quick" method="post" action="/dashboard/ticket/{{ t.ticket_view_id }}/status_quick">
                       <select name="status">
                         <option value="offen" {% if t.status_ui=="offen" %}selected{% endif %}>offen</option>
                         <option value="in_bearbeitung" {% if t.status_ui=="in_bearbeitung" %}selected{% endif %}>in bearbeitung</option>
@@ -1174,7 +1174,7 @@
                     <form
                       class="archive-form"
                       method="post"
-                      action="/dashboard/ticket/{{ t._id }}/archive"
+                      action="/dashboard/ticket/{{ t.ticket_view_id }}/archive"
                       onsubmit="return confirm('Dieses Ticket wirklich archivieren?');"
                     >
                       <button class="archive-btn" type="submit">Archivieren</button>
@@ -1425,8 +1425,8 @@
           return;
         }
 
-        setText("modalSubtitle", "ID: " + (data._id || data.id || data.ticket_id || "-"));
-        setText("mId", data._id || data.id || data.ticket_id || "-");
+        setText("modalSubtitle", "ID: " + (data.ticket_view_id || data._id || data.id || data.ticket_id || "-"));
+        setText("mId", data.ticket_view_id || data._id || data.id || data.ticket_id || "-");
         setText("mKunde", data.kunde_name || data.name || "-");
         setText("mTelefon", data.telefon || "-");
         setText("mFahrzeug", data.fahrzeug || "-");
@@ -1442,7 +1442,7 @@
         setText("dFahrbereit", prettyValue(data.fahrbereit || "-"));
         setText("dAbschleppdienst", prettyValue(data.abschleppdienst || "-"));
         setText("dKilometerstand", prettyValue(data.kilometerstand || "-"));
-        setText("dInternalId", prettyValue(data._id || data.id || data.ticket_id || "-"));
+        setText("dInternalId", prettyValue(data.ticket_view_id || data._id || data.id || data.ticket_id || "-"));
         setText("dCreatedAt", prettyValue(data.created_at || "-"));
         setText("dUpdatedAt", prettyValue(data.updated_at || "-"));
 
