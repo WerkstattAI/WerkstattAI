@@ -4,7 +4,7 @@ import json
 import os
 import threading
 from datetime import datetime
-from typing import Any, Dict, List, Optional
+from typing import Any, Dict, Optional
 
 from app.models import IntakeState
 
@@ -169,11 +169,14 @@ def _normalize_ticket_record(obj: dict[str, Any]) -> dict[str, Any]:
     obj["priority"] = _normalize_priority(obj.get("priority"))
     obj["request_type"] = _normalize_request_type(obj.get("request_type"))
 
-    if obj.get("followup_questions") is None:
+    if obj.get("followup_questions") is None or not isinstance(obj.get("followup_questions"), list):
         obj["followup_questions"] = []
 
-    if obj.get("followup_answers") is None:
+    if obj.get("followup_answers") is None or not isinstance(obj.get("followup_answers"), list):
         obj["followup_answers"] = []
+
+    if obj.get("notes") is None or not isinstance(obj.get("notes"), list):
+        obj["notes"] = []
 
     if not obj.get("kunde_name") and obj.get("name"):
         obj["kunde_name"] = obj.get("name")
@@ -221,6 +224,9 @@ def save_ticket(state: IntakeState) -> str:
         # Follow-ups
         "followup_questions": state.followup_questions or [],
         "followup_answers": state.followup_answers or [],
+
+        # Interne Notizen
+        "notes": [],
 
         # Kontakt
         "name": kunde_name,
@@ -327,6 +333,64 @@ def update_ticket_status(ticket_id: str, new_status: str) -> dict[str, Any]:
 
             if current_id == tid:
                 obj["status"] = status
+                obj["updated_at"] = _now_iso()
+                updated_ticket = obj
+
+            items.append(obj)
+
+        if not updated_ticket:
+            raise KeyError("Ticket nicht gefunden")
+
+        with open(path, "w", encoding="utf-8") as f:
+            for obj in items:
+                f.write(json.dumps(obj, ensure_ascii=False) + "\n")
+
+    return updated_ticket
+
+
+def add_ticket_note(ticket_id: str, note_text: str) -> dict[str, Any]:
+    """
+    Fügt einem Ticket eine interne Notiz hinzu
+    und aktualisiert updated_at.
+    """
+    tid = (ticket_id or "").strip()
+    text = (note_text or "").strip()
+
+    if not tid:
+        raise ValueError("ticket_id ist leer")
+
+    if not text:
+        raise ValueError("note_text ist leer")
+
+    _ensure_data_dir()
+    path = _tickets_path()
+
+    with _LOCK:
+        lines = _read_lines(path)
+        items: list[dict[str, Any]] = []
+        updated_ticket: Optional[dict[str, Any]] = None
+
+        for line in lines:
+            obj = _safe_json_loads(line)
+            if not obj:
+                continue
+
+            obj = _normalize_ticket_record(obj)
+
+            current_id = str(
+                obj.get("ticket_id")
+                or obj.get("_id")
+                or obj.get("id")
+                or ""
+            ).strip()
+
+            if current_id == tid:
+                obj["notes"].append(
+                    {
+                        "text": text,
+                        "created_at": _now_iso(),
+                    }
+                )
                 obj["updated_at"] = _now_iso()
                 updated_ticket = obj
 

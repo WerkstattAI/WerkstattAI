@@ -8,6 +8,7 @@ from fastapi.responses import HTMLResponse, RedirectResponse
 from fastapi.templating import Jinja2Templates
 
 from app.tickets import (
+    add_ticket_note,
     archive_ticket,
     find_ticket_by_id,
     list_latest_tickets,
@@ -184,6 +185,12 @@ def _prepare_tickets(limit: int) -> list[dict]:
         t["kunde_name"] = _extract_name(t)
         t["_details"] = _details_payload(t)
 
+        notes = t.get("notes") if isinstance(t.get("notes"), list) else []
+        last_note = notes[-1] if notes else {}
+
+        t["last_note_text"] = str(last_note.get("text", "")).strip() if isinstance(last_note, dict) else ""
+        t["last_note_created_at"] = str(last_note.get("created_at", "")).strip() if isinstance(last_note, dict) else ""
+
     return tickets
 
 
@@ -243,7 +250,12 @@ def _render_dashboard(
     elif sort == "updated":
         tickets.sort(key=lambda t: t["updated_dt"], reverse=True)
     elif sort == "priority":
-        tickets.sort(key=lambda t: (_priority_rank(t.get("priority", "")), -t["created_dt"].timestamp() if t["created_dt"] != datetime.min else 0))
+        tickets.sort(
+            key=lambda t: (
+                _priority_rank(t.get("priority", "")),
+                -t["created_dt"].timestamp() if t["created_dt"] != datetime.min else 0,
+            )
+        )
     else:
         tickets.sort(key=lambda t: t["created_dt"], reverse=True)
 
@@ -356,6 +368,22 @@ def ticket_set_status_quick(ticket_id: str, status: str = Form(...)):
         return HTMLResponse("Status-Update fehlgeschlagen", status_code=400)
 
     return RedirectResponse(url="/dashboard", status_code=303)
+
+
+@router.post("/dashboard/ticket/{ticket_id}/notes")
+def ticket_add_note(ticket_id: str, note_text: str = Form(...)):
+    try:
+        text = (note_text or "").strip()
+        if not text:
+            return HTMLResponse("Notiz darf nicht leer sein", status_code=400)
+
+        add_ticket_note(ticket_id, text)
+    except KeyError:
+        return HTMLResponse("Ticket nicht gefunden", status_code=404)
+    except Exception:
+        return HTMLResponse("Notiz konnte nicht gespeichert werden", status_code=400)
+
+    return RedirectResponse(url=f"/dashboard/ticket/{ticket_id}", status_code=303)
 
 
 @router.post("/dashboard/ticket/{ticket_id}/archive")

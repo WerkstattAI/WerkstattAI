@@ -825,6 +825,59 @@
 
         <div class="divider"></div>
 
+  <h3 class="section-title">Interne Notizen</h3>
+
+  <form method="post" action="/dashboard/ticket/{{ ticket._id }}/notes" style="margin-bottom:14px;">
+    <div style="display:flex; gap:10px; flex-wrap:wrap;">
+      <textarea
+        name="note_text"
+        placeholder="Neue Notiz hinzufügen..."
+        required
+        style="
+          flex:1;
+          min-height:70px;
+          padding:10px 12px;
+          border-radius:14px;
+          border:1px solid var(--line);
+          background:rgba(15,26,46,.72);
+          color:var(--text);
+          resize:vertical;
+        "
+      ></textarea>
+
+      <div style="display:flex; align-items:flex-end;">
+        <button type="submit">Speichern</button>
+      </div>
+    </div>
+  </form>
+
+  {% if ticket.notes %}
+    <div style="display:flex; flex-direction:column; gap:10px;">
+      {% for note in ticket.notes | reverse %}
+        <div
+          style="
+            padding:10px 12px;
+            border-radius:14px;
+            border:1px solid var(--line);
+            background:rgba(255,255,255,.04);
+          "
+        >
+          <div style="font-size:13px; line-height:1.5;">
+            {{ note.text }}
+          </div>
+
+          <div style="margin-top:6px; font-size:11px; color:var(--muted); font-weight:800;">
+            {{ note.created_at }}
+          </div>
+        </div>
+      {% endfor %}
+    </div>
+  {% else %}
+    <div class="muted">Noch keine Notizen vorhanden.</div>
+  {% endif %}
+
+  <div class="divider"></div>
+  
         <h3 class="section-title">Interne Systemdaten</h3>
         <div class="debug-grid">
           <div class="debug-item">

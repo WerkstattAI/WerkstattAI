@@ -511,6 +511,39 @@
       margin-top:8px;
     }
 
+    .last-note-block{
+      margin-top:10px;
+      padding-top:10px;
+      border-top:1px solid var(--line);
+    }
+
+    .last-note-label{
+      font-size:11px;
+      text-transform:uppercase;
+      letter-spacing:.06em;
+      color:var(--muted);
+      font-weight:900;
+      margin-bottom:6px;
+    }
+
+    .last-note-text{
+      color:#dbe6f5;
+      font-size:13px;
+      line-height:1.5;
+      display:-webkit-box;
+      -webkit-line-clamp:2;
+      -webkit-box-orient:vertical;
+      overflow:hidden;
+      word-break:break-word;
+    }
+
+    .last-note-date{
+      margin-top:6px;
+      color:var(--muted);
+      font-size:11px;
+      font-weight:800;
+    }
+
     .tiny-badge{
       display:inline-flex;
       align-items:center;
@@ -1093,6 +1126,16 @@
                       <span class="tiny-badge danger">Abschleppdienst</span>
                     {% endif %}
                   </div>
+
+                  {% if t.last_note_text %}
+                    <div class="last-note-block">
+                      <div class="last-note-label">Letzte Notiz</div>
+                      <div class="last-note-text">{{ t.last_note_text }}</div>
+                      {% if t.last_note_created_at %}
+                        <div class="last-note-date">{{ t.last_note_created_at }}</div>
+                      {% endif %}
+                    </div>
+                  {% endif %}
                 </td>
 
                 <td class="tel">
