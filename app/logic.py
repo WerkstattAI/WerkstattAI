@@ -1,9 +1,35 @@
 from __future__ import annotations
 
 import re
-from typing import List, Tuple
+from typing import List, Tuple, TypedDict, cast
 
 from app.models import IntakeState
+
+
+# =========================================================
+# Typing
+# =========================================================
+
+class ProblemFlags(TypedDict):
+    service_request: bool
+    start_problem: bool
+    not_drivable_hint: bool
+    critical_brake_or_steering: bool
+    overheat: bool
+    smoke_or_steam: bool
+    red_warning: bool
+    warning_light: bool
+    noise: bool
+    performance_issue: bool
+    fluid_leak: bool
+    generic_problem: bool
+
+
+class AnalysisResult(TypedDict):
+    request_type: str
+    priority: str
+    score: int
+    flags: ProblemFlags
 
 
 # =========================================================
@@ -16,6 +42,17 @@ def _normalize(text: str) -> str:
 
 def _lower(text: str) -> str:
     return _normalize(text).lower()
+
+
+def _copy_state(state: IntakeState) -> IntakeState:
+    """
+    Kompatybilne z Pydantic v1 i v2.
+    """
+    if hasattr(state, "model_copy"):
+        return state.model_copy(deep=True)
+    if hasattr(state, "copy"):
+        return state.copy(deep=True)
+    return state
 
 
 def _extract_year(text: str) -> str | None:
@@ -39,12 +76,10 @@ def _extract_km(text: str) -> str | None:
     """
     t = _lower(text)
 
-    # 180k / 180 tkm
     m = re.search(r"\b(\d{2,3})\s*(k|tkm)\b", t)
     if m:
         return str(int(m.group(1)) * 1000)
 
-    # 180000 km / 180.000 km / 180 000 km
     m = re.search(r"\b(\d{1,3}(?:[.\s]\d{3})+|\d{5,7})\s*km\b", t)
     if m:
         raw = m.group(1)
@@ -52,7 +87,6 @@ def _extract_km(text: str) -> str | None:
         if 4 <= len(digits) <= 7:
             return digits
 
-    # Reine große Zahlen OHNE "km"
     m = re.search(r"\b\d{5,7}\b", t)
     if m:
         return m.group(0)
@@ -126,12 +160,12 @@ def _is_no(text: str) -> bool:
     }
 
 
-def _contains_any(text: str, keywords: list[str]) -> bool:
+def _contains_any(text: str, keywords: List[str]) -> bool:
     t = _lower(text)
     return any(k in t for k in keywords)
 
 
-def _contains_all(text: str, keywords: list[str]) -> bool:
+def _contains_all(text: str, keywords: List[str]) -> bool:
     t = _lower(text)
     return all(k in t for k in keywords)
 
@@ -192,6 +226,7 @@ def _infer_fahrbereit_from_text(text: str) -> str | None:
         "auto steht",
         "kann nicht fahren",
         "nicht mehr fahrbar",
+        "fahrzeug steht",
     ]
     if any(p in t for p in negative_patterns):
         return "nein"
@@ -212,91 +247,42 @@ def _infer_fahrbereit_from_text(text: str) -> str | None:
     return None
 
 
-def _has_start_problem(text: str) -> bool:
-    t = _lower(text)
-    return (
-        "springt nicht an" in t
-        or "springt nicht mehr an" in t
-        or "startet nicht" in t
-        or "startet nicht mehr" in t
-        or ("springt" in t and "nicht" in t and "an" in t)
-        or ("startet" in t and "nicht" in t)
-    )
+def _can_extract_vehicle(text: str) -> bool:
+    t = _normalize(text)
+    if len(t) < 3:
+        return False
+
+    if _extract_phone(t):
+        return False
+
+    pure_digits = re.sub(r"\D", "", t)
+    if pure_digits and len(pure_digits) == len(t.replace(" ", "")):
+        return False
+
+    return True
 
 
-def _has_critical_brake_or_steering(text: str) -> bool:
-    t = _lower(text)
+def _consume_inline_vehicle_year_km(state: IntakeState, text: str) -> None:
+    t = _normalize(text)
 
-    steering_critical = (
-        ("lenk" in t or "lenkrad" in t)
-        and any(k in t for k in ["seite", "zieht", "schief", "block", "schwer", "problem"])
-    )
+    if not getattr(state, "fahrzeug", None) and _can_extract_vehicle(t):
+        fahrzeug = _cleanup_vehicle_text(t)
+        if len(fahrzeug) >= 3:
+            state.fahrzeug = fahrzeug
 
-    brake_critical = (
-        "bremse ohne wirkung" in t
-        or "bremsen funktionieren nicht" in t
-        or ("brems" in t and any(k in t for k in ["zieht", "seite", "stark", "problem", "schief"]))
-    )
+    if not getattr(state, "baujahr", None):
+        year = _extract_year(t)
+        if year:
+            state.baujahr = year
 
-    return steering_critical or brake_critical
-
-
-def _has_notfall_hint(text: str) -> bool:
-    t = _lower(text)
-
-    return (
-        _has_start_problem(t)
-        or "nicht fahrbereit" in t
-        or "liegen geblieben" in t
-        or "bleibt liegen" in t
-        or "motor geht aus" in t
-        or "rote warnlampe" in t
-        or "warnlampe rot" in t
-        or "rauch" in t
-        or "qualm" in t
-        or "dampf" in t
-        or "überhitz" in t
-        or "ueberhitz" in t
-        or "kühlmittel" in t
-        or "kuehlmittel" in t
-        or _has_critical_brake_or_steering(t)
-    )
-
-
-def _detect_priority(text: str, request_type: str | None = None) -> str:
-    """
-    Kompatibel mit deinem jetzigen Projekt:
-    normal | dringend | notfall
-    """
-    t = _lower(text)
-    rt = request_type or _detect_request_type(t)
-
-    if _has_start_problem(t) or "nicht fahrbereit" in t or "liegen geblieben" in t:
-        return "notfall"
-
-    if rt == "notfall":
-        return "dringend"
-
-    if _has_critical_brake_or_steering(t):
-        return "dringend"
-
-    if any(k in t for k in [
-        "warnlampe",
-        "fehlermeldung",
-        "ruckel",
-        "leistung",
-        "ölverlust",
-        "oelverlust",
-        "problem",
-        "defekt",
-    ]):
-        return "dringend"
-
-    return "normal"
+    if not getattr(state, "kilometerstand", None):
+        km = _extract_km(t)
+        if km:
+            state.kilometerstand = km
 
 
 # =========================================================
-# Anfrage-Typ erkennen
+# Anfrage-Typ / Analyse
 # =========================================================
 
 SERVICE_KEYWORDS = [
@@ -328,6 +314,7 @@ DIAGNOSE_HINTS = [
     "quiets",
     "schleif",
     "pfeif",
+    "brumm",
     "ruckel",
     "leistung",
     "warnlampe",
@@ -342,6 +329,104 @@ DIAGNOSE_HINTS = [
     "funktioniert nicht",
     "motorlampe",
     "check engine",
+]
+
+START_HINTS = [
+    "springt nicht an",
+    "springt nicht mehr an",
+    "startet nicht",
+    "startet nicht mehr",
+    "anlasser",
+    "batterie leer",
+    "klickt nur",
+    "kein strom",
+]
+
+BRAKE_HINTS = [
+    "bremse ohne wirkung",
+    "bremsen funktionieren nicht",
+    "bremsen greifen nicht",
+    "bremsproblem",
+    "bremsenproblem",
+]
+
+STEERING_HINTS = [
+    "lenkung schwer",
+    "lenkrad schwer",
+    "lenkung blockiert",
+    "lenkproblem",
+]
+
+OVERHEAT_HINTS = [
+    "überhitz",
+    "ueberhitz",
+    "temperatur zu hoch",
+    "motor wird heiß",
+    "motor wird heiss",
+    "kühlmittelverlust",
+    "kuehlmittelverlust",
+    "dampf",
+]
+
+SMOKE_HINTS = [
+    "rauch",
+    "qualm",
+]
+
+RED_WARNING_HINTS = [
+    "rote warnlampe",
+    "warnlampe rot",
+    "rote lampe",
+    "öldruck",
+    "oeldruck",
+    "batterielampe rot",
+    "temperaturwarnung",
+]
+
+WARNING_HINTS = [
+    "warnlampe",
+    "fehlermeldung",
+    "check engine",
+    "motorkontrollleuchte",
+    "motorlampe",
+    "abs",
+    "esp",
+    "airbag",
+]
+
+DRIVEABILITY_HINTS = [
+    "nicht fahrbereit",
+    "nicht mehr fahrbar",
+    "bleibt liegen",
+    "liegen geblieben",
+    "motor geht aus",
+    "auto steht",
+]
+
+NOISE_HINTS = [
+    "geräusch",
+    "geraeusch",
+    "klopf",
+    "quiets",
+    "schleif",
+    "pfeif",
+    "brumm",
+]
+
+PERFORMANCE_HINTS = [
+    "ruckel",
+    "keine leistung",
+    "leistungsverlust",
+    "zieht nicht",
+    "nimmt kein gas an",
+]
+
+LEAK_HINTS = [
+    "ölverlust",
+    "oelverlust",
+    "verliert öl",
+    "verliert oel",
+    "leck",
 ]
 
 
@@ -363,22 +448,173 @@ def _is_service_request(text: str) -> bool:
     return False
 
 
-def _detect_request_type(text: str) -> str:
-    """
-    service | diagnose | notfall
-    """
+def _has_start_problem(text: str) -> bool:
+    t = _lower(text)
+    return any(k in t for k in START_HINTS) or (
+        ("springt" in t and "nicht" in t and "an" in t)
+        or ("startet" in t and "nicht" in t)
+    )
+
+
+def _has_critical_brake_or_steering(text: str) -> bool:
     t = _lower(text)
 
-    if _has_notfall_hint(t):
-        return "notfall"
+    brake_critical = any(k in t for k in BRAKE_HINTS) or (
+        "brems" in t and any(k in t for k in ["zieht", "seite", "stark", "schief", "problem", "weich"])
+    )
 
-    if _is_service_request(t):
-        return "service"
+    steering_critical = any(k in t for k in STEERING_HINTS) or (
+        ("lenk" in t or "lenkrad" in t)
+        and any(k in t for k in ["zieht", "schief", "block", "schwer", "problem", "seite"])
+    )
 
-    if _contains_any(t, DIAGNOSE_HINTS):
-        return "diagnose"
+    return brake_critical or steering_critical
 
-    return "diagnose"
+
+def _build_problem_flags(text: str) -> ProblemFlags:
+    t = _lower(text)
+
+    flags: ProblemFlags = {
+        "service_request": _is_service_request(t),
+        "start_problem": _has_start_problem(t),
+        "not_drivable_hint": any(k in t for k in DRIVEABILITY_HINTS),
+        "critical_brake_or_steering": _has_critical_brake_or_steering(t),
+        "overheat": any(k in t for k in OVERHEAT_HINTS),
+        "smoke_or_steam": any(k in t for k in SMOKE_HINTS),
+        "red_warning": any(k in t for k in RED_WARNING_HINTS),
+        "warning_light": any(k in t for k in WARNING_HINTS),
+        "noise": any(k in t for k in NOISE_HINTS),
+        "performance_issue": any(k in t for k in PERFORMANCE_HINTS),
+        "fluid_leak": any(k in t for k in LEAK_HINTS),
+        "generic_problem": any(k in t for k in ["problem", "defekt", "funktioniert nicht"]),
+    }
+
+    return flags
+
+
+def analyze_problem(
+    problem_text: str,
+    fahrbereit: str | None = None,
+    abschleppdienst: str | None = None,
+) -> AnalysisResult:
+    """
+    Zentraler Analysator:
+    returns {
+        "request_type": "service" | "diagnose" | "notfall",
+        "priority": "normal" | "dringend" | "notfall",
+        "score": int,
+        "flags": {...}
+    }
+    """
+    flags = _build_problem_flags(problem_text)
+    score = 0
+
+    if flags["start_problem"]:
+        score += 5
+
+    if flags["not_drivable_hint"]:
+        score += 5
+
+    if flags["critical_brake_or_steering"]:
+        score += 5
+
+    if flags["overheat"]:
+        score += 5
+
+    if flags["smoke_or_steam"]:
+        score += 4
+
+    if flags["red_warning"]:
+        score += 4
+
+    if flags["warning_light"]:
+        score += 2
+
+    if flags["performance_issue"]:
+        score += 2
+
+    if flags["noise"]:
+        score += 2
+
+    if flags["fluid_leak"]:
+        score += 2
+
+    if flags["generic_problem"]:
+        score += 1
+
+    if fahrbereit == "nein":
+        score += 5
+
+    if abschleppdienst == "ja":
+        score += 2
+
+    service_only = (
+        flags["service_request"]
+        and not flags["start_problem"]
+        and not flags["not_drivable_hint"]
+        and not flags["critical_brake_or_steering"]
+        and not flags["overheat"]
+        and not flags["smoke_or_steam"]
+        and not flags["red_warning"]
+        and not flags["warning_light"]
+        and not flags["performance_issue"]
+        and not flags["noise"]
+        and not flags["fluid_leak"]
+        and not flags["generic_problem"]
+    )
+
+    hard_notfall = any(
+        [
+            flags["start_problem"],
+            flags["not_drivable_hint"],
+            flags["critical_brake_or_steering"],
+            flags["overheat"],
+        ]
+    )
+
+    if service_only:
+        request_type = "service"
+    elif hard_notfall:
+        request_type = "notfall"
+    else:
+        request_type = "diagnose"
+
+    if service_only:
+        priority = "normal"
+    elif score >= 6:
+        priority = "notfall"
+    elif score >= 3:
+        priority = "dringend"
+    else:
+        priority = "normal"
+
+    if request_type == "notfall" and priority == "normal":
+        priority = "dringend"
+
+    result: AnalysisResult = {
+        "request_type": request_type,
+        "priority": priority,
+        "score": score,
+        "flags": flags,
+    }
+    return result
+
+
+def _detect_request_type(text: str) -> str:
+    return analyze_problem(text)["request_type"]
+
+
+def _detect_priority(
+    text: str,
+    request_type: str | None = None,
+    fahrbereit: str | None = None,
+    abschleppdienst: str | None = None,
+) -> str:
+    return analyze_problem(
+        text,
+        fahrbereit=fahrbereit,
+        abschleppdienst=abschleppdienst,
+    )["priority"]
 
 
 # =========================================================
@@ -389,38 +625,43 @@ FOLLOWUP_POOL = {
     "since_when": "Seit wann besteht das Problem ungefähr?",
     "sporadic": "Tritt das Problem ständig auf oder nur sporadisch?",
     "warning_lamps": "Leuchtet eine Warnlampe oder gibt es eine Fehlermeldung im Display? Wenn ja, welche?",
-    "noise_smell_smoke": "Gibt es ungewöhnliche Geräusche, Geruch oder Rauch? Bitte kurz beschreiben.",
+    "noise_smell_smoke": "Gibt es ungewöhnliche Geräusche, Geruch, Rauch oder Dampf? Bitte kurz beschreiben.",
     "trigger": "In welcher Situation tritt es auf? (z.B. beim Starten, Bremsen, Beschleunigen oder bei bestimmter Geschwindigkeit)",
     "recent_work": "Wurde in letzter Zeit etwas am Fahrzeug repariert oder ist kurz davor etwas passiert?",
+    "start_behavior": "Was passiert genau beim Startversuch? Dreht der Anlasser, klickt es nur oder bleibt alles still?",
+    "drive_symptoms": "Wie verhält sich das Fahrzeug genau beim Fahren? Ruckeln, Leistungsverlust, Aussetzer oder Notlauf?",
 }
 
 NOTFALL_POOL = {
     "safety_drive": "Ist das Fahrzeug aktuell sicher fahrbar oder riskant weiterzufahren?",
     "overheat": "Steigt die Motortemperatur stark an oder haben Sie Kühlmittelverlust bemerkt?",
     "warning_lamps": "Leuchtet eine rote Warnlampe oder gibt es eine dringende Fehlermeldung?",
+    "brake_steering": "Betrifft das Problem die Bremsen oder die Lenkung direkt und ist das Fahrzeug dadurch unsicher?",
 }
 
 
 def _select_diagnose_followups(problem_text: str, max_q: int = 3) -> List[str]:
-    t = _lower(problem_text)
+    analysis = analyze_problem(problem_text)
+    flags = analysis["flags"]
     selected: List[str] = []
-
-    keywords_start = any(k in t for k in ["springt nicht an", "start", "anlasser", "batterie", "klick", "kein strom"])
-    keywords_noise = any(k in t for k in ["geräusch", "geraeusch", "klopf", "quiets", "schleif", "pfeif", "brumm"])
-    keywords_warning = any(k in t for k in ["warn", "lampe", "check engine", "motorkontroll", "fehlermeld", "abs", "esp", "airbag"])
 
     selected.append(FOLLOWUP_POOL["since_when"])
 
-    if keywords_warning:
+    if flags["start_problem"]:
+        selected.append(FOLLOWUP_POOL["start_behavior"])
+    elif flags["warning_light"]:
         selected.append(FOLLOWUP_POOL["warning_lamps"])
     else:
         selected.append(FOLLOWUP_POOL["sporadic"])
 
-    if keywords_noise or keywords_start:
+    if flags["noise"] or flags["smoke_or_steam"]:
         selected.append(FOLLOWUP_POOL["noise_smell_smoke"])
+    elif flags["performance_issue"]:
+        selected.append(FOLLOWUP_POOL["drive_symptoms"])
     else:
         selected.append(FOLLOWUP_POOL["trigger"])
 
+    t = _lower(problem_text)
     if any(k in t for k in ["repar", "werkstatt", "gewechselt", "service", "inspektion", "nach"]):
         selected.append(FOLLOWUP_POOL["recent_work"])
 
@@ -437,13 +678,16 @@ def _select_diagnose_followups(problem_text: str, max_q: int = 3) -> List[str]:
 
 
 def _select_notfall_followups(problem_text: str, include_safety_drive: bool = True) -> List[str]:
-    t = _lower(problem_text)
+    analysis = analyze_problem(problem_text)
+    flags = analysis["flags"]
     selected: List[str] = []
 
     if include_safety_drive:
         selected.append(NOTFALL_POOL["safety_drive"])
 
-    if any(k in t for k in ["überhitz", "ueberhitz", "temperatur", "kühlmittel", "kuehlmittel", "dampf"]):
+    if flags["critical_brake_or_steering"]:
+        selected.append(NOTFALL_POOL["brake_steering"])
+    elif flags["overheat"] or flags["smoke_or_steam"]:
         selected.append(NOTFALL_POOL["overheat"])
     else:
         selected.append(NOTFALL_POOL["warning_lamps"])
@@ -457,7 +701,8 @@ def _select_notfall_followups(problem_text: str, include_safety_drive: bool = Tr
 
 
 def _select_followups(problem_text: str, include_safety_drive: bool = True) -> List[str]:
-    request_type = _detect_request_type(problem_text)
+    analysis = analyze_problem(problem_text)
+    request_type = analysis["request_type"]
 
     if request_type == "service":
         return []
@@ -469,55 +714,12 @@ def _select_followups(problem_text: str, include_safety_drive: bool = True) -> L
 
 
 # =========================================================
-# Intelligente Feld-Erkennung
-# =========================================================
-
-def _can_extract_vehicle(text: str) -> bool:
-    t = _normalize(text)
-    if len(t) < 3:
-        return False
-
-    if _extract_phone(t):
-        return False
-
-    pure_digits = re.sub(r"\D", "", t)
-    if pure_digits and len(pure_digits) == len(t.replace(" ", "")):
-        return False
-
-    return True
-
-
-def _consume_inline_vehicle_year_km(state: IntakeState, text: str) -> None:
-    """
-    Beispiele:
-    - BMW 320d 2014 210000 km
-    - Audi A4 2011 180k
-    """
-    t = _normalize(text)
-
-    if not getattr(state, "fahrzeug", None) and _can_extract_vehicle(t):
-        fahrzeug = _cleanup_vehicle_text(t)
-        if len(fahrzeug) >= 3:
-            state.fahrzeug = fahrzeug
-
-    if not getattr(state, "baujahr", None):
-        year = _extract_year(t)
-        if year:
-            state.baujahr = year
-
-    if not getattr(state, "kilometerstand", None):
-        km = _extract_km(t)
-        if km:
-            state.kilometerstand = km
-
-
-# =========================================================
 # Zustandsmaschine
 # =========================================================
 
 def next_step(state: IntakeState, user_message: str | None) -> Tuple[IntakeState, str, bool]:
     """
-    Flow v2:
+    Flow v3:
       fahrzeug
       -> baujahr
       -> kilometerstand
@@ -544,7 +746,7 @@ def next_step(state: IntakeState, user_message: str | None) -> Tuple[IntakeState
         )
         return new_state, reply, False
 
-    new_state = state.model_copy(deep=True)
+    new_state = _copy_state(state)
     new_state.last_user_message = msg
 
     if new_state.step == "fahrzeug":
@@ -612,8 +814,10 @@ def next_step(state: IntakeState, user_message: str | None) -> Tuple[IntakeState
             return new_state, "Bitte beschreiben Sie Ihr Anliegen kurz etwas genauer.", False
 
         new_state.problem = msg
-        request_type = _detect_request_type(new_state.problem)
-        priority = _detect_priority(new_state.problem, request_type)
+
+        analysis = analyze_problem(new_state.problem)
+        request_type = analysis["request_type"]
+        priority = analysis["priority"]
 
         if hasattr(new_state, "request_type"):
             new_state.request_type = request_type
@@ -635,6 +839,18 @@ def next_step(state: IntakeState, user_message: str | None) -> Tuple[IntakeState
         inferred = _infer_fahrbereit_from_text(new_state.problem)
         if inferred:
             new_state.fahrbereit = inferred
+
+            analysis = analyze_problem(
+                new_state.problem,
+                fahrbereit=new_state.fahrbereit,
+                abschleppdienst=getattr(new_state, "abschleppdienst", None),
+            )
+
+            if hasattr(new_state, "request_type"):
+                new_state.request_type = analysis["request_type"]
+
+            if hasattr(new_state, "priority"):
+                new_state.priority = analysis["priority"]
 
             if inferred == "nein":
                 new_state.step = "abschleppdienst"
@@ -663,6 +879,18 @@ def next_step(state: IntakeState, user_message: str | None) -> Tuple[IntakeState
 
         new_state.fahrbereit = inferred or ("ja" if _is_yes(msg) else "nein")
 
+        analysis = analyze_problem(
+            new_state.problem or "",
+            fahrbereit=new_state.fahrbereit,
+            abschleppdienst=getattr(new_state, "abschleppdienst", None),
+        )
+
+        if hasattr(new_state, "request_type"):
+            new_state.request_type = analysis["request_type"]
+
+        if hasattr(new_state, "priority"):
+            new_state.priority = analysis["priority"]
+
         if new_state.fahrbereit == "nein":
             new_state.step = "abschleppdienst"
             return new_state, "Benötigen Sie einen Abschleppdienst? (Ja/Nein)", False
@@ -685,6 +913,18 @@ def next_step(state: IntakeState, user_message: str | None) -> Tuple[IntakeState
 
         new_state.abschleppdienst = "ja" if _is_yes(msg) else "nein"
 
+        analysis = analyze_problem(
+            new_state.problem or "",
+            fahrbereit=getattr(new_state, "fahrbereit", None),
+            abschleppdienst=new_state.abschleppdienst,
+        )
+
+        if hasattr(new_state, "request_type"):
+            new_state.request_type = analysis["request_type"]
+
+        if hasattr(new_state, "priority"):
+            new_state.priority = analysis["priority"]
+
         followups = _select_followups(
             new_state.problem or "",
             include_safety_drive=False,
@@ -704,14 +944,14 @@ def next_step(state: IntakeState, user_message: str | None) -> Tuple[IntakeState
         if not msg:
             return new_state, "Könnten Sie das bitte kurz beantworten?", False
 
-        answers = list(getattr(new_state, "followup_answers", []) or [])
+        answers = list(cast(List[str], getattr(new_state, "followup_answers", []) or []))
         answers.append(msg)
         new_state.followup_answers = answers
 
         idx = int(getattr(new_state, "followup_index", 0) or 0) + 1
         new_state.followup_index = idx
 
-        questions = list(getattr(new_state, "followup_questions", []) or [])
+        questions = list(cast(List[str], getattr(new_state, "followup_questions", []) or []))
         if idx < len(questions):
             return new_state, questions[idx], False
 
@@ -736,8 +976,14 @@ def next_step(state: IntakeState, user_message: str | None) -> Tuple[IntakeState
 
         new_state.step = "fertig"
 
-        request_type = _detect_request_type(new_state.problem or "")
-        priority = _detect_priority(new_state.problem or "", request_type)
+        analysis = analyze_problem(
+            new_state.problem or "",
+            fahrbereit=getattr(new_state, "fahrbereit", None),
+            abschleppdienst=getattr(new_state, "abschleppdienst", None),
+        )
+        request_type = analysis["request_type"]
+        priority = analysis["priority"]
+        score = analysis["score"]
 
         if hasattr(new_state, "request_type"):
             new_state.request_type = request_type
@@ -761,14 +1007,16 @@ def next_step(state: IntakeState, user_message: str | None) -> Tuple[IntakeState
         if hasattr(new_state, "priority"):
             summary_lines.append(f"- Priorität: {getattr(new_state, 'priority', None) or '-'}")
 
+        summary_lines.append(f"- Analyse-Score: {score}")
+
         if request_type != "service":
             summary_lines.append(f"- Fahrbereit: {getattr(new_state, 'fahrbereit', None) or '-'}")
 
         if getattr(new_state, "abschleppdienst", None):
             summary_lines.append(f"- Abschleppdienst: {new_state.abschleppdienst}")
 
-        q_list = list(getattr(new_state, "followup_questions", []) or [])
-        a_list = list(getattr(new_state, "followup_answers", []) or [])
+        q_list = list(cast(List[str], getattr(new_state, "followup_questions", []) or []))
+        a_list = list(cast(List[str], getattr(new_state, "followup_answers", []) or []))
         if q_list and a_list:
             summary_lines.append("")
             summary_lines.append("Zusätzliche Angaben:")
