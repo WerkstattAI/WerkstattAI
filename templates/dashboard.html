@@ -6,77 +6,96 @@
   <title>WerkstattAI – Dashboard</title>
   <style>
     :root{
-      --bg:#0b1220;
-      --card:#0f1a2e;
-      --panel:#0e1730;
-      --muted:#9aa4b2;
-      --text:#e6eaf0;
+      --bg:#09111f;
+      --bg-2:#0d1629;
+      --card:#0f1b33;
+      --card-2:#13213d;
+      --panel:#101a31;
       --line:rgba(255,255,255,.08);
+      --line-2:rgba(255,255,255,.12);
+      --text:#e8eef8;
+      --muted:#97a3b6;
+      --soft:#c8d4e4;
+
       --ok:#22c55e;
       --warn:#f59e0b;
       --info:#60a5fa;
       --danger:#ef4444;
-      --shadow: 0 10px 30px rgba(0,0,0,.35);
-      --r:18px;
+
+      --shadow:0 10px 30px rgba(0,0,0,.32);
+      --shadow-2:0 20px 50px rgba(0,0,0,.40);
+      --r:20px;
+      --r-sm:14px;
     }
 
     *{box-sizing:border-box}
 
+    html{
+      scroll-behavior:smooth;
+    }
+
     body{
       margin:0;
       font-family: system-ui, -apple-system, Segoe UI, Roboto, Arial, sans-serif;
-      background:
-        radial-gradient(1200px 600px at 20% -10%, #1d3a8a33, transparent 60%),
-        radial-gradient(1000px 500px at 90% 0%, #0ea5e933, transparent 60%),
-        var(--bg);
       color:var(--text);
+      background:
+        radial-gradient(1100px 500px at 15% -10%, rgba(37,99,235,.18), transparent 60%),
+        radial-gradient(900px 480px at 95% 0%, rgba(14,165,233,.12), transparent 60%),
+        linear-gradient(180deg, #09111f 0%, #0a1222 100%);
     }
 
     .wrap{
-      max-width:1380px;
+      max-width:1400px;
       margin:0 auto;
       padding:22px;
     }
 
-    .top{
+    .topbar{
       display:flex;
-      gap:14px;
-      flex-wrap:wrap;
-      align-items:center;
       justify-content:space-between;
-      margin-bottom:14px;
+      align-items:flex-start;
+      gap:16px;
+      flex-wrap:wrap;
+      margin-bottom:16px;
     }
 
     .brand{
       display:flex;
       flex-direction:column;
-      gap:6px;
+      gap:8px;
+    }
+
+    .eyebrow{
+      display:inline-flex;
+      align-items:center;
+      gap:8px;
+      width:max-content;
+      padding:7px 11px;
+      border-radius:999px;
+      border:1px solid var(--line);
+      background:rgba(255,255,255,.04);
+      color:var(--muted);
+      font-size:12px;
+      font-weight:800;
+      letter-spacing:.04em;
+      text-transform:uppercase;
     }
 
     .brand h1{
       margin:0;
-      font-size:20px;
+      font-size:28px;
+      line-height:1.1;
       letter-spacing:.2px;
     }
 
     .brand .sub{
       color:var(--muted);
-      font-size:12px;
+      font-size:14px;
+      line-height:1.5;
+      max-width:760px;
     }
 
-    .chip{
-      display:inline-flex;
-      align-items:center;
-      gap:8px;
-      padding:8px 12px;
-      border-radius:999px;
-      background:rgba(255,255,255,.06);
-      border:1px solid var(--line);
-      color:var(--muted);
-      font-size:12px;
-    }
-
-    .switches{
+    .top-actions{
       display:flex;
       gap:10px;
       flex-wrap:wrap;
@@ -86,39 +105,87 @@
     .nav-btn{
       display:inline-flex;
       align-items:center;
+      justify-content:center;
       gap:8px;
-      padding:10px 12px;
+      min-height:44px;
+      padding:10px 14px;
       border-radius:14px;
       border:1px solid var(--line);
-      background: rgba(255,255,255,.06);
+      background:rgba(255,255,255,.05);
       color:var(--text);
       text-decoration:none;
       font-weight:800;
+      transition:.18s ease;
+    }
+
+    .nav-btn:hover{
+      background:rgba(255,255,255,.09);
+      border-color:rgba(255,255,255,.14);
+      transform:translateY(-1px);
     }
 
     .nav-btn.active{
-      background: rgba(96,165,250,.16);
-      border-color: rgba(96,165,250,.35);
+      background:linear-gradient(180deg, rgba(96,165,250,.18), rgba(96,165,250,.10));
+      border-color:rgba(96,165,250,.35);
+      box-shadow:0 10px 24px rgba(96,165,250,.10);
+    }
+
+    .chip{
+      display:inline-flex;
+      align-items:center;
+      gap:8px;
+      min-height:44px;
+      padding:10px 14px;
+      border-radius:14px;
+      border:1px solid var(--line);
+      background:rgba(255,255,255,.04);
+      color:var(--muted);
+      font-size:12px;
+      font-weight:700;
     }
 
     .grid{
       display:grid;
-      grid-template-columns: 1fr;
-      gap:14px;
+      gap:16px;
     }
 
     .cards{
       display:grid;
-      grid-template-columns: repeat(6, minmax(160px,1fr));
+      grid-template-columns:repeat(6, minmax(160px,1fr));
       gap:12px;
     }
 
     .card{
-      background: linear-gradient(180deg, rgba(255,255,255,.06), rgba(255,255,255,.03));
+      background:linear-gradient(180deg, rgba(255,255,255,.06), rgba(255,255,255,.03));
       border:1px solid var(--line);
-      border-radius: var(--r);
-      box-shadow: var(--shadow);
-      padding:14px 16px;
+      border-radius:var(--r);
+      box-shadow:var(--shadow);
+      padding:16px;
+      position:relative;
+      overflow:hidden;
+    }
+
+    .card::after{
+      content:"";
+      position:absolute;
+      inset:auto -30px -30px auto;
+      width:80px;
+      height:80px;
+      border-radius:999px;
+      background:rgba(255,255,255,.03);
+      filter:blur(4px);
+    }
+
+    .kpi{
+      text-decoration:none;
+      color:inherit;
+      transition:.18s ease;
+    }
+
+    .kpi:hover{
+      transform:translateY(-2px);
+      border-color:rgba(255,255,255,.14);
+      background:linear-gradient(180deg, rgba(255,255,255,.08), rgba(255,255,255,.04));
     }
 
     .kpi .label{
@@ -126,122 +193,207 @@
       font-size:12px;
       text-transform:uppercase;
       letter-spacing:.08em;
+      font-weight:800;
     }
 
     .kpi .value{
-      font-size:28px;
-      margin-top:8px;
-      font-weight:700;
+      margin-top:10px;
+      font-size:30px;
+      line-height:1;
+      font-weight:900;
+      letter-spacing:.2px;
     }
 
     .kpi .hint{
-      margin-top:6px;
+      margin-top:8px;
       color:var(--muted);
       font-size:12px;
+      line-height:1.4;
     }
 
     .toolbar{
       display:flex;
-      gap:10px;
       flex-wrap:wrap;
-      align-items:center;
-      padding:12px;
-      background: rgba(255,255,255,.04);
+      justify-content:space-between;
+      gap:12px;
+      padding:14px;
+      border-radius:var(--r);
       border:1px solid var(--line);
-      border-radius: var(--r);
+      background:rgba(255,255,255,.035);
+      box-shadow:var(--shadow);
     }
 
     .toolbar form{
-      display:flex;
-      gap:10px;
-      flex-wrap:wrap;
-      align-items:center;
       width:100%;
+      display:flex;
+      flex-wrap:wrap;
+      justify-content:space-between;
+      gap:12px;
+      align-items:center;
+    }
+
+    .toolbar-left,
+    .toolbar-right{
+      display:flex;
+      flex-wrap:wrap;
+      gap:10px;
+      align-items:center;
     }
 
     input, select, button{
+      min-height:44px;
       padding:10px 12px;
       border-radius:14px;
       border:1px solid var(--line);
-      background: rgba(15,26,46,.7);
-      color: var(--text);
+      background:rgba(15,26,46,.72);
+      color:var(--text);
       outline:none;
+      transition:.18s ease;
     }
 
     input::placeholder{
       color:#7f8aa0;
     }
 
+    input:focus, select:focus, button:focus{
+      border-color:rgba(96,165,250,.35);
+      box-shadow:0 0 0 3px rgba(96,165,250,.10);
+    }
+
     button{
-      background: linear-gradient(180deg, rgba(96,165,250,.22), rgba(96,165,250,.10));
       cursor:pointer;
-      font-weight:600;
+      font-weight:800;
+      background:linear-gradient(180deg, rgba(96,165,250,.20), rgba(96,165,250,.10));
+    }
+
+    button:hover{
+      transform:translateY(-1px);
+      background:linear-gradient(180deg, rgba(96,165,250,.28), rgba(96,165,250,.14));
     }
 
     .btn-secondary{
-      background: rgba(255,255,255,.06);
-      text-decoration:none;
       display:inline-flex;
       align-items:center;
+      justify-content:center;
+      min-height:44px;
       padding:10px 12px;
       border-radius:14px;
       border:1px solid var(--line);
+      background:rgba(255,255,255,.05);
       color:var(--text);
+      text-decoration:none;
+      font-weight:800;
+      transition:.18s ease;
     }
 
-    .table{
+    .btn-secondary:hover{
+      background:rgba(255,255,255,.09);
+      transform:translateY(-1px);
+    }
+
+    .table-shell{
+      border-radius:var(--r);
       overflow:hidden;
-      border-radius: var(--r);
       border:1px solid var(--line);
-      background: rgba(15,26,46,.55);
-      box-shadow: var(--shadow);
+      background:rgba(12,20,37,.72);
+      box-shadow:var(--shadow-2);
+    }
+
+    .table-head{
+      display:flex;
+      justify-content:space-between;
+      gap:10px;
+      align-items:center;
+      padding:14px 16px;
+      border-bottom:1px solid var(--line);
+      background:rgba(255,255,255,.03);
+    }
+
+    .table-title{
+      font-size:14px;
+      font-weight:900;
+      letter-spacing:.03em;
+    }
+
+    .table-sub{
+      color:var(--muted);
+      font-size:12px;
+      margin-top:3px;
+    }
+
+    .table-wrap{
+      overflow:auto;
     }
 
     table{
       width:100%;
       border-collapse:collapse;
+      min-width:1120px;
     }
 
     th, td{
-      padding:12px 14px;
+      padding:14px 14px;
       border-bottom:1px solid var(--line);
       vertical-align:top;
     }
 
     th{
-      color: var(--muted);
-      font-size:12px;
-      text-transform: uppercase;
-      letter-spacing:.08em;
-      background: rgba(255,255,255,.03);
+      color:var(--muted);
+      font-size:11px;
+      text-transform:uppercase;
+      letter-spacing:.1em;
+      text-align:left;
+      background:rgba(255,255,255,.02);
+      font-weight:900;
     }
 
-    tr:hover td{
-      background: rgba(255,255,255,.03);
+    tbody tr{
+      transition:background .16s ease;
+      position:relative;
+    }
+
+    tbody tr:hover td{
+      background:rgba(255,255,255,.025);
+    }
+
+    tbody tr.row-high td:first-child{
+      box-shadow:inset 4px 0 0 rgba(239,68,68,.95);
+    }
+
+    tbody tr.row-notfall td:first-child{
+      box-shadow:inset 4px 0 0 rgba(245,158,11,.95);
     }
 
     .muted{
       color:var(--muted);
       font-size:12px;
+      line-height:1.45;
+    }
+
+    .id{
+      margin-top:8px;
     }
 
     .status{
       display:inline-flex;
       align-items:center;
       gap:8px;
-      padding:4px 10px;
+      padding:5px 10px;
       border-radius:999px;
       border:1px solid var(--line);
-      background: rgba(255,255,255,.04);
+      background:rgba(255,255,255,.04);
       font-size:12px;
-      font-weight:600;
+      font-weight:800;
       text-transform:capitalize;
+      white-space:nowrap;
     }
 
     .dot{
       width:8px;
       height:8px;
       border-radius:999px;
+      display:inline-block;
+      flex:0 0 auto;
     }
 
     .s-offen .dot{background:var(--warn)}
@@ -249,34 +401,48 @@
     .s-erledigt .dot{background:var(--ok)}
     .s-archiviert .dot{background:#94a3b8}
 
+    .new{
+      display:inline-flex;
+      align-items:center;
+      margin-top:8px;
+      padding:4px 8px;
+      border-radius:999px;
+      border:1px solid rgba(245,158,11,.26);
+      background:rgba(245,158,11,.12);
+      color:#ffd39a;
+      font-size:11px;
+      font-weight:900;
+      letter-spacing:.05em;
+    }
+
     .priority{
       display:inline-flex;
       align-items:center;
       gap:6px;
-      padding:4px 10px;
+      padding:5px 10px;
       border-radius:999px;
       border:1px solid var(--line);
-      font-size:12px;
-      font-weight:800;
+      font-size:11px;
+      font-weight:900;
       text-transform:uppercase;
-      letter-spacing:.04em;
-      margin-top:8px;
+      letter-spacing:.06em;
+      white-space:nowrap;
     }
 
     .p-niedrig{
-      background: rgba(34,197,94,.12);
-      border-color: rgba(34,197,94,.24);
+      background:rgba(34,197,94,.12);
+      border-color:rgba(34,197,94,.24);
       color:#bbf7d0;
     }
 
     .p-normal{
-      background: rgba(255,255,255,.04);
+      background:rgba(255,255,255,.04);
       color:#dbe6f5;
     }
 
     .p-hoch{
-      background: rgba(239,68,68,.14);
-      border-color: rgba(239,68,68,.28);
+      background:rgba(239,68,68,.14);
+      border-color:rgba(239,68,68,.28);
       color:#fecaca;
     }
 
@@ -284,102 +450,167 @@
       display:inline-flex;
       align-items:center;
       gap:6px;
-      padding:4px 10px;
+      margin-top:8px;
+      padding:5px 10px;
       border-radius:999px;
       border:1px solid var(--line);
-      background: rgba(96,165,250,.10);
-      color:#cfe3ff;
       font-size:11px;
-      font-weight:800;
+      font-weight:900;
       text-transform:uppercase;
-      letter-spacing:.04em;
-      margin-top:8px;
+      letter-spacing:.05em;
+      white-space:nowrap;
     }
 
     .rt-service{
-      background: rgba(34,197,94,.10);
-      border-color: rgba(34,197,94,.22);
+      background:rgba(34,197,94,.10);
+      border-color:rgba(34,197,94,.22);
       color:#bbf7d0;
     }
 
     .rt-diagnose{
-      background: rgba(96,165,250,.10);
-      border-color: rgba(96,165,250,.22);
+      background:rgba(96,165,250,.10);
+      border-color:rgba(96,165,250,.22);
       color:#cfe3ff;
     }
 
     .rt-notfall{
-      background: rgba(245,158,11,.14);
-      border-color: rgba(245,158,11,.28);
+      background:rgba(245,158,11,.14);
+      border-color:rgba(245,158,11,.28);
       color:#ffd39a;
     }
 
-    .new{
-      margin-left:8px;
-      padding:2px 8px;
-      border-radius:999px;
-      border:1px solid var(--line);
-      background: rgba(245,158,11,.12);
-      color:#ffd39a;
-      font-size:11px;
-      font-weight:700;
-      letter-spacing:.04em;
+    .vehicle{
+      display:flex;
+      flex-direction:column;
+      gap:5px;
     }
 
-    .id{
-      margin-top:6px;
+    .vehicle .title{
+      font-weight:900;
+      line-height:1.35;
     }
 
-    .open{
+    .problem{
+      max-width:360px;
+    }
+
+    .problem-text{
+      display:-webkit-box;
+      -webkit-line-clamp:2;
+      -webkit-box-orient:vertical;
+      overflow:hidden;
+      color:#e6edf8;
+      line-height:1.5;
+      word-break:break-word;
+    }
+
+    .meta-row{
+      display:flex;
+      flex-wrap:wrap;
+      gap:8px;
+      margin-top:8px;
+    }
+
+    .tiny-badge{
       display:inline-flex;
       align-items:center;
-      justify-content:center;
-      gap:8px;
-      padding:10px 12px;
-      border-radius:14px;
+      gap:6px;
+      padding:4px 8px;
+      border-radius:999px;
       border:1px solid var(--line);
-      background: rgba(255,255,255,.06);
-      text-decoration:none;
-      font-weight:700;
+      background:rgba(255,255,255,.04);
+      color:var(--soft);
+      font-size:11px;
+      font-weight:800;
       white-space:nowrap;
-      color: var(--text);
     }
 
-    .open:hover{
-      background: rgba(255,255,255,.10);
+    .tiny-badge.warn{
+      background:rgba(245,158,11,.12);
+      border-color:rgba(245,158,11,.24);
+      color:#ffd39a;
+    }
+
+    .tiny-badge.danger{
+      background:rgba(239,68,68,.12);
+      border-color:rgba(239,68,68,.24);
+      color:#fecaca;
     }
 
     .tel a{
       color:var(--text);
       text-decoration:none;
-      font-weight:700;
+      font-weight:800;
     }
 
     .tel a:hover{
       text-decoration:underline;
     }
 
+    .date-cell{
+      white-space:nowrap;
+    }
+
+    .right{
+      text-align:right;
+    }
+
     .actions{
       display:flex;
-      gap:10px;
       justify-content:flex-end;
-      align-items:center;
+      align-items:flex-start;
+      gap:8px;
       flex-wrap:wrap;
+    }
+
+    .open,
+    .details-btn,
+    .mini-action{
+      display:inline-flex;
+      align-items:center;
+      justify-content:center;
+      min-height:40px;
+      padding:9px 12px;
+      border-radius:12px;
+      border:1px solid var(--line);
+      background:rgba(255,255,255,.05);
+      color:var(--text);
+      text-decoration:none;
+      font-size:12px;
+      font-weight:900;
+      white-space:nowrap;
+      transition:.18s ease;
+    }
+
+    .open:hover,
+    .details-btn:hover,
+    .mini-action:hover{
+      background:rgba(255,255,255,.09);
+      transform:translateY(-1px);
+    }
+
+    .details-btn{
+      cursor:pointer;
     }
 
     .quick{
       display:flex;
       gap:8px;
-      justify-content:flex-end;
       align-items:center;
+      flex-wrap:wrap;
+      justify-content:flex-end;
     }
 
     .quick select{
+      min-height:40px;
       padding:8px 10px;
+      font-size:12px;
     }
 
     .quick button{
+      min-height:40px;
       padding:8px 10px;
+      font-size:12px;
     }
 
     .archive-form{
@@ -388,41 +619,34 @@
     }
 
     .archive-btn{
-      padding:10px 12px;
-      border-radius:14px;
+      min-height:40px;
+      padding:9px 12px;
+      border-radius:12px;
       border:1px solid rgba(239,68,68,.28);
-      background: rgba(239,68,68,.14);
+      background:rgba(239,68,68,.14);
       color:#fecaca;
-      font-weight:800;
+      font-size:12px;
+      font-weight:900;
       cursor:pointer;
+      transition:.18s ease;
     }
 
     .archive-btn:hover{
-      background: rgba(239,68,68,.22);
+      background:rgba(239,68,68,.22);
+      transform:translateY(-1px);
     }
 
-    .right{
-      text-align:right;
-    }
-
-    .details-btn{
-      padding:10px 12px;
-      border-radius:14px;
-      border:1px solid var(--line);
-      background: rgba(255,255,255,.06);
-      font-weight:800;
-      cursor:pointer;
-    }
-
-    .details-btn:hover{
-      background: rgba(255,255,255,.10);
+    .empty{
+      padding:18px;
+      color:var(--muted);
+      font-size:14px;
     }
 
     .modal-backdrop{
       position:fixed;
       inset:0;
-      background: rgba(3, 8, 20, .76);
-      backdrop-filter: blur(4px);
+      background:rgba(3,8,20,.78);
+      backdrop-filter:blur(5px);
       display:none;
       align-items:center;
       justify-content:center;
@@ -431,64 +655,68 @@
     }
 
     .modal{
-      width:min(960px, 100%);
-      background: #0d172b;
+      width:min(980px,100%);
+      max-height:min(92vh, 980px);
+      overflow:auto;
+      background:#0d172b;
       border:1px solid rgba(255,255,255,.12);
-      border-radius:18px;
-      box-shadow: 0 24px 60px rgba(0,0,0,.55);
-      overflow:hidden;
+      border-radius:20px;
+      box-shadow:0 24px 60px rgba(0,0,0,.55);
     }
 
     .modal-header{
+      position:sticky;
+      top:0;
+      z-index:2;
       display:flex;
       justify-content:space-between;
-      gap:12px;
       align-items:center;
-      padding:14px 16px;
+      gap:12px;
+      padding:16px 18px;
       border-bottom:1px solid rgba(255,255,255,.10);
-      background: #101d36;
+      background:#101d36;
     }
 
     .modal-title{
       margin:0;
-      font-size:14px;
-      letter-spacing:.02em;
+      font-size:16px;
       font-weight:900;
       color:#f1f5f9;
+      letter-spacing:.02em;
     }
 
     .modal-close{
+      min-height:40px;
       padding:8px 10px;
       border-radius:12px;
       border:1px solid rgba(255,255,255,.12);
-      background: rgba(255,255,255,.07);
+      background:rgba(255,255,255,.07);
+      color:var(--text);
       cursor:pointer;
       font-weight:900;
     }
 
     .modal-body{
-      padding:16px;
+      padding:18px;
       display:grid;
       gap:14px;
       background:#0d172b;
-    }
-
-    .modal-body .muted{
-      color:#b7c0cf;
     }
 
     .mini-card{
       border:1px solid rgba(255,255,255,.10);
       border-radius:16px;
       padding:14px 16px;
-      background: #13213d;
+      background:#13213d;
     }
 
     .mini-card h3{
-      margin:0 0 10px 0;
+      margin:0 0 12px 0;
       font-size:13px;
       font-weight:900;
       color:#f1f5f9;
+      letter-spacing:.03em;
+      text-transform:uppercase;
     }
 
     .kv{
@@ -499,11 +727,12 @@
 
     .kv b{
       color:#e2e8f0;
+      font-size:13px;
     }
 
     .debug-grid{
       display:grid;
-      grid-template-columns: repeat(2, minmax(240px, 1fr));
+      grid-template-columns:repeat(2, minmax(240px, 1fr));
       gap:12px;
     }
 
@@ -520,7 +749,7 @@
       letter-spacing:.08em;
       color:#94a3b8;
       margin-bottom:6px;
-      font-weight:800;
+      font-weight:900;
     }
 
     .debug-value{
@@ -542,35 +771,21 @@
       margin-top:4px;
     }
 
-    pre{
-      white-space: pre-wrap;
-      word-break: break-word;
-      overflow:auto;
-      max-height:340px;
-      background: #0a1222;
-      border:1px solid rgba(255,255,255,.10);
-      border-radius:14px;
-      padding:12px;
-      margin:0;
-      color:#dbe6f5;
-      line-height:1.5;
-      font-size:13px;
-    }
-
     details{
       border:1px solid rgba(255,255,255,.10);
       border-radius:14px;
-      background: #13213d;
+      background:#13213d;
       overflow:hidden;
     }
 
     summary{
       cursor:pointer;
-      padding:10px 12px;
+      padding:12px 14px;
       font-weight:900;
       list-style:none;
       color:#f1f5f9;
       background:#101d36;
+      user-select:none;
     }
 
     summary::-webkit-details-marker{
@@ -583,19 +798,19 @@
       background:#13213d;
     }
 
-    .copy-btn{
-      padding:8px 10px;
-      border-radius:12px;
-      border:1px solid var(--line);
-      background: rgba(255,255,255,.06);
-      color: var(--text);
-      font-weight:900;
-      font-size:12px;
-      cursor:pointer;
-    }
-
-    .copy-btn:hover{
-      background: rgba(255,255,255,.10);
+    pre{
+      white-space:pre-wrap;
+      word-break:break-word;
+      overflow:auto;
+      max-height:340px;
+      background:#0a1222;
+      border:1px solid rgba(255,255,255,.10);
+      border-radius:14px;
+      padding:12px;
+      margin:0;
+      color:#dbe6f5;
+      line-height:1.5;
+      font-size:13px;
     }
 
     .copy-row{
@@ -605,62 +820,86 @@
       flex-wrap:wrap;
     }
 
+    .copy-btn{
+      min-height:34px;
+      padding:7px 10px;
+      border-radius:10px;
+      border:1px solid var(--line);
+      background:rgba(255,255,255,.06);
+      color:var(--text);
+      font-weight:900;
+      font-size:12px;
+      cursor:pointer;
+      transition:.18s ease;
+    }
+
+    .copy-btn:hover{
+      background:rgba(255,255,255,.10);
+    }
+
     .toast{
-      position: fixed;
-      right: 18px;
-      bottom: 18px;
-      padding: 10px 12px;
-      border-radius: 14px;
-      border: 1px solid var(--line);
-      background: rgba(0,0,0,.55);
-      color: var(--text);
-      box-shadow: var(--shadow);
-      font-weight: 900;
-      font-size: 12px;
-      opacity: 0;
-      transform: translateY(10px);
-      transition: opacity .18s ease, transform .18s ease;
+      position:fixed;
+      right:18px;
+      bottom:18px;
+      padding:10px 12px;
+      border-radius:14px;
+      border:1px solid var(--line);
+      background:rgba(0,0,0,.55);
+      color:var(--text);
+      box-shadow:var(--shadow);
+      font-weight:900;
+      font-size:12px;
+      opacity:0;
+      transform:translateY(10px);
+      transition:opacity .18s ease, transform .18s ease;
       pointer-events:none;
       z-index:60;
     }
 
     .toast.show{
       opacity:1;
-      transform: translateY(0);
+      transform:translateY(0);
     }
 
-    @media (max-width: 1100px){
+    @media (max-width: 1220px){
       .cards{
-        grid-template-columns: repeat(3, minmax(160px,1fr));
+        grid-template-columns:repeat(3, minmax(180px,1fr));
       }
     }
 
-    @media (max-width: 980px){
-      th:nth-child(5), td:nth-child(5){
-        display:none;
+    @media (max-width: 900px){
+      .cards{
+        grid-template-columns:repeat(2, minmax(180px,1fr));
       }
+
       .debug-grid{
         grid-template-columns:1fr;
       }
     }
 
-    @media (max-width: 760px){
-      .cards{
-        grid-template-columns: repeat(2, minmax(160px,1fr));
+    @media (max-width: 680px){
+      .wrap{
+        padding:14px;
       }
-    }
 
-    @media (max-width: 600px){
+      .brand h1{
+        font-size:24px;
+      }
+
       .cards{
         grid-template-columns:1fr;
       }
-      th:nth-child(4), td:nth-child(4){
-        display:none;
+
+      .toolbar form{
+        flex-direction:column;
+        align-items:stretch;
       }
-      .quick,
-      .actions{
-        justify-content:flex-start;
+
+      .toolbar-left,
+      .toolbar-right{
+        width:100%;
       }
+
       .kv{
         grid-template-columns:1fr;
       }
@@ -669,8 +908,10 @@
 </head>
 <body>
   <div class="wrap">
-    <div class="top">
+    <div class="topbar">
       <div class="brand">
+        <div class="eyebrow">WerkstattAI • internes System</div>
+
         <h1>
           {% if archive_mode %}
             WerkstattAI – Archiv
@@ -678,177 +919,239 @@
             WerkstattAI – Dashboard
           {% endif %}
         </h1>
+
         <div class="sub">
           {% if archive_mode %}
-            Archivierte Aufträge und Historie
+            Archivierte Aufträge, abgeschlossene Fälle und historische Vorgänge auf einen Blick.
           {% else %}
-            Schnell. Übersichtlich. Für echte Werkstatt-Prozesse.
+            Alle aktiven Werkstatt-Anfragen zentral an einem Ort – klar priorisiert, schnell bearbeitbar und sofort verständlich.
           {% endif %}
         </div>
       </div>
 
-      <div class="switches">
+      <div class="top-actions">
         <a class="nav-btn {% if not archive_mode %}active{% endif %}" href="/dashboard">Aktive Tickets</a>
         <a class="nav-btn {% if archive_mode %}active{% endif %}" href="/dashboard/archive">Archiv</a>
-        <div class="chip">🔒 Intern • <span class="muted">MVP v1</span></div>
+        <div class="chip">🔒 MVP v1 • intern</div>
       </div>
     </div>
 
     <div class="grid">
       <div class="cards">
-        <div class="card kpi">
+        <a class="card kpi" href="{% if archive_mode %}/dashboard/archive?status=offen&q={{ filters.q }}&sort={{ filters.sort }}{% else %}/dashboard?status=offen&q={{ filters.q }}&sort={{ filters.sort }}{% endif %}">
           <div class="label">Offen</div>
           <div class="value">{{ stats.offen or 0 }}</div>
-          <div class="hint">Neue / unbehandelte Anfragen</div>
-        </div>
-        <div class="card kpi">
+          <div class="hint">Neue oder noch unbehandelte Anfragen</div>
+        </a>
+
+        <a class="card kpi" href="{% if archive_mode %}/dashboard/archive?status=in_bearbeitung&q={{ filters.q }}&sort={{ filters.sort }}{% else %}/dashboard?status=in_bearbeitung&q={{ filters.q }}&sort={{ filters.sort }}{% endif %}">
           <div class="label">In Bearbeitung</div>
           <div class="value">{{ stats.in_bearbeitung or 0 }}</div>
-          <div class="hint">Mechaniker arbeitet dran</div>
-        </div>
-        <div class="card kpi">
+          <div class="hint">Mechaniker oder Team arbeitet bereits daran</div>
+        </a>
+
+        <a class="card kpi" href="{% if archive_mode %}/dashboard/archive?status=erledigt&q={{ filters.q }}&sort={{ filters.sort }}{% else %}/dashboard?status=erledigt&q={{ filters.q }}&sort={{ filters.sort }}{% endif %}">
           <div class="label">Erledigt</div>
           <div class="value">{{ stats.erledigt or 0 }}</div>
-          <div class="hint">Fertig / abgeschlossen</div>
-        </div>
-        <div class="card kpi">
+          <div class="hint">Abgeschlossene oder fertige Fälle</div>
+        </a>
+
+        <a class="card kpi" href="{% if archive_mode %}/dashboard/archive?status={{ filters.status }}&q=hoch&sort=priority{% else %}/dashboard?status={{ filters.status }}&q=hoch&sort=priority{% endif %}">
           <div class="label">Hohe Priorität</div>
           <div class="value">{{ stats.hoch or 0 }}</div>
-          <div class="hint">Schnell prüfen</div>
-        </div>
-        <div class="card kpi">
+          <div class="hint">Sofort prüfen oder zuerst bearbeiten</div>
+        </a>
+
+        <a class="card kpi" href="{% if archive_mode %}/dashboard/archive?status={{ filters.status }}&q=notfall&sort=priority{% else %}/dashboard?status={{ filters.status }}&q=notfall&sort=priority{% endif %}">
           <div class="label">Notfall-Typ</div>
           <div class="value">{{ stats.notfall or 0 }}</div>
-          <div class="hint">Kritische Art der Anfrage</div>
-        </div>
-        <div class="card kpi">
+          <div class="hint">Kritische Anfragen mit erhöhter Dringlichkeit</div>
+        </a>
+
+        <a class="card kpi" href="{% if archive_mode %}/dashboard/archive{% else %}/dashboard{% endif %}">
           <div class="label">Alle</div>
           <div class="value">{{ stats.all or 0 }}</div>
-          <div class="hint">Gesamt in der Liste</div>
-        </div>
+          <div class="hint">Gesamtanzahl in der aktuellen Ansicht</div>
+        </a>
       </div>
 
       <div class="toolbar">
         <form method="get" action="{% if archive_mode %}/dashboard/archive{% else %}/dashboard{% endif %}">
-          <select name="status">
-            <option value="all" {% if filters.status=="all" %}selected{% endif %}>Status: alle</option>
-            <option value="offen" {% if filters.status=="offen" %}selected{% endif %}>offen</option>
-            <option value="in_bearbeitung" {% if filters.status=="in_bearbeitung" %}selected{% endif %}>in bearbeitung</option>
-            <option value="erledigt" {% if filters.status=="erledigt" %}selected{% endif %}>erledigt</option>
-          </select>
+          <div class="toolbar-left">
+            <select name="status">
+              <option value="all" {% if filters.status=="all" %}selected{% endif %}>Status: alle</option>
+              <option value="offen" {% if filters.status=="offen" %}selected{% endif %}>offen</option>
+              <option value="in_bearbeitung" {% if filters.status=="in_bearbeitung" %}selected{% endif %}>in bearbeitung</option>
+              <option value="erledigt" {% if filters.status=="erledigt" %}selected{% endif %}>erledigt</option>
+            </select>
 
-          <input type="text" name="q" placeholder="Suche: Fahrzeug, Problem, Telefon, ID, Priorität, Typ…" value="{{ filters.q }}" style="min-width:260px; flex:1" />
+            <input
+              type="text"
+              name="q"
+              placeholder="Suche: Fahrzeug, Problem, Telefon, ID, Priorität, Typ…"
+              value="{{ filters.q }}"
+              style="min-width:300px; flex:1"
+            />
+          </div>
 
-          <select name="sort">
-            <option value="newest" {% if filters.sort=="newest" %}selected{% endif %}>Sort: neueste</option>
-            <option value="oldest" {% if filters.sort=="oldest" %}selected{% endif %}>Sort: älteste</option>
-            <option value="updated" {% if filters.sort=="updated" %}selected{% endif %}>Sort: zuletzt aktualisiert</option>
-            <option value="priority" {% if filters.sort=="priority" %}selected{% endif %}>Sort: Priorität</option>
-          </select>
+          <div class="toolbar-right">
+            <select name="sort">
+              <option value="newest" {% if filters.sort=="newest" %}selected{% endif %}>Sort: neueste</option>
+              <option value="oldest" {% if filters.sort=="oldest" %}selected{% endif %}>Sort: älteste</option>
+              <option value="updated" {% if filters.sort=="updated" %}selected{% endif %}>Sort: zuletzt aktualisiert</option>
+              <option value="priority" {% if filters.sort=="priority" %}selected{% endif %}>Sort: Priorität</option>
+            </select>
 
-          <button type="submit">Anwenden</button>
-          <a class="btn-secondary" href="{% if archive_mode %}/dashboard/archive{% else %}/dashboard{% endif %}">Reset</a>
+            <button type="submit">Anwenden</button>
+            <a class="btn-secondary" href="{% if archive_mode %}/dashboard/archive{% else %}/dashboard{% endif %}">Reset</a>
+          </div>
         </form>
       </div>
 
-      <div class="table">
-        <table>
-          <thead>
-            <tr>
-              <th>Status</th>
-              <th>Priorität</th>
-              <th>Fahrzeug</th>
-              <th>Problem</th>
-              <th>Telefon</th>
-              <th>Erstellt</th>
-              <th class="right">Aktion</th>
-            </tr>
-          </thead>
-          <tbody>
-            {% for t in tickets %}
-            <tr>
-              <td>
-                <span class="status s-{{ t.status_ui }}">
-                  <span class="dot"></span>
-                  {{ (t.status_ui or "-") | replace("_", " ") }}
-                </span>
-                {% if t.is_new and not archive_mode %}<span class="new">NEW</span>{% endif %}
-                <div class="muted id">ID: {{ t._id }}</div>
-              </td>
+      <div class="table-shell">
+        <div class="table-head">
+          <div>
+            <div class="table-title">
+              {% if archive_mode %}
+                Archivierte Tickets
+              {% else %}
+                Aktive Tickets
+              {% endif %}
+            </div>
+            <div class="table-sub">
+              Übersicht aller Vorgänge mit Status, Priorität und Schnellaktionen
+            </div>
+          </div>
+        </div>
 
-              <td>
-                <span class="priority p-{{ t.priority or 'normal' }}">
-                  {{ t.priority or "normal" }}
-                </span>
-                <div>
-                  <span class="request-type rt-{{ t.request_type or 'diagnose' }}">
-                    {{ t.request_type or "diagnose" }}
+        <div class="table-wrap">
+          <table>
+            <thead>
+              <tr>
+                <th>Status</th>
+                <th>Priorität</th>
+                <th>Fahrzeug / Kunde</th>
+                <th>Problem</th>
+                <th>Telefon</th>
+                <th>Erstellt</th>
+                <th class="right">Aktion</th>
+              </tr>
+            </thead>
+            <tbody>
+              {% for t in tickets %}
+              <tr
+                class="
+                  {% if t.priority == 'hoch' %}row-high{% endif %}
+                  {% if t.request_type == 'notfall' %}row-notfall{% endif %}
+                "
+              >
+                <td>
+                  <span class="status s-{{ t.status_ui }}">
+                    <span class="dot"></span>
+                    {{ (t.status_ui or "-") | replace("_", " ") }}
                   </span>
-                </div>
-              </td>
 
-              <td>
-                <div style="font-weight:800;">{{ t.fahrzeug or "-" }}</div>
-                <div class="muted">Kunde: {{ t.kunde_name or "-" }}</div>
-                <div class="muted">Baujahr: {{ t.baujahr or "-" }}</div>
-              </td>
-
-              <td>{{ t.problem or "-" }}</td>
-
-              <td class="tel">
-                {% if t.telefon %}
-                  <a href="tel:{{ t.telefon }}">{{ t.telefon }}</a>
-                {% else %}-{% endif %}
-              </td>
-
-              <td class="muted">{{ t.created_at }}</td>
-
-              <td class="right">
-                <div class="actions">
-                  <a class="open" href="/dashboard/ticket/{{ t._id }}">Öffnen →</a>
-
-                  <button
-                    class="details-btn"
-                    type="button"
-                    data-details='{{ t._details | tojson }}'
-                  >
-                    Details
-                  </button>
-
-                  {% if not archive_mode %}
-                  <form class="quick" method="post" action="/dashboard/ticket/{{ t._id }}/status_quick">
-                    <select name="status">
-                      <option value="offen" {% if t.status_ui=="offen" %}selected{% endif %}>offen</option>
-                      <option value="in_bearbeitung" {% if t.status_ui=="in_bearbeitung" %}selected{% endif %}>in bearbeitung</option>
-                      <option value="erledigt" {% if t.status_ui=="erledigt" %}selected{% endif %}>erledigt</option>
-                    </select>
-                    <button type="submit">Speichern</button>
-                  </form>
-
-                  {% if t.status_ui == "erledigt" %}
-                  <form
-                    class="archive-form"
-                    method="post"
-                    action="/dashboard/ticket/{{ t._id }}/archive"
-                    onsubmit="return confirm('Dieses Ticket wirklich archivieren?');"
-                  >
-                    <button class="archive-btn" type="submit">Archivieren</button>
-                  </form>
+                  {% if t.is_new and not archive_mode %}
+                    <div><span class="new">NEW</span></div>
                   {% endif %}
+
+                  <div class="muted id">ID: {{ t._id }}</div>
+                </td>
+
+                <td>
+                  <span class="priority p-{{ t.priority or 'normal' }}">
+                    {{ t.priority or "normal" }}
+                  </span>
+
+                  <div>
+                    <span class="request-type rt-{{ t.request_type or 'diagnose' }}">
+                      {{ t.request_type or "diagnose" }}
+                    </span>
+                  </div>
+                </td>
+
+                <td>
+                  <div class="vehicle">
+                    <div class="title">{{ t.fahrzeug or "-" }}</div>
+                    <div class="muted">Kunde: {{ t.kunde_name or "-" }}</div>
+                    <div class="muted">Baujahr: {{ t.baujahr or "-" }}</div>
+                  </div>
+                </td>
+
+                <td class="problem">
+                  <div class="problem-text">{{ t.problem or "-" }}</div>
+
+                  <div class="meta-row">
+                    {% if t.fahrbereit is not none %}
+                      <span class="tiny-badge {% if not t.fahrbereit %}warn{% endif %}">
+                        Fahrbereit:
+                        {% if t.fahrbereit %}Ja{% else %}Nein{% endif %}
+                      </span>
+                    {% endif %}
+
+                    {% if t.abschleppdienst %}
+                      <span class="tiny-badge danger">Abschleppdienst</span>
+                    {% endif %}
+                  </div>
+                </td>
+
+                <td class="tel">
+                  {% if t.telefon %}
+                    <a href="tel:{{ t.telefon }}">{{ t.telefon }}</a>
+                  {% else %}
+                    -
                   {% endif %}
-                </div>
-              </td>
-            </tr>
-            {% endfor %}
-          </tbody>
-        </table>
+                </td>
+
+                <td class="muted date-cell">{{ t.created_at }}</td>
+
+                <td class="right">
+                  <div class="actions">
+                    <a class="open" href="/dashboard/ticket/{{ t._id }}">Ticket öffnen</a>
+
+                    <button
+                      class="details-btn"
+                      type="button"
+                      data-details='{{ t._details | tojson }}'
+                    >
+                      Schnellansicht
+                    </button>
+
+                    {% if not archive_mode %}
+                    <form class="quick" method="post" action="/dashboard/ticket/{{ t._id }}/status_quick">
+                      <select name="status">
+                        <option value="offen" {% if t.status_ui=="offen" %}selected{% endif %}>offen</option>
+                        <option value="in_bearbeitung" {% if t.status_ui=="in_bearbeitung" %}selected{% endif %}>in bearbeitung</option>
+                        <option value="erledigt" {% if t.status_ui=="erledigt" %}selected{% endif %}>erledigt</option>
+                      </select>
+                      <button type="submit">Status speichern</button>
+                    </form>
+
+                    {% if t.status_ui == "erledigt" %}
+                    <form
+                      class="archive-form"
+                      method="post"
+                      action="/dashboard/ticket/{{ t._id }}/archive"
+                      onsubmit="return confirm('Dieses Ticket wirklich archivieren?');"
+                    >
+                      <button class="archive-btn" type="submit">Archivieren</button>
+                    </form>
+                    {% endif %}
+                    {% endif %}
+                  </div>
+                </td>
+              </tr>
+              {% endfor %}
+            </tbody>
+          </table>
+        </div>
 
         {% if tickets|length == 0 %}
-          <div style="padding:14px;" class="muted">
+          <div class="empty">
             {% if archive_mode %}
               Keine archivierten Tickets gefunden.
             {% else %}
-              Keine Tickets gefunden (Filter/Suche?).
+              Keine Tickets gefunden. Prüfe Filter oder Sucheingabe.
             {% endif %}
           </div>
         {% endif %}
@@ -860,7 +1163,7 @@
     <div class="modal" role="dialog" aria-modal="true" aria-labelledby="modalTitle">
       <div class="modal-header">
         <div>
-          <div class="modal-title" id="modalTitle">Ticket Details</div>
+          <div class="modal-title" id="modalTitle">Ticket Schnellansicht</div>
           <div class="muted" id="modalSubtitle"></div>
         </div>
         <button class="modal-close" type="button" id="modalClose">✕</button>
@@ -871,11 +1174,13 @@
           <h3>Kontakt</h3>
           <div class="kv">
             <b>Kunde</b><div class="muted" id="mKunde">-</div>
+
             <b>Telefon</b>
             <div class="copy-row">
               <span class="muted" id="mTelefon">-</span>
               <button class="copy-btn" type="button" data-copy="#mTelefon">Kopieren</button>
             </div>
+
             <b>Ticket-ID</b>
             <div class="copy-row">
               <span class="muted" id="mId">-</span>
@@ -885,7 +1190,7 @@
         </div>
 
         <div class="mini-card">
-          <h3>Fahrzeug & Problem</h3>
+          <h3>Fahrzeug & Fall</h3>
           <div class="kv">
             <b>Fahrzeug</b><div class="muted" id="mFahrzeug">-</div>
             <b>Baujahr</b><div class="muted" id="mBaujahr">-</div>
@@ -897,32 +1202,38 @@
         </div>
 
         <div class="mini-card">
-          <h3>Debug Übersicht</h3>
+          <h3>Systemdaten</h3>
           <div class="debug-grid">
             <div class="debug-item">
               <div class="debug-label">Backend Status</div>
               <div class="debug-value" id="dStatusBackend">-</div>
             </div>
+
             <div class="debug-item">
               <div class="debug-label">Priorität</div>
               <div class="debug-value" id="dPriority">-</div>
             </div>
+
             <div class="debug-item">
               <div class="debug-label">Request Type</div>
               <div class="debug-value" id="dRequestType">-</div>
             </div>
+
             <div class="debug-item">
               <div class="debug-label">Fahrbereit</div>
               <div class="debug-value" id="dFahrbereit">-</div>
             </div>
+
             <div class="debug-item">
               <div class="debug-label">Abschleppdienst</div>
               <div class="debug-value" id="dAbschleppdienst">-</div>
             </div>
+
             <div class="debug-item">
               <div class="debug-label">Kilometerstand</div>
               <div class="debug-value" id="dKilometerstand">-</div>
             </div>
+
             <div class="debug-item">
               <div class="debug-label">Interne ID</div>
               <div class="debug-value" id="dInternalId">-</div>
@@ -937,14 +1248,17 @@
               <div class="debug-label">Erstellt</div>
               <div class="debug-value" id="dCreatedAt">-</div>
             </div>
+
             <div class="debug-item">
               <div class="debug-label">Aktualisiert</div>
               <div class="debug-value" id="dUpdatedAt">-</div>
             </div>
+
             <div class="debug-item">
               <div class="debug-label">Follow-up Fragen</div>
               <div class="debug-value" id="dFollowupQuestions">-</div>
             </div>
+
             <div class="debug-item">
               <div class="debug-label">Follow-up Antworten</div>
               <div class="debug-value" id="dFollowupAnswers">-</div>

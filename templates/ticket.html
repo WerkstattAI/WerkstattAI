@@ -3,36 +3,49 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width,initial-scale=1" />
-  <title>Ticket</title>
+  <title>WerkstattAI – Ticket</title>
   <style>
     :root{
-      --bg:#0b1220;
-      --card:#0f1a2e;
-      --muted:#9aa4b2;
-      --text:#e6eaf0;
+      --bg:#09111f;
+      --bg-2:#0d1629;
+      --card:#0f1b33;
+      --card-2:#13213d;
+      --panel:#101a31;
       --line:rgba(255,255,255,.08);
-      --shadow: 0 10px 30px rgba(0,0,0,.35);
-      --r:18px;
+      --line-2:rgba(255,255,255,.12);
+      --text:#e8eef8;
+      --muted:#97a3b6;
+      --soft:#c8d4e4;
+
+      --ok:#22c55e;
       --warn:#f59e0b;
       --info:#60a5fa;
-      --ok:#22c55e;
       --danger:#ef4444;
+
+      --shadow:0 10px 30px rgba(0,0,0,.32);
+      --shadow-2:0 20px 50px rgba(0,0,0,.42);
+      --r:20px;
+      --r-sm:14px;
     }
 
     *{box-sizing:border-box}
 
+    html{
+      scroll-behavior:smooth;
+    }
+
     body{
       margin:0;
       font-family: system-ui, -apple-system, Segoe UI, Roboto, Arial, sans-serif;
-      background:
-        radial-gradient(1200px 600px at 20% -10%, #1d3a8a33, transparent 60%),
-        radial-gradient(1000px 500px at 90% 0%, #0ea5e933, transparent 60%),
-        var(--bg);
       color:var(--text);
+      background:
+        radial-gradient(1100px 500px at 15% -10%, rgba(37,99,235,.18), transparent 60%),
+        radial-gradient(900px 480px at 95% 0%, rgba(14,165,233,.12), transparent 60%),
+        linear-gradient(180deg, #09111f 0%, #0a1222 100%);
     }
 
     .wrap{
-      max-width:1100px;
+      max-width:1180px;
       margin:0 auto;
       padding:22px;
     }
@@ -40,68 +53,205 @@
     a{
       color:var(--text);
       text-decoration:none;
-      font-weight:700;
+      font-weight:800;
     }
 
-    a:hover{text-decoration:underline}
+    a:hover{
+      text-decoration:underline;
+    }
 
     .muted{
       color:var(--muted);
       font-size:12px;
+      line-height:1.5;
     }
 
     .card{
-      background: linear-gradient(180deg, rgba(255,255,255,.06), rgba(255,255,255,.03));
+      background:linear-gradient(180deg, rgba(255,255,255,.06), rgba(255,255,255,.03));
       border:1px solid var(--line);
-      border-radius: var(--r);
-      box-shadow: var(--shadow);
-      padding:14px 16px;
+      border-radius:var(--r);
+      box-shadow:var(--shadow);
+      padding:16px;
     }
 
-    .top{
+    .topbar{
       display:flex;
       justify-content:space-between;
-      gap:12px;
+      gap:16px;
       flex-wrap:wrap;
-      align-items:center;
-      margin-bottom:12px;
+      align-items:flex-start;
+      margin-bottom:16px;
     }
 
-    .title{
-      margin:0;
-      font-size:18px;
+    .topbar-left{
+      display:flex;
+      flex-direction:column;
+      gap:10px;
+    }
+
+    .back-link{
+      display:inline-flex;
+      align-items:center;
+      gap:8px;
+      width:max-content;
+      min-height:42px;
+      padding:10px 14px;
+      border-radius:14px;
+      border:1px solid var(--line);
+      background:rgba(255,255,255,.05);
+      transition:.18s ease;
+    }
+
+    .back-link:hover{
+      background:rgba(255,255,255,.09);
+      text-decoration:none;
+      transform:translateY(-1px);
+    }
+
+    .eyebrow{
+      display:inline-flex;
+      align-items:center;
+      gap:8px;
+      width:max-content;
+      padding:7px 11px;
+      border-radius:999px;
+      border:1px solid var(--line);
+      background:rgba(255,255,255,.04);
+      color:var(--muted);
+      font-size:12px;
+      font-weight:800;
+      letter-spacing:.04em;
+      text-transform:uppercase;
     }
 
     .title-row{
       display:flex;
-      gap:10px;
+      flex-wrap:wrap;
       align-items:center;
+      gap:10px;
+    }
+
+    .title{
+      margin:0;
+      font-size:30px;
+      line-height:1.1;
+      letter-spacing:.2px;
+    }
+
+    .copy-wrap{
+      display:inline-flex;
+      align-items:center;
+      gap:8px;
       flex-wrap:wrap;
     }
 
-    .grid{
-      display:grid;
-      grid-template-columns: repeat(3, minmax(220px, 1fr));
-      gap:12px;
+    .copy-btn{
+      min-height:36px;
+      padding:8px 10px;
+      border-radius:12px;
+      border:1px solid var(--line);
+      background:rgba(255,255,255,.06);
+      color:var(--text);
+      font-weight:900;
+      font-size:12px;
+      cursor:pointer;
+      transition:.18s ease;
     }
 
-    .row{
-      margin-top:12px;
+    .copy-btn:hover{
+      background:rgba(255,255,255,.10);
+      transform:translateY(-1px);
+    }
+
+    .copy-btn:disabled{
+      opacity:.5;
+      cursor:not-allowed;
+      transform:none;
+    }
+
+    .mini{
+      font-size:12px;
+      color:var(--muted);
+      font-weight:800;
+    }
+
+    .hero{
       display:grid;
-      grid-template-columns: 1fr;
-      gap:12px;
+      grid-template-columns: 1.25fr .95fr;
+      gap:14px;
+      margin-bottom:14px;
+    }
+
+    .hero-main{
+      position:relative;
+      overflow:hidden;
+      background:
+        radial-gradient(500px 180px at 0% 0%, rgba(96,165,250,.12), transparent 60%),
+        linear-gradient(180deg, rgba(255,255,255,.06), rgba(255,255,255,.03));
+    }
+
+    .hero-main::after{
+      content:"";
+      position:absolute;
+      right:-30px;
+      bottom:-30px;
+      width:140px;
+      height:140px;
+      border-radius:999px;
+      background:rgba(255,255,255,.03);
+      filter:blur(6px);
+    }
+
+    .hero-label{
+      color:var(--muted);
+      font-size:12px;
+      text-transform:uppercase;
+      letter-spacing:.08em;
+      font-weight:900;
+    }
+
+    .hero-problem{
+      font-size:28px;
+      line-height:1.2;
+      font-weight:900;
+      margin-top:10px;
+      max-width:760px;
+      position:relative;
+      z-index:1;
+    }
+
+    .hero-meta{
+      display:flex;
+      flex-wrap:wrap;
+      gap:8px;
+      margin-top:14px;
+      position:relative;
+      z-index:1;
+    }
+
+    .pill{
+      display:inline-flex;
+      align-items:center;
+      gap:8px;
+      padding:6px 11px;
+      border-radius:999px;
+      border:1px solid var(--line);
+      background:rgba(255,255,255,.04);
+      font-size:12px;
+      font-weight:800;
+      white-space:nowrap;
     }
 
     .status{
       display:inline-flex;
       align-items:center;
       gap:8px;
-      padding:4px 10px;
+      padding:5px 11px;
       border-radius:999px;
       border:1px solid var(--line);
-      background: rgba(255,255,255,.04);
+      background:rgba(255,255,255,.04);
       font-size:12px;
-      font-weight:800;
+      font-weight:900;
       text-transform:capitalize;
     }
 
@@ -109,48 +259,42 @@
       width:8px;
       height:8px;
       border-radius:999px;
+      flex:0 0 auto;
     }
 
     .s-offen .dot{background:var(--warn)}
     .s-in_bearbeitung .dot{background:var(--info)}
     .s-erledigt .dot{background:var(--ok)}
     .s-archiviert .dot{background:#94a3b8}
-    .s-geschlossen .dot{background:var(--ok)} /* fallback */
-
-    .badge-row{
-      display:flex;
-      gap:8px;
-      flex-wrap:wrap;
-      margin-top:8px;
-    }
+    .s-geschlossen .dot{background:var(--ok)}
 
     .priority{
       display:inline-flex;
       align-items:center;
       gap:6px;
-      padding:4px 10px;
+      padding:5px 11px;
       border-radius:999px;
       border:1px solid var(--line);
-      font-size:12px;
-      font-weight:800;
+      font-size:11px;
+      font-weight:900;
       text-transform:uppercase;
-      letter-spacing:.04em;
+      letter-spacing:.06em;
     }
 
     .p-niedrig{
-      background: rgba(34,197,94,.12);
-      border-color: rgba(34,197,94,.24);
+      background:rgba(34,197,94,.12);
+      border-color:rgba(34,197,94,.24);
       color:#bbf7d0;
     }
 
     .p-normal{
-      background: rgba(255,255,255,.04);
+      background:rgba(255,255,255,.04);
       color:#dbe6f5;
     }
 
     .p-hoch{
-      background: rgba(239,68,68,.14);
-      border-color: rgba(239,68,68,.28);
+      background:rgba(239,68,68,.14);
+      border-color:rgba(239,68,68,.28);
       color:#fecaca;
     }
 
@@ -158,132 +302,122 @@
       display:inline-flex;
       align-items:center;
       gap:6px;
-      padding:4px 10px;
+      padding:5px 11px;
       border-radius:999px;
       border:1px solid var(--line);
-      font-size:12px;
-      font-weight:800;
+      font-size:11px;
+      font-weight:900;
       text-transform:uppercase;
-      letter-spacing:.04em;
+      letter-spacing:.05em;
     }
 
     .rt-service{
-      background: rgba(34,197,94,.10);
-      border-color: rgba(34,197,94,.22);
+      background:rgba(34,197,94,.10);
+      border-color:rgba(34,197,94,.22);
       color:#bbf7d0;
     }
 
     .rt-diagnose{
-      background: rgba(96,165,250,.10);
-      border-color: rgba(96,165,250,.22);
+      background:rgba(96,165,250,.10);
+      border-color:rgba(96,165,250,.22);
       color:#cfe3ff;
     }
 
     .rt-notfall{
-      background: rgba(245,158,11,.14);
-      border-color: rgba(245,158,11,.28);
+      background:rgba(245,158,11,.14);
+      border-color:rgba(245,158,11,.28);
       color:#ffd39a;
     }
 
-    input, select, button{
-      padding:10px 12px;
-      border-radius:14px;
-      border:1px solid var(--line);
-      background: rgba(15,26,46,.7);
-      color:var(--text);
-    }
-
-    button{
-      cursor:pointer;
-      font-weight:700;
-    }
-
-    .copy-btn{
-      padding:8px 10px;
-      border-radius:12px;
-      border:1px solid var(--line);
-      background: rgba(255,255,255,.06);
-      color: var(--text);
-      font-weight:800;
-      font-size:12px;
-    }
-
-    .copy-btn:hover{
-      background: rgba(255,255,255,.10);
-    }
-
-    .archive-btn{
-      padding:10px 12px;
-      border-radius:14px;
-      border:1px solid rgba(239,68,68,.28);
-      background: rgba(239,68,68,.14);
-      color:#fecaca;
-      font-weight:800;
-    }
-
-    .archive-btn:hover{
-      background: rgba(239,68,68,.22);
-    }
-
-    .copy-wrap{
+    .tiny-badge{
       display:inline-flex;
-      gap:8px;
       align-items:center;
-    }
-
-    .mini{
-      font-size:12px;
-      color: var(--muted);
-      font-weight:700;
-    }
-
-    .actions{
-      display:flex;
-      gap:10px;
-      flex-wrap:wrap;
-      align-items:flex-end;
-    }
-
-    details{
-      margin-top:12px;
-      border:1px solid rgba(255,255,255,.10);
-      border-radius:14px;
-      background: #13213d;
-      overflow:hidden;
-    }
-
-    summary{
-      cursor:pointer;
-      padding:10px 12px;
+      gap:6px;
+      padding:5px 10px;
+      border-radius:999px;
+      border:1px solid var(--line);
+      background:rgba(255,255,255,.04);
+      color:var(--soft);
+      font-size:11px;
       font-weight:800;
-      list-style:none;
-      color:#f1f5f9;
-      background:#101d36;
     }
 
-    summary::-webkit-details-marker{
-      display:none;
+    .tiny-badge.warn{
+      background:rgba(245,158,11,.12);
+      border-color:rgba(245,158,11,.24);
+      color:#ffd39a;
     }
 
-    .raw{
-      padding:12px;
-      border-top:1px solid rgba(255,255,255,.08);
-      background:#13213d;
+    .tiny-badge.danger{
+      background:rgba(239,68,68,.12);
+      border-color:rgba(239,68,68,.24);
+      color:#fecaca;
     }
 
-    pre{
-      white-space: pre-wrap;
-      word-break: break-word;
-      overflow:auto;
-      max-height:360px;
-      background: #0a1222;
-      border:1px solid rgba(255,255,255,.10);
-      border-radius:14px;
-      padding:12px;
-      margin:0;
-      color:#dbe6f5;
-      line-height:1.5;
+    .hero-side{
+      display:flex;
+      flex-direction:column;
+      gap:12px;
+    }
+
+    .status-card{
+      min-height:100%;
+      {% raw %}{% endraw %}
+    }
+
+    .status-card.row-high{
+      box-shadow:inset 4px 0 0 rgba(239,68,68,.95), var(--shadow);
+    }
+
+    .status-card.row-notfall{
+      box-shadow:inset 4px 0 0 rgba(245,158,11,.95), var(--shadow);
+    }
+
+    .status-head{
+      display:flex;
+      justify-content:space-between;
+      gap:12px;
+      align-items:flex-start;
+      flex-wrap:wrap;
+    }
+
+    .status-value{
+      margin-top:8px;
+    }
+
+    .status-sub{
+      margin-top:10px;
+      color:var(--muted);
       font-size:13px;
+      line-height:1.5;
+    }
+
+    .grid{
+      display:grid;
+      grid-template-columns:repeat(3, minmax(220px, 1fr));
+      gap:14px;
+      margin-bottom:14px;
+    }
+
+    .section{
+      display:grid;
+      gap:14px;
+    }
+
+    .section-title{
+      margin:0 0 10px 0;
+      font-size:13px;
+      font-weight:900;
+      color:#f1f5f9;
+      letter-spacing:.05em;
+      text-transform:uppercase;
+    }
+
+    .value-lg{
+      font-size:20px;
+      font-weight:900;
+      line-height:1.25;
+      margin-top:6px;
     }
 
     .kv{
@@ -294,18 +428,89 @@
     }
 
     .kv b{
-      color:#cfd6e3;
+      color:#d7dfeb;
+      font-size:13px;
     }
 
     .divider{
       height:1px;
       background:var(--line);
-      margin:12px 0;
+      margin:14px 0;
+    }
+
+    .problem-box{
+      font-size:20px;
+      font-weight:900;
+      line-height:1.35;
+      margin-top:6px;
+    }
+
+    .action-card{
+      background:
+        radial-gradient(420px 160px at 100% 0%, rgba(96,165,250,.10), transparent 60%),
+        linear-gradient(180deg, rgba(255,255,255,.06), rgba(255,255,255,.03));
+    }
+
+    .actions{
+      display:flex;
+      gap:12px;
+      flex-wrap:wrap;
+      align-items:flex-end;
+    }
+
+    .status-form{
+      display:flex;
+      gap:10px;
+      flex-wrap:wrap;
+      align-items:flex-end;
+      flex:1;
+    }
+
+    .field{
+      min-width:260px;
+      flex:1;
+    }
+
+    input, select, button{
+      min-height:44px;
+      padding:10px 12px;
+      border-radius:14px;
+      border:1px solid var(--line);
+      background:rgba(15,26,46,.72);
+      color:var(--text);
+      outline:none;
+      transition:.18s ease;
+    }
+
+    input:focus, select:focus, button:focus{
+      border-color:rgba(96,165,250,.35);
+      box-shadow:0 0 0 3px rgba(96,165,250,.10);
+    }
+
+    button{
+      cursor:pointer;
+      font-weight:900;
+      background:linear-gradient(180deg, rgba(96,165,250,.20), rgba(96,165,250,.10));
+    }
+
+    button:hover{
+      transform:translateY(-1px);
+      background:linear-gradient(180deg, rgba(96,165,250,.28), rgba(96,165,250,.14));
+    }
+
+    .archive-btn{
+      background:rgba(239,68,68,.14);
+      border:1px solid rgba(239,68,68,.28);
+      color:#fecaca;
+    }
+
+    .archive-btn:hover{
+      background:rgba(239,68,68,.22);
     }
 
     .debug-grid{
       display:grid;
-      grid-template-columns: repeat(2, minmax(240px, 1fr));
+      grid-template-columns:repeat(2, minmax(240px, 1fr));
       gap:12px;
       margin-top:12px;
     }
@@ -323,7 +528,7 @@
       letter-spacing:.08em;
       color:#94a3b8;
       margin-bottom:6px;
-      font-weight:800;
+      font-weight:900;
     }
 
     .debug-value{
@@ -345,6 +550,49 @@
       margin-top:4px;
     }
 
+    details{
+      border:1px solid rgba(255,255,255,.10);
+      border-radius:14px;
+      background:#13213d;
+      overflow:hidden;
+      margin-top:14px;
+    }
+
+    summary{
+      cursor:pointer;
+      padding:12px 14px;
+      font-weight:900;
+      list-style:none;
+      color:#f1f5f9;
+      background:#101d36;
+      user-select:none;
+    }
+
+    summary::-webkit-details-marker{
+      display:none;
+    }
+
+    .raw{
+      padding:12px;
+      border-top:1px solid rgba(255,255,255,.08);
+      background:#13213d;
+    }
+
+    pre{
+      white-space:pre-wrap;
+      word-break:break-word;
+      overflow:auto;
+      max-height:360px;
+      background:#0a1222;
+      border:1px solid rgba(255,255,255,.10);
+      border-radius:14px;
+      padding:12px;
+      margin:0;
+      color:#dbe6f5;
+      line-height:1.5;
+      font-size:13px;
+    }
+
     .toast{
       position:fixed;
       right:18px;
@@ -352,86 +600,147 @@
       padding:10px 12px;
       border-radius:14px;
       border:1px solid var(--line);
-      background: rgba(0,0,0,.55);
+      background:rgba(0,0,0,.55);
       color:var(--text);
-      box-shadow: var(--shadow);
-      font-weight:800;
+      box-shadow:var(--shadow);
+      font-weight:900;
       font-size:12px;
       opacity:0;
-      transform: translateY(10px);
-      transition: opacity .18s ease, transform .18s ease;
+      transform:translateY(10px);
+      transition:opacity .18s ease, transform .18s ease;
       pointer-events:none;
+      z-index:60;
     }
 
     .toast.show{
       opacity:1;
-      transform: translateY(0);
+      transform:translateY(0);
     }
 
-    @media (max-width: 900px){
-      .grid{
-        grid-template-columns: 1fr;
+    @media (max-width: 980px){
+      .hero{
+        grid-template-columns:1fr;
       }
 
-      .kv{
-        grid-template-columns: 1fr;
+      .grid{
+        grid-template-columns:1fr;
       }
 
       .debug-grid{
         grid-template-columns:1fr;
+      }
+
+      .kv{
+        grid-template-columns:1fr;
+      }
+    }
+
+    @media (max-width: 680px){
+      .wrap{
+        padding:14px;
+      }
+
+      .title{
+        font-size:24px;
+      }
+
+      .hero-problem{
+        font-size:22px;
       }
     }
   </style>
 </head>
 <body>
   <div class="wrap">
-    <div class="top">
-      <div>
-        <a href="/dashboard">← Zurück</a>
+    <div class="topbar">
+      <div class="topbar-left">
+        <a class="back-link" href="/dashboard">← Zurück zum Dashboard</a>
+        <div class="eyebrow">WerkstattAI • Ticketansicht</div>
 
-        <div class="title-row">
-          <h1 class="title">Ticket <span id="ticketIdText">{{ ticket._id }}</span></h1>
+        <div>
+          <div class="title-row">
+            <h1 class="title">Ticket <span id="ticketIdText">{{ ticket._id }}</span></h1>
 
-          <div class="copy-wrap">
-            <button class="copy-btn" type="button" data-copy="#ticketIdText">Kopieren</button>
-            <span class="mini">ID</span>
+            <div class="copy-wrap">
+              <button class="copy-btn" type="button" data-copy="#ticketIdText">Kopieren</button>
+              <span class="mini">ID</span>
+            </div>
           </div>
-        </div>
 
-        <div class="muted">Übersicht und Status-Management</div>
+          <div class="muted">Vollansicht mit Statusverwaltung, Kontaktdaten und internen Systeminformationen.</div>
+        </div>
+      </div>
+    </div>
+
+    <div class="hero">
+      <div class="card hero-main">
+        <div class="hero-label">Gemeldetes Problem</div>
+        <div class="hero-problem">{{ ticket.problem or "-" }}</div>
+
+        <div class="hero-meta">
+          <span class="pill">Fahrzeug: {{ ticket.fahrzeug or "-" }}</span>
+          <span class="pill">Baujahr: {{ ticket.baujahr or "-" }}</span>
+
+          {% if ticket.kilometerstand %}
+            <span class="pill">Kilometerstand: {{ ticket.kilometerstand }}</span>
+          {% endif %}
+
+          {% if ticket.fahrbereit is not none %}
+            <span class="tiny-badge {% if not ticket.fahrbereit %}warn{% endif %}">
+              Fahrbereit:
+              {% if ticket.fahrbereit %}Ja{% else %}Nein{% endif %}
+            </span>
+          {% endif %}
+
+          {% if ticket.abschleppdienst %}
+            <span class="tiny-badge danger">Abschleppdienst</span>
+          {% endif %}
+        </div>
       </div>
 
-      <div class="card">
-        <div class="muted">Status</div>
-        <div style="margin-top:6px;">
-          <span class="status s-{{ ticket.status_ui }}">
-            <span class="dot"></span>
-            {{ (ticket.status_ui or "-") | replace("_", " ") }}
-          </span>
-        </div>
+      <div class="hero-side">
+        <div class="card status-card {% if ticket.priority == 'hoch' %}row-high{% endif %} {% if ticket.request_type == 'notfall' %}row-notfall{% endif %}">
+          <div class="status-head">
+            <div>
+              <div class="muted">Aktueller Status</div>
+              <div class="status-value">
+                <span class="status s-{{ ticket.status_ui }}">
+                  <span class="dot"></span>
+                  {{ (ticket.status_ui or "-") | replace("_", " ") }}
+                </span>
+              </div>
+            </div>
+          </div>
 
-        <div class="badge-row">
-          <span class="priority p-{{ ticket.priority or 'normal' }}">
-            {{ ticket.priority or "-" }}
-          </span>
-          <span class="request-type rt-{{ ticket.request_type or 'diagnose' }}">
-            {{ ticket.request_type or "-" }}
-          </span>
+          <div style="display:flex; gap:8px; flex-wrap:wrap; margin-top:12px;">
+            <span class="priority p-{{ ticket.priority or 'normal' }}">
+              {{ ticket.priority or "-" }}
+            </span>
+            <span class="request-type rt-{{ ticket.request_type or 'diagnose' }}">
+              {{ ticket.request_type or "-" }}
+            </span>
+          </div>
+
+          <div class="status-sub">
+            Ticket-ID: {{ ticket._id or "-" }}<br>
+            Backend-Status: {{ ticket.status or "-" }}
+          </div>
         </div>
       </div>
     </div>
 
     <div class="grid">
       <div class="card">
-        <div class="muted">Fahrzeug</div>
-        <div style="font-size:18px; font-weight:900; margin-top:6px;">{{ ticket.fahrzeug or "-" }}</div>
-        <div class="muted" style="margin-top:6px;">Baujahr: {{ ticket.baujahr or "-" }}</div>
-        <div class="muted" style="margin-top:6px;">Kilometerstand: {{ ticket.kilometerstand or "-" }}</div>
+        <h3 class="section-title">Fahrzeug</h3>
+        <div class="value-lg">{{ ticket.fahrzeug or "-" }}</div>
+        <div class="kv">
+          <b>Baujahr</b><div class="muted">{{ ticket.baujahr or "-" }}</div>
+          <b>Kilometerstand</b><div class="muted">{{ ticket.kilometerstand or "-" }}</div>
+        </div>
       </div>
 
       <div class="card">
-        <div class="muted">Kontakt</div>
-
+        <h3 class="section-title">Kontakt</h3>
         <div class="kv">
           <b>Kunde</b>
           <div class="muted">{{ ticket.kunde_name or ticket.name or "-" }}</div>
@@ -443,7 +752,7 @@
               <button class="copy-btn" type="button" data-copy="#phoneText">Kopieren</button>
             {% else %}
               <span class="muted" id="phoneText">-</span>
-              <button class="copy-btn" type="button" data-copy="#phoneText" disabled style="opacity:.5; cursor:not-allowed;">Kopieren</button>
+              <button class="copy-btn" type="button" data-copy="#phoneText" disabled>Kopieren</button>
             {% endif %}
           </div>
 
@@ -453,26 +762,21 @@
       </div>
 
       <div class="card">
-        <div class="muted">Zeit</div>
-        <div style="margin-top:10px;" class="kv">
-          <b>Erstellt</b>
-          <div class="muted">{{ ticket.created_at or "-" }}</div>
-          <b>Aktualisiert</b>
-          <div class="muted">{{ ticket.updated_at or "-" }}</div>
+        <h3 class="section-title">Zeit</h3>
+        <div class="kv">
+          <b>Erstellt</b><div class="muted">{{ ticket.created_at or "-" }}</div>
+          <b>Aktualisiert</b><div class="muted">{{ ticket.updated_at or "-" }}</div>
         </div>
       </div>
     </div>
 
-    <div class="row">
-      <div class="card">
-        <div class="muted">Problem</div>
-        <div style="font-size:20px; font-weight:900; margin-top:6px;">{{ ticket.problem or "-" }}</div>
-      </div>
+    <div class="section">
+      <div class="card action-card">
+        <h3 class="section-title">Statusverwaltung</h3>
 
-      <div class="card">
         <div class="actions">
-          <form method="post" action="/dashboard/ticket/{{ ticket._id }}/status" style="display:flex; gap:10px; flex-wrap:wrap; align-items:flex-end; flex:1;">
-            <div style="min-width:260px; flex:1;">
+          <form method="post" action="/dashboard/ticket/{{ ticket._id }}/status" class="status-form">
+            <div class="field">
               <div class="muted">Status ändern</div>
               <select name="status" style="margin-top:6px; width:100%;">
                 <option value="offen" {% if ticket.status_ui=="offen" %}selected{% endif %}>offen</option>
@@ -480,8 +784,9 @@
                 <option value="erledigt" {% if ticket.status_ui=="erledigt" %}selected{% endif %}>erledigt</option>
               </select>
             </div>
+
             <div>
-              <button type="submit">Speichern</button>
+              <button type="submit">Status speichern</button>
             </div>
           </form>
 
@@ -498,8 +803,7 @@
 
         <div class="divider"></div>
 
-        <div class="muted">Daten</div>
-
+        <h3 class="section-title">Falldaten</h3>
         <div class="kv">
           <b>Kunde</b><div class="muted">{{ ticket.kunde_name or ticket.name or "-" }}</div>
           <b>Fahrzeug</b><div class="muted">{{ ticket.fahrzeug or "-" }}</div>
@@ -508,8 +812,21 @@
           <b>Telefon</b><div class="muted">{{ ticket.telefon or "-" }}</div>
           <b>Priorität</b><div class="muted">{{ ticket.priority or "-" }}</div>
           <b>Typ</b><div class="muted">{{ ticket.request_type or "-" }}</div>
+          <b>Fahrbereit</b>
+          <div class="muted">
+            {% if ticket.fahrbereit is sameas true %}Ja
+            {% elif ticket.fahrbereit is sameas false %}Nein
+            {% else %}-{% endif %}
+          </div>
+          <b>Abschleppdienst</b>
+          <div class="muted">
+            {% if ticket.abschleppdienst %}Ja{% else %}Nein{% endif %}
+          </div>
         </div>
 
+        <div class="divider"></div>
+
+        <h3 class="section-title">Interne Systemdaten</h3>
         <div class="debug-grid">
           <div class="debug-item">
             <div class="debug-label">Backend Status</div>
@@ -525,11 +842,15 @@
           </div>
           <div class="debug-item">
             <div class="debug-label">Fahrbereit</div>
-            <div class="debug-value">{{ ticket.fahrbereit or "-" }}</div>
+            <div class="debug-value">
+              {% if ticket.fahrbereit is sameas true %}Ja
+              {% elif ticket.fahrbereit is sameas false %}Nein
+              {% else %}-{% endif %}
+            </div>
           </div>
           <div class="debug-item">
             <div class="debug-label">Abschleppdienst</div>
-            <div class="debug-value">{{ ticket.abschleppdienst or "-" }}</div>
+            <div class="debug-value">{% if ticket.abschleppdienst %}Ja{% else %}Nein{% endif %}</div>
           </div>
           <div class="debug-item">
             <div class="debug-label">Kilometerstand</div>
@@ -538,6 +859,10 @@
           <div class="debug-item">
             <div class="debug-label">Ticket-ID</div>
             <div class="debug-value">{{ ticket._id or "-" }}</div>
+          </div>
+          <div class="debug-item">
+            <div class="debug-label">Session-ID</div>
+            <div class="debug-value">{{ ticket.session_id or "-" }}</div>
           </div>
         </div>
 
