@@ -44,7 +44,6 @@ def _dump_state(state: IntakeState) -> dict:
 def _normalize_status(status: str) -> str:
     """
     Vereinheitlicht Statuswerte.
-    Akzeptiert zur Sicherheit auch alte Werte aus früheren Versionen.
     """
     value = (status or "").strip().lower()
 
@@ -60,12 +59,21 @@ def _normalize_status(status: str) -> str:
     return value
 
 
-# Einfache In-Memory-Sessions (MVP v1)
 SESSIONS: Dict[str, IntakeState] = {}
 
 
 class StatusUpdate(BaseModel):
     status: str
+
+
+# ✅ NOWY ROOT ENDPOINT
+@app.get("/")
+def root():
+    return {
+        "ok": True,
+        "app": settings.app_name,
+        "message": "WerkstattAI läuft 🚀",
+    }
 
 
 @app.get("/health")
@@ -94,17 +102,6 @@ def ticket_by_id(ticket_id: str):
 
 @app.patch("/tickets/{ticket_id}/status")
 def patch_ticket_status(ticket_id: str, payload: StatusUpdate):
-    """
-    Ändert den Status eines Tickets und aktualisiert updated_at.
-
-    Erlaubte Statuswerte:
-    - offen
-    - in_bearbeitung
-    - erledigt
-
-    Alter Fallback:
-    - geschlossen -> erledigt
-    """
     try:
         normalized_status = _normalize_status(payload.status)
         updated = update_ticket_status(ticket_id, normalized_status)
@@ -121,10 +118,8 @@ def chat(payload: ChatRequest) -> ChatResponse:
 
     new_state, reply, done = next_step(state, payload.message)
 
-    # Antwort stilistisch verbessern, Logik aber nicht verändern
     reply = polish_reply_de(reply)
 
-    # Wenn abgeschlossen, Ticket nur 1x pro Session speichern
     if done and not new_state.ticket_id:
         ticket_id = save_ticket(new_state)
         new_state.ticket_id = ticket_id
@@ -134,7 +129,6 @@ def chat(payload: ChatRequest) -> ChatResponse:
             + "Bitte notieren Sie sich diese Nummer für Rückfragen."
         )
 
-    # Session speichern
     SESSIONS[payload.session_id] = new_state
 
     return ChatResponse(
