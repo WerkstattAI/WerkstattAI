@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 import json
-from datetime import datetime
+from datetime import datetime, timezone
 from typing import Any
 
 from fastapi import APIRouter, Form, Request
@@ -33,11 +33,14 @@ def _as_dict(x: Any) -> dict:
 
 def _parse_iso(dt: str | None) -> datetime:
     if not dt:
-        return datetime.min
+        return datetime.min.replace(tzinfo=timezone.utc)
     try:
-        return datetime.fromisoformat(dt.replace("Z", "+00:00"))
+        parsed = datetime.fromisoformat(dt.replace("Z", "+00:00"))
+        if parsed.tzinfo is None:
+            return parsed.replace(tzinfo=timezone.utc)
+        return parsed
     except Exception:
-        return datetime.min
+        return datetime.min.replace(tzinfo=timezone.utc)
 
 
 def _ticket_id(t: dict) -> str:
@@ -271,7 +274,9 @@ def _render_dashboard(
         tickets.sort(
             key=lambda t: (
                 _priority_rank(t.get("priority", "")),
-                -t["created_dt"].timestamp() if t["created_dt"] != datetime.min else 0,
+                -t["created_dt"].timestamp()
+                if t["created_dt"] != datetime.min.replace(tzinfo=timezone.utc)
+                else 0,
             )
         )
     else:
@@ -356,6 +361,7 @@ def ticket_detail(request: Request, ticket_id: str):
     t["priority"] = _normalize_priority(t.get("priority"))
     t["request_type"] = _normalize_request_type(t.get("request_type"))
     t["kunde_name"] = _extract_name(t)
+    t["raw_json"] = json.dumps(t, ensure_ascii=False, default=str, indent=2)
 
     return templates.TemplateResponse(
         "ticket.html",

@@ -470,7 +470,7 @@
       flex:1;
     }
 
-    input, select, button{
+    input, select, button, textarea{
       min-height:44px;
       padding:10px 12px;
       border-radius:14px;
@@ -481,7 +481,7 @@
       transition:.18s ease;
     }
 
-    input:focus, select:focus, button:focus{
+    input:focus, select:focus, button:focus, textarea:focus{
       border-color:rgba(96,165,250,.35);
       box-shadow:0 0 0 3px rgba(96,165,250,.10);
     }
@@ -658,7 +658,7 @@
 
         <div>
           <div class="title-row">
-            <h1 class="title">Ticket <span id="ticketIdText">{{ ticket._id }}</span></h1>
+            <h1 class="title">Ticket <span id="ticketIdText">{{ ticket.ticket_view_id or "-" }}</span></h1>
 
             <div class="copy-wrap">
               <button class="copy-btn" type="button" data-copy="#ticketIdText">Kopieren</button>
@@ -721,7 +721,7 @@
           </div>
 
           <div class="status-sub">
-            Ticket-ID: {{ ticket._id or "-" }}<br>
+            Ticket-ID: {{ ticket.ticket_view_id or "-" }}<br>
             Backend-Status: {{ ticket.status or "-" }}
           </div>
         </div>
@@ -774,7 +774,7 @@
         <h3 class="section-title">Statusverwaltung</h3>
 
         <div class="actions">
-          <form method="post" action="/dashboard/ticket/{{ ticket._id }}/status" class="status-form">
+          <form method="post" action="/dashboard/ticket/{{ ticket.ticket_view_id }}/status" class="status-form">
             <div class="field">
               <div class="muted">Status ändern</div>
               <select name="status" style="margin-top:6px; width:100%;">
@@ -792,7 +792,7 @@
           {% if ticket.status_ui == "erledigt" %}
           <form
             method="post"
-            action="/dashboard/ticket/{{ ticket._id }}/archive"
+            action="/dashboard/ticket/{{ ticket.ticket_view_id }}/archive"
             onsubmit="return confirm('Dieses Ticket wirklich archivieren?');"
           >
             <button class="archive-btn" type="submit">Archivieren</button>
@@ -825,59 +825,59 @@
 
         <div class="divider"></div>
 
-  <h3 class="section-title">Interne Notizen</h3>
+        <h3 class="section-title">Interne Notizen</h3>
 
-  <form method="post" action="/dashboard/ticket/{{ ticket._id }}/notes" style="margin-bottom:14px;">
-    <div style="display:flex; gap:10px; flex-wrap:wrap;">
-      <textarea
-        name="note_text"
-        placeholder="Neue Notiz hinzufügen..."
-        required
-        style="
-          flex:1;
-          min-height:70px;
-          padding:10px 12px;
-          border-radius:14px;
-          border:1px solid var(--line);
-          background:rgba(15,26,46,.72);
-          color:var(--text);
-          resize:vertical;
-        "
-      ></textarea>
+        <form method="post" action="/dashboard/ticket/{{ ticket.ticket_view_id }}/notes" style="margin-bottom:14px;">
+          <div style="display:flex; gap:10px; flex-wrap:wrap;">
+            <textarea
+              name="note_text"
+              placeholder="Neue Notiz hinzufügen..."
+              required
+              style="
+                flex:1;
+                min-height:70px;
+                padding:10px 12px;
+                border-radius:14px;
+                border:1px solid var(--line);
+                background:rgba(15,26,46,.72);
+                color:var(--text);
+                resize:vertical;
+              "
+            ></textarea>
 
-      <div style="display:flex; align-items:flex-end;">
-        <button type="submit">Speichern</button>
-      </div>
-    </div>
-  </form>
-
-  {% if ticket.notes %}
-    <div style="display:flex; flex-direction:column; gap:10px;">
-      {% for note in ticket.notes | reverse %}
-        <div
-          style="
-            padding:10px 12px;
-            border-radius:14px;
-            border:1px solid var(--line);
-            background:rgba(255,255,255,.04);
-          "
-        >
-          <div style="font-size:13px; line-height:1.5;">
-            {{ note.text }}
+            <div style="display:flex; align-items:flex-end;">
+              <button type="submit">Speichern</button>
+            </div>
           </div>
+        </form>
 
-          <div style="margin-top:6px; font-size:11px; color:var(--muted); font-weight:800;">
-            {{ note.created_at }}
+        {% if ticket.notes %}
+          <div style="display:flex; flex-direction:column; gap:10px;">
+            {% for note in ticket.notes | reverse %}
+              <div
+                style="
+                  padding:10px 12px;
+                  border-radius:14px;
+                  border:1px solid var(--line);
+                  background:rgba(255,255,255,.04);
+                "
+              >
+                <div style="font-size:13px; line-height:1.5;">
+                  {{ note.text }}
+                </div>
+
+                <div style="margin-top:6px; font-size:11px; color:var(--muted); font-weight:800;">
+                  {{ note.created_at }}
+                </div>
+              </div>
+            {% endfor %}
           </div>
-        </div>
-      {% endfor %}
-    </div>
-  {% else %}
-    <div class="muted">Noch keine Notizen vorhanden.</div>
-  {% endif %}
+        {% else %}
+          <div class="muted">Noch keine Notizen vorhanden.</div>
+        {% endif %}
 
-  <div class="divider"></div>
-  
+        <div class="divider"></div>
+
         <h3 class="section-title">Interne Systemdaten</h3>
         <div class="debug-grid">
           <div class="debug-item">
@@ -910,7 +910,7 @@
           </div>
           <div class="debug-item">
             <div class="debug-label">Ticket-ID</div>
-            <div class="debug-value">{{ ticket._id or "-" }}</div>
+            <div class="debug-value">{{ ticket.ticket_view_id or "-" }}</div>
           </div>
           <div class="debug-item">
             <div class="debug-label">Session-ID</div>
@@ -953,7 +953,7 @@
         <details>
           <summary>Vollständige Raw Daten anzeigen</summary>
           <div class="raw">
-            <pre>{{ ticket | tojson(indent=2) }}</pre>
+            <pre>{{ ticket.raw_json or "{}" }}</pre>
           </div>
         </details>
       </div>
