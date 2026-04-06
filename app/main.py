@@ -8,6 +8,7 @@ from pydantic import BaseModel
 
 from app.ai_service import polish_reply_de
 from app.config import settings
+from app.db import init_db
 from app.logic import next_step
 from app.models import ChatRequest, ChatResponse, IntakeState
 from app.tickets import (
@@ -20,6 +21,11 @@ from app.web import router as web_router
 
 
 app = FastAPI(title=settings.app_name)
+
+# ✅ NOWE — inicjalizacja bazy SQLite
+@app.on_event("startup")
+def on_startup():
+    init_db()
 
 app.add_middleware(
     CORSMiddleware,
@@ -50,7 +56,7 @@ def _normalize_status(status: str) -> str:
     if value == "geschlossen":
         return "erledigt"
 
-    allowed = {"offen", "in_bearbeitung", "erledigt"}
+    allowed = {"offen", "in_bearbeitung", "erledigt", "archiviert"}
     if value not in allowed:
         raise ValueError(
             "Ungültiger Status. Erlaubt sind: offen, in_bearbeitung, erledigt"
@@ -66,7 +72,6 @@ class StatusUpdate(BaseModel):
     status: str
 
 
-# ✅ NOWY ROOT ENDPOINT
 @app.get("/")
 def root():
     return {

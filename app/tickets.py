@@ -1,11 +1,11 @@
 from __future__ import annotations
 
 import json
-import os
 import threading
 from datetime import datetime
 from typing import Any, Dict, Optional
 
+from app.db import get_conn
 from app.models import IntakeState
 
 _LOCK = threading.Lock()
@@ -15,43 +15,8 @@ ALLOWED_PRIORITY = {"niedrig", "normal", "hoch"}
 ALLOWED_REQUEST_TYPE = {"service", "diagnose", "notfall"}
 
 
-def _project_root() -> str:
-    # app/tickets.py -> app -> Projekt-Root
-    return os.path.dirname(os.path.dirname(__file__))
-
-
-def _data_dir() -> str:
-    return os.path.join(_project_root(), "data")
-
-
-def _tickets_path() -> str:
-    return os.path.join(_data_dir(), "tickets.jsonl")
-
-
-def _ensure_data_dir() -> None:
-    os.makedirs(_data_dir(), exist_ok=True)
-
-
 def _now_iso() -> str:
     return datetime.now().isoformat(timespec="seconds")
-
-
-def _read_lines(path: str) -> list[str]:
-    if not os.path.exists(path):
-        return []
-    with open(path, "r", encoding="utf-8") as f:
-        return f.readlines()
-
-
-def _safe_json_loads(line: str) -> Optional[dict[str, Any]]:
-    line = (line or "").strip()
-    if not line:
-        return None
-    try:
-        obj = json.loads(line)
-        return obj if isinstance(obj, dict) else None
-    except Exception:
-        return None
 
 
 def _normalize_status(value: Any) -> str:
@@ -103,43 +68,33 @@ def _normalize_request_type(value: Any) -> Optional[str]:
     return None
 
 
-def _next_sequence_for_today(lines: list[str], today: str) -> int:
-    """
-    Zählt, wie viele Tickets bereits heute existieren,
-    und liefert die nächste laufende Nummer.
-    today: YYYYMMDD
-    """
-    count = 0
-    for line in lines:
-        obj = _safe_json_loads(line)
-        if not obj:
-            continue
+def _safe_json_loads(value: Any, default: Any) -> Any:
+    if value is None:
+        return default
 
-        ticket_id = str(
-            obj.get("ticket_id")
-            or obj.get("_id")
-            or obj.get("id")
-            or ""
-        )
+    if isinstance(value, (list, dict)):
+        return value
 
-        if ticket_id.startswith(f"WS-{today}-"):
-            count += 1
+    text = str(value).strip()
+    if not text:
+        return default
 
-    return count + 1
+    try:
+        return json.loads(text)
+    except Exception:
+        return default
 
 
-def generate_ticket_id() -> str:
-    """
-    Format: WS-YYYYMMDD-0001
-    """
-    _ensure_data_dir()
-    path = _tickets_path()
-    today = datetime.now().strftime("%Y%m%d")
+def _bool_to_db(value: Any) -> Optional[int]:
+    if value is None:
+        return None
+    return 1 if bool(value) else 0
 
-    with _LOCK:
-        lines = _read_lines(path)
-        seq = _next_sequence_for_today(lines, today)
-        return f"WS-{today}-{seq:04d}"
+
+def _db_to_bool(value: Any) -> Optional[bool]:
+    if value is None:
+        return None
+    return bool(value)
 
 
 def _normalize_ticket_record(obj: dict[str, Any]) -> dict[str, Any]:
@@ -187,14 +142,67 @@ def _normalize_ticket_record(obj: dict[str, Any]) -> dict[str, Any]:
     return obj
 
 
+def _row_to_ticket_dict(row: Any) -> dict[str, Any]:
+    obj: dict[str, Any] = {
+        "ticket_id": row["ticket_id"],
+        "created_at": row["created_at"],
+        "updated_at": row["updated_at"],
+        "status": row["status"],
+        "priority": row["priority"],
+        "request_type": row["request_type"],
+        "fahrzeug": row["fahrzeug"],
+        "baujahr": row["baujahr"],
+        "kilometerstand": row["kilometerstand"],
+        "fahrbereit": _db_to_bool(row["fahrbereit"]),
+        "abschleppdienst": _db_to_bool(row["abschleppdienst"]),
+        "problem": row["problem"],
+        "name": row["name"],
+        "kunde_name": row["kunde_name"],
+        "telefon": row["telefon"],
+        "followup_questions": _safe_json_loads(row["followup_questions_json"], []),
+        "followup_answers": _safe_json_loads(row["followup_answers_json"], []),
+        "notes": _safe_json_loads(row["notes_json"], []),
+    }
+
+    return _normalize_ticket_record(obj)
+
+
+def _next_sequence_for_today(today: str) -> int:
+    with get_conn() as conn:
+        rows = conn.execute(
+            """
+            SELECT ticket_id
+            FROM tickets
+            WHERE ticket_id LIKE ?
+            """,
+            (f"WS-{today}-%",),
+        ).fetchall()
+
+    count = 0
+    for row in rows:
+        ticket_id = str(row["ticket_id"] or "")
+        if ticket_id.startswith(f"WS-{today}-"):
+            count += 1
+
+    return count + 1
+
+
+def generate_ticket_id() -> str:
+    """
+    Format: WS-YYYYMMDD-0001
+    """
+    today = datetime.now().strftime("%Y%m%d")
+
+    with _LOCK:
+        seq = _next_sequence_for_today(today)
+        return f"WS-{today}-{seq:04d}"
+
+
 def save_ticket(state: IntakeState) -> str:
     """
-    Speichert ein Ticket in data/tickets.jsonl
+    Speichert ein Ticket in SQLite
     und gibt die ticket_id zurück.
     """
-    _ensure_data_dir()
-    path = _tickets_path()
-
     ticket_id = state.ticket_id or generate_ticket_id()
     now_iso = _now_iso()
     kunde_name = state.name
@@ -237,30 +245,72 @@ def save_ticket(state: IntakeState) -> str:
     record = _normalize_ticket_record(record)
 
     with _LOCK:
-        with open(path, "a", encoding="utf-8") as f:
-            f.write(json.dumps(record, ensure_ascii=False) + "\n")
+        with get_conn() as conn:
+            conn.execute(
+                """
+                INSERT INTO tickets (
+                    ticket_id,
+                    created_at,
+                    updated_at,
+                    status,
+                    priority,
+                    request_type,
+                    fahrzeug,
+                    baujahr,
+                    kilometerstand,
+                    fahrbereit,
+                    abschleppdienst,
+                    problem,
+                    name,
+                    kunde_name,
+                    telefon,
+                    followup_questions_json,
+                    followup_answers_json,
+                    notes_json
+                )
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                """,
+                (
+                    record["ticket_id"],
+                    record["created_at"],
+                    record["updated_at"],
+                    record["status"],
+                    record["priority"],
+                    record["request_type"],
+                    record["fahrzeug"],
+                    record["baujahr"],
+                    record["kilometerstand"],
+                    _bool_to_db(record["fahrbereit"]),
+                    _bool_to_db(record["abschleppdienst"]),
+                    record["problem"],
+                    record["name"],
+                    record["kunde_name"],
+                    record["telefon"],
+                    json.dumps(record["followup_questions"], ensure_ascii=False),
+                    json.dumps(record["followup_answers"], ensure_ascii=False),
+                    json.dumps(record["notes"], ensure_ascii=False),
+                ),
+            )
+            conn.commit()
 
     return ticket_id
 
 
 def load_all_tickets() -> list[dict[str, Any]]:
     """
-    Lädt alle Tickets aus data/tickets.jsonl.
+    Lädt alle Tickets aus SQLite.
     """
-    _ensure_data_dir()
-    path = _tickets_path()
-
     with _LOCK:
-        lines = _read_lines(path)
+        with get_conn() as conn:
+            rows = conn.execute(
+                """
+                SELECT *
+                FROM tickets
+                ORDER BY created_at ASC, id ASC
+                """
+            ).fetchall()
 
-    items: list[dict[str, Any]] = []
-    for line in lines:
-        obj = _safe_json_loads(line)
-        if not obj:
-            continue
-        items.append(_normalize_ticket_record(obj))
-
-    return items
+    return [_row_to_ticket_dict(row) for row in rows]
 
 
 def list_latest_tickets(limit: int = 50) -> list[dict[str, Any]]:
@@ -269,9 +319,20 @@ def list_latest_tickets(limit: int = 50) -> list[dict[str, Any]]:
     Hard-Limit: 500
     """
     safe_limit = max(0, min(int(limit), 500))
-    items = load_all_tickets()
-    items.reverse()
-    return items[:safe_limit]
+
+    with _LOCK:
+        with get_conn() as conn:
+            rows = conn.execute(
+                """
+                SELECT *
+                FROM tickets
+                ORDER BY created_at DESC, id DESC
+                LIMIT ?
+                """,
+                (safe_limit,),
+            ).fetchall()
+
+    return [_row_to_ticket_dict(row) for row in rows]
 
 
 def find_ticket_by_id(ticket_id: str) -> Optional[dict[str, Any]]:
@@ -282,24 +343,27 @@ def find_ticket_by_id(ticket_id: str) -> Optional[dict[str, Any]]:
     if not tid:
         return None
 
-    items = load_all_tickets()
-    for obj in items:
-        current_id = str(
-            obj.get("ticket_id")
-            or obj.get("_id")
-            or obj.get("id")
-            or ""
-        ).strip()
+    with _LOCK:
+        with get_conn() as conn:
+            row = conn.execute(
+                """
+                SELECT *
+                FROM tickets
+                WHERE ticket_id = ?
+                LIMIT 1
+                """,
+                (tid,),
+            ).fetchone()
 
-        if current_id == tid:
-            return obj
+    if not row:
+        return None
 
-    return None
+    return _row_to_ticket_dict(row)
 
 
 def update_ticket_status(ticket_id: str, new_status: str) -> dict[str, Any]:
     """
-    Aktualisiert den Ticket-Status und updated_at in der JSONL-Datei.
+    Aktualisiert den Ticket-Status und updated_at in SQLite.
     Gibt das aktualisierte Ticket zurück.
     """
     tid = (ticket_id or "").strip()
@@ -310,42 +374,38 @@ def update_ticket_status(ticket_id: str, new_status: str) -> dict[str, Any]:
     if status not in ALLOWED_STATUS:
         raise ValueError(f"Ungültiger Status: {new_status}")
 
-    _ensure_data_dir()
-    path = _tickets_path()
+    now_iso = _now_iso()
 
     with _LOCK:
-        lines = _read_lines(path)
-        items: list[dict[str, Any]] = []
-        updated_ticket: Optional[dict[str, Any]] = None
+        with get_conn() as conn:
+            cur = conn.execute(
+                """
+                UPDATE tickets
+                SET status = ?, updated_at = ?
+                WHERE ticket_id = ?
+                """,
+                (status, now_iso, tid),
+            )
 
-        for line in lines:
-            obj = _safe_json_loads(line)
-            if not obj:
-                continue
+            if cur.rowcount == 0:
+                raise KeyError("Ticket nicht gefunden")
 
-            obj = _normalize_ticket_record(obj)
-            current_id = str(
-                obj.get("ticket_id")
-                or obj.get("_id")
-                or obj.get("id")
-                or ""
-            ).strip()
+            conn.commit()
 
-            if current_id == tid:
-                obj["status"] = status
-                obj["updated_at"] = _now_iso()
-                updated_ticket = obj
+            row = conn.execute(
+                """
+                SELECT *
+                FROM tickets
+                WHERE ticket_id = ?
+                LIMIT 1
+                """,
+                (tid,),
+            ).fetchone()
 
-            items.append(obj)
+    if not row:
+        raise KeyError("Ticket nicht gefunden")
 
-        if not updated_ticket:
-            raise KeyError("Ticket nicht gefunden")
-
-        with open(path, "w", encoding="utf-8") as f:
-            for obj in items:
-                f.write(json.dumps(obj, ensure_ascii=False) + "\n")
-
-    return updated_ticket
+    return _row_to_ticket_dict(row)
 
 
 def add_ticket_note(ticket_id: str, note_text: str) -> dict[str, Any]:
@@ -362,48 +422,62 @@ def add_ticket_note(ticket_id: str, note_text: str) -> dict[str, Any]:
     if not text:
         raise ValueError("note_text ist leer")
 
-    _ensure_data_dir()
-    path = _tickets_path()
+    now_iso = _now_iso()
 
     with _LOCK:
-        lines = _read_lines(path)
-        items: list[dict[str, Any]] = []
-        updated_ticket: Optional[dict[str, Any]] = None
+        with get_conn() as conn:
+            row = conn.execute(
+                """
+                SELECT *
+                FROM tickets
+                WHERE ticket_id = ?
+                LIMIT 1
+                """,
+                (tid,),
+            ).fetchone()
 
-        for line in lines:
-            obj = _safe_json_loads(line)
-            if not obj:
-                continue
+            if not row:
+                raise KeyError("Ticket nicht gefunden")
 
-            obj = _normalize_ticket_record(obj)
+            notes = _safe_json_loads(row["notes_json"], [])
+            if not isinstance(notes, list):
+                notes = []
 
-            current_id = str(
-                obj.get("ticket_id")
-                or obj.get("_id")
-                or obj.get("id")
-                or ""
-            ).strip()
+            notes.append(
+                {
+                    "text": text,
+                    "created_at": now_iso,
+                }
+            )
 
-            if current_id == tid:
-                obj["notes"].append(
-                    {
-                        "text": text,
-                        "created_at": _now_iso(),
-                    }
-                )
-                obj["updated_at"] = _now_iso()
-                updated_ticket = obj
+            conn.execute(
+                """
+                UPDATE tickets
+                SET notes_json = ?, updated_at = ?
+                WHERE ticket_id = ?
+                """,
+                (
+                    json.dumps(notes, ensure_ascii=False),
+                    now_iso,
+                    tid,
+                ),
+            )
+            conn.commit()
 
-            items.append(obj)
+            updated_row = conn.execute(
+                """
+                SELECT *
+                FROM tickets
+                WHERE ticket_id = ?
+                LIMIT 1
+                """,
+                (tid,),
+            ).fetchone()
 
-        if not updated_ticket:
-            raise KeyError("Ticket nicht gefunden")
+    if not updated_row:
+        raise KeyError("Ticket nicht gefunden")
 
-        with open(path, "w", encoding="utf-8") as f:
-            for obj in items:
-                f.write(json.dumps(obj, ensure_ascii=False) + "\n")
-
-    return updated_ticket
+    return _row_to_ticket_dict(updated_row)
 
 
 def archive_ticket(ticket_id: str) -> dict[str, Any]:
