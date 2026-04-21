@@ -29,6 +29,8 @@ class IntakeState(BaseModel):
     # -> diagnose/notfall: fahrbereit -> ggf. abschleppdienst -> followup -> telefon -> name -> fertig
     step: str = "fahrzeug"
 
+    mode: str = "unknown"  # "unknown" | "new" | "existing" | "general"
+
     # Fahrzeugdaten
     fahrzeug: Optional[str] = None
     baujahr: Optional[str] = None

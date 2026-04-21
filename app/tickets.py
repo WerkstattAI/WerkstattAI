@@ -335,6 +335,69 @@ def list_latest_tickets(limit: int = 50) -> list[dict[str, Any]]:
     return [_row_to_ticket_dict(row) for row in rows]
 
 
+def normalize_phone_for_search(phone: str) -> str:
+    """
+    Normalisiert Telefonnummern für tolerante Suche:
+    - entfernt Leerzeichen, Bindestriche, Klammern usw.
+    - behält nur Ziffern
+    """
+    return "".join(ch for ch in str(phone or "") if ch.isdigit())
+
+
+def find_tickets_by_phone(phone: str) -> list[dict[str, Any]]:
+    """
+    Sucht Tickets tolerant anhand der Telefonnummer.
+
+    Beispiele:
+    - 0176 1234567
+    - 0176-1234567
+    - +49 176 1234567
+
+    Für MVP laden wir passende Kandidaten aus SQLite
+    und vergleichen dann normalisiert in Python.
+    """
+    normalized_query = normalize_phone_for_search(phone)
+    if len(normalized_query) < 7:
+        return []
+
+    with _LOCK:
+        with get_conn() as conn:
+            rows = conn.execute(
+                """
+                SELECT *
+                FROM tickets
+                WHERE telefon IS NOT NULL
+                ORDER BY created_at DESC, id DESC
+                """
+            ).fetchall()
+
+    matches: list[dict[str, Any]] = []
+
+    for row in rows:
+        ticket = _row_to_ticket_dict(row)
+        ticket_phone = normalize_phone_for_search(ticket.get("telefon", ""))
+
+        if not ticket_phone:
+            continue
+
+        if (
+            ticket_phone == normalized_query
+            or normalized_query in ticket_phone
+            or ticket_phone in normalized_query
+        ):
+            matches.append(ticket)
+
+    return matches
+
+
+def find_latest_ticket_by_phone(phone: str) -> Optional[dict[str, Any]]:
+    """
+    Gibt das neueste Ticket zu einer Telefonnummer zurück.
+    """
+    matches = find_tickets_by_phone(phone)
+    return matches[0] if matches else None
+
+
 def find_ticket_by_id(ticket_id: str) -> Optional[dict[str, Any]]:
     """
     Sucht ein Ticket anhand der Ticket-ID.

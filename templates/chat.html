@@ -251,6 +251,32 @@
       color:#97a6bb;
     }
 
+    .quick-actions{
+      display:flex;
+      flex-wrap:wrap;
+      gap:10px;
+      margin-top:10px;
+      max-width:min(78%, 720px);
+    }
+
+    .quick-btn{
+      padding:10px 14px;
+      border-radius:14px;
+      border:1px solid rgba(255,255,255,.10);
+      background:rgba(255,255,255,.06);
+      color:var(--text);
+      cursor:pointer;
+      font-weight:800;
+      font-size:13px;
+      transition:all .15s ease;
+    }
+
+    .quick-btn:hover{
+      background:rgba(96,165,250,.14);
+      border-color:rgba(96,165,250,.28);
+      transform:translateY(-1px);
+    }
+
     .composer{
       border-top:1px solid var(--line);
       background:#101d36;
@@ -383,6 +409,10 @@
         max-width:88%;
       }
 
+      .quick-actions{
+        max-width:88%;
+      }
+
       .composer-form{
         flex-direction:column;
         align-items:stretch;
@@ -421,20 +451,26 @@
         </div>
 
         <div class="hint-box">
-          <div class="hint-title">Am besten testen</div>
+          <div class="hint-title">Neue Möglichkeiten</div>
           <div class="hint-text">
-            Schreib einfach natürlich, zum Beispiel:
+            Der Assistent kann jetzt:
             <br><br>
-            „Mercedes C180 2014 180000 km“
+            • neue Werkstatt-Anfragen aufnehmen
             <br>
-            „Auto springt nicht mehr an“
+            • bestehende Tickets abfragen
+            <br>
+            • allgemeine Fragen beantworten
           </div>
         </div>
 
         <div class="hint-box">
-          <div class="hint-title">Ergebnis</div>
+          <div class="hint-title">Beispiele</div>
           <div class="hint-text">
-            Wenn der Chat fertig ist, wird automatisch ein Ticket erstellt und erscheint im Dashboard.
+            „Mein Auto springt nicht an“
+            <br>
+            „Status von Ticket WS-20260419-0001“
+            <br>
+            „Was sind eure Öffnungszeiten?“
           </div>
         </div>
 
@@ -448,7 +484,7 @@
         <div class="chat-header">
           <div>
             <h2>Kundenchat</h2>
-            <div class="muted">WerkstattAI fragt Schritt für Schritt die Daten ab.</div>
+            <div class="muted">WerkstattAI unterstützt neue Meldungen, bestehende Tickets und allgemeine Fragen.</div>
           </div>
 
           <div class="chat-status">
@@ -481,7 +517,7 @@
               </div>
             </div>
 
-            <button class="ghost-btn" type="button" id="resetBtn">Neu starten</button>
+            <button class="ghost-btn" type="button" id="resetBtn">Neue Session</button>
             <button class="send-btn" type="submit" id="sendBtn">Senden</button>
           </form>
 
@@ -501,6 +537,27 @@
     const doneBoxEl = document.getElementById("doneBox");
     const charCountEl = document.getElementById("charCount");
     const sessionIdBox = document.getElementById("sessionIdBox");
+
+    const WELCOME_MESSAGE = `Willkommen bei WerkstattAI 🚗
+
+Wie kann ich Ihnen helfen?
+
+Wählen Sie einfach die passende Art der Anfrage aus oder schreiben Sie direkt Ihr Anliegen.`;
+
+    const QUICK_ACTIONS = [
+      {
+        label: "Neue Anfrage",
+        message: "Ich möchte eine neue Anfrage zur Werkstatt stellen."
+      },
+      {
+        label: "Bestehendes Ticket",
+        message: "Ich habe eine Frage zu einem bestehenden Ticket."
+      },
+      {
+        label: "Allgemeine Frage",
+        message: "Ich habe eine allgemeine Frage."
+      }
+    ];
 
     function createSessionId() {
       return "session-" + Math.random().toString(36).slice(2) + "-" + Date.now();
@@ -534,6 +591,38 @@
       messagesEl.appendChild(row);
 
       scrollToBottom();
+      return row;
+    }
+
+    function removeQuickActions() {
+      const existing = document.getElementById("quickActions");
+      if (existing) existing.remove();
+    }
+
+    function renderQuickActions() {
+      removeQuickActions();
+
+      const wrap = document.createElement("div");
+      wrap.className = "quick-actions";
+      wrap.id = "quickActions";
+
+      QUICK_ACTIONS.forEach((action) => {
+        const btn = document.createElement("button");
+        btn.type = "button";
+        btn.className = "quick-btn";
+        btn.textContent = action.label;
+
+        btn.addEventListener("click", async () => {
+          removeQuickActions();
+          addMessage("user", action.message, "Du");
+          await sendMessage(action.message);
+        });
+
+        wrap.appendChild(btn);
+      });
+
+      messagesEl.appendChild(wrap);
+      scrollToBottom();
     }
 
     function setLoading(isLoading) {
@@ -550,7 +639,7 @@
       charCountEl.textContent = `${inputEl.value.length} Zeichen`;
     }
 
-    async function sendToBackend(message, isStart = false) {
+    async function sendToBackend(message) {
       const response = await fetch("/chat", {
         method: "POST",
         headers: {
@@ -558,7 +647,7 @@
         },
         body: JSON.stringify({
           session_id: sessionId,
-          message: isStart ? null : message
+          message: message
         }),
       });
 
@@ -583,27 +672,12 @@
         "Das Ticket sollte jetzt im Dashboard sichtbar sein.";
     }
 
-    async function startConversation() {
+    function renderWelcome() {
       messagesEl.innerHTML = "";
       doneBoxEl.style.display = "none";
       doneBoxEl.textContent = "";
-
-      setLoading(true);
-
-      try {
-        const data = await sendToBackend(null, true);
-        if (data.reply) {
-          addMessage("bot", data.reply, "WerkstattAI");
-        }
-      } catch (error) {
-        addMessage(
-          "bot",
-          "Der Chat konnte nicht gestartet werden. Bitte Seite neu laden.",
-          "System"
-        );
-      } finally {
-        setLoading(false);
-      }
+      addMessage("bot", WELCOME_MESSAGE, "WerkstattAI");
+      renderQuickActions();
     }
 
     async function sendMessage(message) {
@@ -638,7 +712,7 @@
       inputEl.value = "";
       updateCount();
 
-      await startConversation();
+      renderWelcome();
     }
 
     formEl.addEventListener("submit", async (e) => {
@@ -647,6 +721,7 @@
       const message = inputEl.value.trim();
       if (!message) return;
 
+      removeQuickActions();
       addMessage("user", message, "Du");
       inputEl.value = "";
       updateCount();
@@ -666,7 +741,7 @@
     resetBtn.addEventListener("click", resetChat);
 
     updateCount();
-    startConversation();
+    renderWelcome();
   </script>
 </body>
 </html>

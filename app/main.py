@@ -9,7 +9,7 @@ from pydantic import BaseModel
 from app.ai_service import polish_reply_de
 from app.config import settings
 from app.db import init_db
-from app.logic import next_step
+from app.conversation.router import next_step
 from app.models import ChatRequest, ChatResponse, IntakeState
 from app.tickets import (
     find_ticket_by_id,
