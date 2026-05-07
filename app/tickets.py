@@ -12,7 +12,8 @@ _LOCK = threading.Lock()
 
 ALLOWED_STATUS = {"offen", "in_bearbeitung", "erledigt", "archiviert"}
 ALLOWED_PRIORITY = {"niedrig", "normal", "hoch"}
-ALLOWED_REQUEST_TYPE = {"service", "diagnose", "notfall"}
+ALLOWED_REQUEST_TYPE = {"service", "diagnose", "notfall", "kostenvoranschlag"}
+ALLOWED_NOTE_TYPE = {"internal_note", "customer_message", "customer_reply"}
 
 
 def _now_iso() -> str:
@@ -85,9 +86,41 @@ def _safe_json_loads(value: Any, default: Any) -> Any:
         return default
 
 
+def _normalize_note_type(value: Any, text: str = "") -> str:
+    note_type = str(value or "").strip().lower()
+    if note_type in ALLOWED_NOTE_TYPE:
+        return note_type
+
+    normalized_text = str(text or "").strip().lower()
+    if normalized_text.startswith("kundenfrage über den chat:"):
+        return "customer_message"
+
+    return "internal_note"
+
+
+def _normalize_note(note: dict[str, Any]) -> dict[str, Any]:
+    text = str(note.get("text", "")).strip()
+    created_at = str(note.get("created_at", "") or "").strip() or _now_iso()
+
+    return {
+        **note,
+        "type": _normalize_note_type(note.get("type"), text),
+        "text": text,
+        "created_at": created_at,
+    }
+
+
 def _bool_to_db(value: Any) -> Optional[int]:
     if value is None:
         return None
+
+    if isinstance(value, str):
+        normalized = value.strip().lower()
+        if normalized in {"ja", "yes", "true", "1"}:
+            return 1
+        if normalized in {"nein", "no", "false", "0"}:
+            return 0
+
     return 1 if bool(value) else 0
 
 
@@ -132,6 +165,8 @@ def _normalize_ticket_record(obj: dict[str, Any]) -> dict[str, Any]:
 
     if obj.get("notes") is None or not isinstance(obj.get("notes"), list):
         obj["notes"] = []
+    else:
+        obj["notes"] = [_normalize_note(note) for note in obj["notes"] if isinstance(note, dict)]
 
     if not obj.get("kunde_name") and obj.get("name"):
         obj["kunde_name"] = obj.get("name")
@@ -471,7 +506,7 @@ def update_ticket_status(ticket_id: str, new_status: str) -> dict[str, Any]:
     return _row_to_ticket_dict(row)
 
 
-def add_ticket_note(ticket_id: str, note_text: str) -> dict[str, Any]:
+def add_ticket_note(ticket_id: str, note_text: str, note_type: str = "internal_note") -> dict[str, Any]:
     """
     Fügt einem Ticket eine interne Notiz hinzu
     und aktualisiert updated_at.
@@ -505,9 +540,12 @@ def add_ticket_note(ticket_id: str, note_text: str) -> dict[str, Any]:
             notes = _safe_json_loads(row["notes_json"], [])
             if not isinstance(notes, list):
                 notes = []
+            else:
+                notes = [_normalize_note(note) for note in notes if isinstance(note, dict)]
 
             notes.append(
                 {
+                    "type": _normalize_note_type(note_type, text),
                     "text": text,
                     "created_at": now_iso,
                 }

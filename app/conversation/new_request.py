@@ -69,7 +69,7 @@ def copy_state(state: IntakeState) -> IntakeState:
 
 
 def reset_state() -> IntakeState:
-    return IntakeState(step=STEP_FAHRZEUG)
+    return IntakeState(step=STEP_FAHRZEUG, mode="unknown")
 
 
 def is_cancel(text: str) -> bool:
@@ -120,6 +120,17 @@ def prepare_followups(
     return followups
 
 
+def _is_new_request_starter(text: str) -> bool:
+    normalized = lower(text)
+    return normalized in {
+        "problem melden",
+        "ich möchte ein problem melden.",
+        "ich möchte ein problem melden",
+        "ich moechte ein problem melden.",
+        "ich moechte ein problem melden",
+    }
+
+
 def handle_new_request(state: IntakeState, user_message: str | None) -> Tuple[IntakeState, str, bool]:
     """
     Flow v3:
@@ -140,9 +151,13 @@ def handle_new_request(state: IntakeState, user_message: str | None) -> Tuple[In
         return reset_state(), reset_reply(), False
 
     new_state = copy_state(state)
+    new_state.mode = "new"
     new_state.last_user_message = msg
 
     if new_state.step == STEP_FAHRZEUG:
+        if _is_new_request_starter(msg):
+            return new_state, welcome_reply(), False
+
         consume_inline_vehicle_year_km(new_state, msg)
 
         if not getattr(new_state, "fahrzeug", None):

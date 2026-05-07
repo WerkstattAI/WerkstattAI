@@ -8,6 +8,8 @@ class ChatRequest(BaseModel):
     """Eingabemodell für den /chat Endpoint."""
     session_id: str = Field(..., description="Eindeutige Session-ID (z.B. vom Frontend)")
     message: Optional[str] = Field(None, description="Nachricht des Nutzers; None = Gespräch starten")
+    channel: str = Field("web_chat", description="Kanal der Unterhaltung, z.B. web_chat oder whatsapp")
+    phone: Optional[str] = Field(None, description="Telefonnummer des Nutzers, relevant für WhatsApp")
 
 
 class ChatResponse(BaseModel):

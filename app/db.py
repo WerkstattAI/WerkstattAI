@@ -88,4 +88,31 @@ def init_db() -> None:
             """
         )
 
+        conn.execute(
+            """
+            CREATE TABLE IF NOT EXISTS conversation_sessions (
+                session_id TEXT PRIMARY KEY,
+                channel TEXT NOT NULL DEFAULT 'web_chat',
+                phone TEXT,
+                state_json TEXT NOT NULL,
+                created_at TEXT NOT NULL,
+                updated_at TEXT NOT NULL
+            )
+            """
+        )
+
+        conn.execute(
+            """
+            CREATE INDEX IF NOT EXISTS idx_conversation_sessions_updated_at
+            ON conversation_sessions(updated_at DESC)
+            """
+        )
+
+        conn.execute(
+            """
+            CREATE INDEX IF NOT EXISTS idx_conversation_sessions_phone
+            ON conversation_sessions(phone)
+            """
+        )
+
         conn.commit()

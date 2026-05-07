@@ -11,15 +11,20 @@ from app.conversation.constants import (
     STEP_KILOMETERSTAND,
     STEP_NAME,
     STEP_PROBLEM,
+    STEP_QUOTE_ANLIEGEN,
+    STEP_QUOTE_FAHRZEUG,
+    STEP_QUOTE_NAME,
+    STEP_QUOTE_TELEFON,
     STEP_TELEFON,
 )
-from app.conversation.extractors import lower, normalize
+from app.conversation.extractors import extract_km, extract_year, lower, normalize
 from app.models import IntakeState
 
 
 INTENT_NEW_REQUEST = "new_request"
 INTENT_EXISTING_TICKET = "existing_ticket"
 INTENT_GENERAL_QUESTION = "general_question"
+INTENT_QUOTE_REQUEST = "quote_request"
 
 
 ACTIVE_INTAKE_STEPS = {
@@ -34,8 +39,18 @@ ACTIVE_INTAKE_STEPS = {
     STEP_NAME,
 }
 
+ACTIVE_QUOTE_STEPS = {
+    STEP_QUOTE_ANLIEGEN,
+    STEP_QUOTE_FAHRZEUG,
+    STEP_QUOTE_TELEFON,
+    STEP_QUOTE_NAME,
+}
+
 
 EXISTING_TICKET_KEYWORDS = [
+    "bestehendes ticket",
+    "bestehenden ticket",
+    "anfrage zu einem bestehenden ticket",
     "ticket",
     "ticketnr",
     "ticket-nr",
@@ -67,6 +82,26 @@ EXISTING_TICKET_KEYWORDS = [
 ]
 
 GENERAL_QUESTION_KEYWORDS = [
+    "allgemeine frage",
+    "eine allgemeine frage",
+    "oeffnungszeiten",
+    "öffnungszeiten",
+    "wann offen",
+    "wann habt ihr offen",
+    "adresse",
+    "wo seid ihr",
+    "standort",
+    "kontakt",
+    "telefon",
+    "telefonnummer",
+    "nummer",
+    "email",
+    "preise",
+    "preis",
+    "kosten",
+    "leistungen",
+    "repariert ihr",
+    "abschleppdienst",
     "was bedeutet",
     "wie funktioniert",
     "wie geht",
@@ -83,7 +118,22 @@ GENERAL_QUESTION_KEYWORDS = [
     "kannst du mir sagen",
 ]
 
+QUOTE_REQUEST_KEYWORDS = [
+    "kostenvoranschlag",
+    "kosten voranschlag",
+    "kostenschätzung",
+    "kostenschaetzung",
+    "preisanfrage",
+    "preis anfrage",
+    "angebot",
+    "was kostet",
+    "wie viel kostet",
+    "wie teuer",
+]
+
 NEW_REQUEST_HINTS = [
+    "problem melden",
+    "ich möchte ein problem melden",
     "springt nicht an",
     "startet nicht",
     "inspektion",
@@ -108,6 +158,10 @@ def is_active_intake_step(step: str | None) -> bool:
     return (step or "").strip().lower() in ACTIVE_INTAKE_STEPS
 
 
+def is_active_quote_step(step: str | None) -> bool:
+    return (step or "").strip().lower() in ACTIVE_QUOTE_STEPS
+
+
 def extract_ticket_reference(text: str) -> str | None:
     """
     Erkennt grob Ticket-Referenzen wie:
@@ -117,7 +171,11 @@ def extract_ticket_reference(text: str) -> str | None:
     """
     t = normalize(text)
 
-    m = re.search(r"\b([A-Z]{2,10}-\d{1,10})\b", t, flags=re.IGNORECASE)
+    m = re.search(
+        r"\b([A-Z]{2,10}-\d{4,8}(?:-\d{1,10})?)\b",
+        t,
+        flags=re.IGNORECASE,
+    )
     if m:
         return m.group(1)
 
@@ -139,6 +197,23 @@ def extract_phone_reference(text: str) -> str | None:
     Wenn >= 7 Ziffern vorkommen, behandeln wir das als mögliche Telefonsuche.
     """
     t = normalize(text)
+    tl = lower(t)
+
+    has_phone_context = any(
+        keyword in tl
+        for keyword in [
+            "telefon",
+            "telefonnummer",
+            "nummer",
+            "handy",
+            "mobil",
+            "rufnummer",
+        ]
+    )
+
+    if not has_phone_context and (extract_year(t) or extract_km(t)):
+        return None
+
     digits = re.sub(r"\D", "", t)
 
     if len(digits) >= 7:
@@ -155,6 +230,9 @@ def looks_like_existing_ticket_question(text: str) -> bool:
 
     if extract_phone_reference(text):
         return True
+
+    if (extract_year(text) or extract_km(text)) and "ticket" not in t:
+        return False
 
     return any(keyword in t for keyword in EXISTING_TICKET_KEYWORDS)
 
@@ -176,6 +254,33 @@ def looks_like_new_request(text: str) -> bool:
     return any(keyword in t for keyword in NEW_REQUEST_HINTS)
 
 
+def looks_like_quote_request(text: str) -> bool:
+    t = lower(text)
+    return any(keyword in t for keyword in QUOTE_REQUEST_KEYWORDS)
+
+
+def has_direct_ticket_reference(text: str) -> bool:
+    return bool(extract_ticket_reference(text) or extract_phone_reference(text))
+
+
+def has_explicit_ticket_context(text: str) -> bool:
+    t = lower(text)
+    if has_direct_ticket_reference(text):
+        return True
+
+    explicit_keywords = [
+        "bestehendes ticket",
+        "bestehenden ticket",
+        "ticket",
+        "ticketnr",
+        "ticket-nr",
+        "ticketnummer",
+        "auftrag",
+        "fall",
+    ]
+    return any(keyword in t for keyword in explicit_keywords)
+
+
 def detect_intent(state: IntakeState, user_message: str | None) -> str:
     """
     Erkennt grob die Absicht des Nutzers:
@@ -192,14 +297,28 @@ def detect_intent(state: IntakeState, user_message: str | None) -> str:
 
     msg = normalize(user_message)
 
-    if is_active_intake_step(getattr(state, "step", None)):
+    mode = (getattr(state, "mode", None) or "unknown").strip().lower()
+
+    if mode == "new" and is_active_intake_step(getattr(state, "step", None)):
         return INTENT_NEW_REQUEST
+
+    if mode == "quote" and is_active_quote_step(getattr(state, "step", None)):
+        return INTENT_QUOTE_REQUEST
+
+    if mode == "existing" and getattr(state, "ticket_id", None):
+        return INTENT_EXISTING_TICKET
+
+    if has_direct_ticket_reference(msg):
+        return INTENT_EXISTING_TICKET
+
+    if looks_like_quote_request(msg):
+        return INTENT_QUOTE_REQUEST
+
+    if looks_like_general_question(msg) and not has_explicit_ticket_context(msg):
+        return INTENT_GENERAL_QUESTION
 
     if looks_like_existing_ticket_question(msg):
         return INTENT_EXISTING_TICKET
-
-    if looks_like_general_question(msg):
-        return INTENT_GENERAL_QUESTION
 
     if looks_like_new_request(msg):
         return INTENT_NEW_REQUEST

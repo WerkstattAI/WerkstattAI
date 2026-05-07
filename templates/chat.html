@@ -455,11 +455,13 @@
           <div class="hint-text">
             Der Assistent kann jetzt:
             <br><br>
-            • neue Werkstatt-Anfragen aufnehmen
+            • Probleme aufnehmen
             <br>
-            • bestehende Tickets abfragen
+            • Anfragen zu bestehenden Tickets bearbeiten
             <br>
             • allgemeine Fragen beantworten
+            <br>
+            • Kostenvoranschläge anfragen
           </div>
         </div>
 
@@ -484,7 +486,7 @@
         <div class="chat-header">
           <div>
             <h2>Kundenchat</h2>
-            <div class="muted">WerkstattAI unterstützt neue Meldungen, bestehende Tickets und allgemeine Fragen.</div>
+            <div class="muted">WerkstattAI unterstützt Problemmeldungen, Kostenvoranschläge, Anfragen zu bestehenden Tickets und allgemeine Fragen.</div>
           </div>
 
           <div class="chat-status">
@@ -542,16 +544,20 @@
 
 Wie kann ich Ihnen helfen?
 
-Wählen Sie einfach die passende Art der Anfrage aus oder schreiben Sie direkt Ihr Anliegen.`;
+Wählen Sie einfach den passenden Bereich aus oder schreiben Sie direkt Ihr Anliegen.`;
 
     const QUICK_ACTIONS = [
       {
-        label: "Neue Anfrage",
-        message: "Ich möchte eine neue Anfrage zur Werkstatt stellen."
+        label: "Problem melden",
+        message: "Ich möchte ein Problem melden."
       },
       {
-        label: "Bestehendes Ticket",
-        message: "Ich habe eine Frage zu einem bestehenden Ticket."
+        label: "Kostenvoranschlag anfragen",
+        message: "Ich möchte einen Kostenvoranschlag anfragen."
+      },
+      {
+        label: "Anfrage zu einem bestehenden Ticket",
+        message: "Ich habe eine Anfrage zu einem bestehenden Ticket."
       },
       {
         label: "Allgemeine Frage",

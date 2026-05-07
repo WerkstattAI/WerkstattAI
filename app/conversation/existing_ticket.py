@@ -5,7 +5,7 @@ from typing import Any, Tuple
 from app.conversation.extractors import lower, normalize
 from app.conversation.intent import extract_phone_reference, extract_ticket_reference
 from app.models import IntakeState
-from app.tickets import find_ticket_by_id, find_tickets_by_phone
+from app.tickets import add_ticket_note, find_ticket_by_id, find_tickets_by_phone
 
 
 def _format_ticket_short(ticket: dict[str, Any]) -> str:
@@ -21,11 +21,28 @@ def _format_ticket_short(ticket: dict[str, Any]) -> str:
     )
 
 
-def _get_latest_note(ticket: dict[str, Any]) -> dict[str, Any] | None:
+def _note_type(note: dict[str, Any]) -> str:
+    note_type = str(note.get("type", "") if isinstance(note, dict) else "").strip().lower()
+    if note_type in {"internal_note", "customer_message", "customer_reply"}:
+        return note_type
+
+    text = str(note.get("text", "") if isinstance(note, dict) else "").strip().lower()
+    if text.startswith("kundenfrage über den chat:"):
+        return "customer_message"
+
+    return "internal_note"
+
+
+def _get_latest_customer_reply(ticket: dict[str, Any]) -> dict[str, Any] | None:
     notes = ticket.get("notes") or []
-    if not isinstance(notes, list) or not notes:
+    if not isinstance(notes, list):
         return None
-    return notes[-1]
+
+    for note in reversed(notes):
+        if isinstance(note, dict) and _note_type(note) == "customer_reply":
+            return note
+
+    return None
 
 
 def _build_ticket_summary(ticket: dict[str, Any]) -> str:
@@ -74,13 +91,13 @@ def _build_ticket_summary(ticket: dict[str, Any]) -> str:
         f"- Zuletzt aktualisiert: {updated_at}",
     ]
 
-    latest_note = _get_latest_note(ticket)
+    latest_note = _get_latest_customer_reply(ticket)
     if latest_note:
         note_text = latest_note.get("text") or "-"
         note_created_at = latest_note.get("created_at") or "-"
         lines.append("")
-        lines.append(f"Letzte Notiz: {note_text}")
-        lines.append(f"Notiz-Zeit: {note_created_at}")
+        lines.append(f"Letzte Antwort der Werkstatt: {note_text}")
+        lines.append(f"Antwort-Zeit: {note_created_at}")
 
     return "\n".join(lines)
 
@@ -95,6 +112,12 @@ def _looks_like_status_question(text: str) -> bool:
             "stand",
             "aktueller stand",
             "bearbeitung",
+            "fertig",
+            "schon fertig",
+            "auto fertig",
+            "fahrzeug fertig",
+            "abholbereit",
+            "bereit zur abholung",
         ]
     )
 
@@ -174,6 +197,46 @@ def _looks_like_note_question(text: str) -> bool:
     )
 
 
+def _looks_like_duration_question(text: str) -> bool:
+    t = lower(text)
+    return any(
+        key in t
+        for key in [
+            "wie lange",
+            "dauer",
+            "dauert",
+            "ungefähr",
+            "ungefaehr",
+            "wann fertig",
+            "wann ist",
+            "fertigstellung",
+            "termin",
+            "abholung",
+            "abholen",
+        ]
+    )
+
+
+def _record_customer_message(
+    ticket: dict[str, Any],
+    question: str,
+    *,
+    include_workshop_hint: bool = False,
+) -> None:
+    ticket_id = str(ticket.get("ticket_id") or "").strip()
+    if not ticket_id:
+        return
+
+    text = "Kundenfrage über den Chat: " + question
+    if include_workshop_hint:
+        text += "\nBitte den Kunden kontaktieren, sobald eine Einschätzung möglich ist."
+
+    try:
+        add_ticket_note(ticket_id, text, note_type="customer_message")
+    except Exception:
+        pass
+
+
 def _looks_like_summary_question(text: str) -> bool:
     t = lower(text)
     return any(
@@ -233,7 +296,31 @@ def _resolve_ticket_from_message(user_message: str) -> tuple[dict[str, Any] | No
     )
 
 
+def _resolve_ticket_for_state(
+    state: IntakeState,
+    user_message: str,
+) -> tuple[dict[str, Any] | None, str | None]:
+    ticket, error_reply = _resolve_ticket_from_message(user_message)
+    if ticket or extract_ticket_reference(user_message) or extract_phone_reference(user_message):
+        return ticket, error_reply
+
+    if getattr(state, "ticket_id", None):
+        remembered = find_ticket_by_id(state.ticket_id or "")
+        if remembered:
+            return remembered, None
+
+    return ticket, error_reply
+
+
 def _answer_ticket_question(ticket: dict[str, Any], user_message: str) -> str:
+    if _looks_like_duration_question(user_message):
+        return (
+            f"Für Ticket **{ticket.get('ticket_id') or '-'}** kann ich noch keine genaue Dauer zusagen.\n"
+            f"Aktueller Status: **{ticket.get('status') or '-'}**.\n\n"
+            "Ich habe Ihre Frage an die Werkstatt weitergegeben. "
+            "Die Werkstatt meldet sich bei Ihnen, sobald eine verlässliche Einschätzung möglich ist."
+        )
+
     if _looks_like_status_question(user_message):
         return (
             f"Der Status von Ticket **{ticket.get('ticket_id') or '-'}** ist: "
@@ -268,12 +355,15 @@ def _answer_ticket_question(ticket: dict[str, Any], user_message: str) -> str:
         )
 
     if _looks_like_note_question(user_message):
-        latest_note = _get_latest_note(ticket)
+        latest_note = _get_latest_customer_reply(ticket)
         if not latest_note:
-            return f"Zu Ticket **{ticket.get('ticket_id') or '-'}** gibt es aktuell keine interne Notiz."
+            return (
+                f"Zu Ticket **{ticket.get('ticket_id') or '-'}** liegt aktuell "
+                "noch keine Antwort der Werkstatt an den Kunden vor."
+            )
 
         return (
-            f"Letzte Notiz zu Ticket **{ticket.get('ticket_id') or '-'}**:\n"
+            f"Letzte Antwort der Werkstatt zu Ticket **{ticket.get('ticket_id') or '-'}**:\n"
             f"- Text: {latest_note.get('text') or '-'}\n"
             f"- Erstellt: {latest_note.get('created_at') or '-'}"
         )
@@ -312,13 +402,20 @@ def handle_existing_ticket(
         return state, reply, False
 
     msg = normalize(user_message)
+    state.mode = "existing"
 
-    ticket, error_reply = _resolve_ticket_from_message(msg)
+    ticket, error_reply = _resolve_ticket_for_state(state, msg)
     if error_reply:
         return state, error_reply, False
 
     if not ticket:
         return state, "Ich konnte kein passendes bestehendes Ticket ermitteln.", False
 
+    state.ticket_id = str(ticket.get("ticket_id") or "")
+    _record_customer_message(
+        ticket,
+        msg,
+        include_workshop_hint=_looks_like_duration_question(msg),
+    )
     reply = _answer_ticket_question(ticket, msg)
     return state, reply, False

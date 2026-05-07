@@ -147,14 +147,51 @@ def infer_fahrbereit_from_text(text: str) -> str | None:
 
 def can_extract_vehicle(text: str) -> bool:
     t = normalize(text)
+    tl = t.lower()
+
     if len(t) < 3:
         return False
 
-    if extract_phone(t):
+    if "?" in t:
         return False
 
     pure_digits = re.sub(r"\D", "", t)
     if pure_digits and len(pure_digits) == len(t.replace(" ", "")):
+        return False
+
+    blocked_phrases = [
+        "ich möchte",
+        "ich moechte",
+        "problem melden",
+        "allgemeine frage",
+        "anfrage zu einem bestehenden ticket",
+        "bestehendes ticket",
+        "öffnungszeiten",
+        "oeffnungszeiten",
+        "wann habt ihr offen",
+        "wie sind eure",
+        "status von ticket",
+        "ticket",
+        "hilfe",
+        "kontakt",
+        "adresse",
+        "kosten",
+        "preis",
+        "springt nicht an",
+        "startet nicht",
+        "warnlampe",
+        "motorkontrollleuchte",
+        "reparatur",
+        "inspektion",
+        "oelwechsel",
+        "ölwechsel",
+        "reifenwechsel",
+    ]
+    if any(phrase in tl for phrase in blocked_phrases):
+        return False
+
+    has_vehicle_context = bool(extract_year(t) or extract_km(t))
+    if extract_phone(t) and not has_vehicle_context:
         return False
 
     return True

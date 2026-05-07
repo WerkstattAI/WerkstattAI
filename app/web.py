@@ -89,7 +89,7 @@ def _normalize_priority(value: str | None) -> str:
 def _normalize_request_type(value: str | None) -> str:
     request_type = (value or "").strip().lower()
 
-    if request_type in {"service", "diagnose", "notfall"}:
+    if request_type in {"service", "diagnose", "notfall", "kostenvoranschlag"}:
         return request_type
 
     return "diagnose"
@@ -149,6 +149,12 @@ def _matches_query(t: dict, q: str) -> bool:
     if not q:
         return True
 
+    if q in {"kundenfrage", "kundenfragen", "chatfrage", "chat-fragen"}:
+        return bool(t.get("has_customer_question"))
+
+    if q in {"kostenvoranschlag", "kostenvoranschlaege", "kostenvoranschläge", "preisanfrage", "angebot"}:
+        return t.get("request_type") == "kostenvoranschlag"
+
     hay = " ".join(
         [
             str(t.get("_id", "")).lower(),
@@ -163,9 +169,27 @@ def _matches_query(t: dict, q: str) -> bool:
             str(t.get("priority", "")).lower(),
             str(t.get("request_type", "")).lower(),
             str(t.get("status", "")).lower(),
+            str(t.get("last_note_text", "")).lower(),
         ]
     )
     return q in hay
+
+
+def _is_customer_question_note(note: dict) -> bool:
+    text = str(note.get("text", "") if isinstance(note, dict) else "").strip()
+    note_type = str(note.get("type", "") if isinstance(note, dict) else "").strip().lower()
+    return note_type == "customer_message" or text.lower().startswith("kundenfrage über den chat:")
+
+
+def _note_type(note: dict) -> str:
+    if not isinstance(note, dict):
+        return "internal_note"
+
+    note_type = str(note.get("type", "")).strip().lower()
+    if note_type in {"internal_note", "customer_message", "customer_reply"}:
+        return note_type
+
+    return "customer_message" if _is_customer_question_note(note) else "internal_note"
 
 
 def _details_payload(t: dict) -> dict:
@@ -193,6 +217,29 @@ def _prepare_tickets(limit: int) -> list[dict]:
 
         notes = t.get("notes") if isinstance(t.get("notes"), list) else []
         last_note = notes[-1] if notes else {}
+        customer_question_notes = [
+            note
+            for note in notes
+            if isinstance(note, dict) and _is_customer_question_note(note)
+        ]
+        latest_customer_question = (
+            customer_question_notes[-1]
+            if customer_question_notes
+            else {}
+        )
+
+        t["has_customer_question"] = bool(customer_question_notes)
+        t["customer_question_count"] = len(customer_question_notes)
+        t["latest_customer_question_text"] = (
+            str(latest_customer_question.get("text", "")).strip()
+            if latest_customer_question
+            else ""
+        )
+        t["latest_customer_question_created_at"] = (
+            str(latest_customer_question.get("created_at", "")).strip()
+            if latest_customer_question
+            else ""
+        )
 
         t["last_note_text"] = (
             str(last_note.get("text", "")).strip()
@@ -227,6 +274,8 @@ def _stats_for(tickets: list[dict]) -> dict:
         "service": sum(1 for t in tickets if t.get("request_type") == "service"),
         "diagnose": sum(1 for t in tickets if t.get("request_type") == "diagnose"),
         "notfall": sum(1 for t in tickets if t.get("request_type") == "notfall"),
+        "kostenvoranschlag": sum(1 for t in tickets if t.get("request_type") == "kostenvoranschlag"),
+        "kundenfragen": sum(1 for t in tickets if t.get("has_customer_question")),
         "all": len(tickets),
     }
 
@@ -361,6 +410,11 @@ def ticket_detail(request: Request, ticket_id: str):
     t["priority"] = _normalize_priority(t.get("priority"))
     t["request_type"] = _normalize_request_type(t.get("request_type"))
     t["kunde_name"] = _extract_name(t)
+
+    notes = t.get("notes") if isinstance(t.get("notes"), list) else []
+    t["internal_notes"] = [note for note in notes if _note_type(note) == "internal_note"]
+    t["customer_messages"] = [note for note in notes if _note_type(note) == "customer_message"]
+    t["customer_replies"] = [note for note in notes if _note_type(note) == "customer_reply"]
     t["raw_json"] = json.dumps(t, ensure_ascii=False, default=str, indent=2)
 
     return templates.TemplateResponse(
@@ -395,13 +449,20 @@ def ticket_set_status_quick(ticket_id: str, status: str = Form(...)):
 
 
 @router.post("/dashboard/ticket/{ticket_id}/notes")
-def ticket_add_note(ticket_id: str, note_text: str = Form(...)):
+def ticket_add_note(
+    ticket_id: str,
+    note_text: str = Form(...),
+    note_type: str = Form("internal_note"),
+):
     try:
         text = (note_text or "").strip()
         if not text:
             return HTMLResponse("Notiz darf nicht leer sein", status_code=400)
 
-        add_ticket_note(ticket_id, text)
+        if note_type not in {"internal_note", "customer_reply"}:
+            return HTMLResponse("Ungültiger Notiztyp", status_code=400)
+
+        add_ticket_note(ticket_id, text, note_type=note_type)
     except KeyError:
         return HTMLResponse("Ticket nicht gefunden", status_code=404)
     except Exception:

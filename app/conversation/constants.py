@@ -15,6 +15,10 @@ STEP_FOLLOWUP = "followup"
 STEP_TELEFON = "telefon"
 STEP_NAME = "name"
 STEP_FERTIG = "fertig"
+STEP_QUOTE_ANLIEGEN = "quote_anliegen"
+STEP_QUOTE_FAHRZEUG = "quote_fahrzeug"
+STEP_QUOTE_TELEFON = "quote_telefon"
+STEP_QUOTE_NAME = "quote_name"
 
 
 # =========================================================
@@ -24,6 +28,7 @@ STEP_FERTIG = "fertig"
 REQUEST_TYPE_SERVICE = "service"
 REQUEST_TYPE_DIAGNOSE = "diagnose"
 REQUEST_TYPE_NOTFALL = "notfall"
+REQUEST_TYPE_KOSTENVORANSCHLAG = "kostenvoranschlag"
 
 
 # =========================================================

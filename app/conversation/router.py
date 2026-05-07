@@ -8,9 +8,11 @@ from app.conversation.intent import (
     INTENT_EXISTING_TICKET,
     INTENT_GENERAL_QUESTION,
     INTENT_NEW_REQUEST,
+    INTENT_QUOTE_REQUEST,
     detect_intent,
 )
 from app.conversation.new_request import handle_new_request
+from app.conversation.quote_request import handle_quote_request
 from app.models import IntakeState
 
 
@@ -22,8 +24,8 @@ def next_step(
     Zentraler Router für alle Konversationen.
 
     Entscheidet basierend auf Intent:
-    - Neue Anfrage (Intake Flow)
-    - Bestehendes Ticket
+    - Problem melden (Intake Flow)
+    - Anfrage zu einem bestehenden Ticket
     - Allgemeine Frage
     """
 
@@ -38,5 +40,8 @@ def next_step(
     if intent == INTENT_GENERAL_QUESTION:
         return handle_general_question(state, user_message)
 
-    # Fallback → neue Anfrage
+    # Fallback → Problem melden
+    if intent == INTENT_QUOTE_REQUEST:
+        return handle_quote_request(state, user_message)
+
     return handle_new_request(state, user_message)

@@ -1,14 +1,14 @@
 from __future__ import annotations
 
-from typing import Dict
-
 from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import JSONResponse
 from pydantic import BaseModel
 
 from app.ai_service import polish_reply_de
 from app.config import settings
 from app.db import init_db
+from app.conversation_sessions import load_session_state, save_session_state
 from app.conversation.router import next_step
 from app.models import ChatRequest, ChatResponse, IntakeState
 from app.tickets import (
@@ -20,7 +20,14 @@ from app.tickets import (
 from app.web import router as web_router
 
 
-app = FastAPI(title=settings.app_name)
+class UTF8JSONResponse(JSONResponse):
+    media_type = "application/json; charset=utf-8"
+
+
+app = FastAPI(
+    title=settings.app_name,
+    default_response_class=UTF8JSONResponse,
+)
 
 # ✅ NOWE — inicjalizacja bazy SQLite
 @app.on_event("startup")
@@ -63,9 +70,6 @@ def _normalize_status(status: str) -> str:
         )
 
     return value
-
-
-SESSIONS: Dict[str, IntakeState] = {}
 
 
 class StatusUpdate(BaseModel):
@@ -119,7 +123,7 @@ def patch_ticket_status(ticket_id: str, payload: StatusUpdate):
 
 @app.post("/chat", response_model=ChatResponse)
 def chat(payload: ChatRequest) -> ChatResponse:
-    state = SESSIONS.get(payload.session_id, IntakeState())
+    state = load_session_state(payload.session_id)
 
     new_state, reply, done = next_step(state, payload.message)
 
@@ -134,7 +138,12 @@ def chat(payload: ChatRequest) -> ChatResponse:
             + "Bitte notieren Sie sich diese Nummer für Rückfragen."
         )
 
-    SESSIONS[payload.session_id] = new_state
+    save_session_state(
+        payload.session_id,
+        new_state,
+        channel=payload.channel,
+        phone=payload.phone,
+    )
 
     return ChatResponse(
         reply=reply,

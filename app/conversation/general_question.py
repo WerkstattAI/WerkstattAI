@@ -14,6 +14,7 @@ def _is_opening_hours_question(text: str) -> bool:
     t = lower(text)
     return any(k in t for k in [
         "öffnungszeiten",
+        "oeffnungszeiten",
         "wann offen",
         "wann habt ihr offen",
         "wann geöffnet",
@@ -130,8 +131,8 @@ def _reply_fallback() -> str:
     return (
         "Ich helfe Ihnen gerne weiter.\n\n"
         "Sie können:\n"
-        "- ein neues Problem melden\n"
-        "- nach einem bestehenden Ticket fragen\n"
+        "- ein Problem melden\n"
+        "- eine Anfrage zu einem bestehenden Ticket stellen\n"
         "- oder eine allgemeine Frage stellen\n\n"
         "Wie kann ich Ihnen helfen?"
     )
@@ -150,6 +151,7 @@ def handle_general_question(
         return state, _reply_fallback(), False
 
     msg = normalize(user_message)
+    state.mode = "general"
 
     if _is_opening_hours_question(msg):
         return state, _reply_opening_hours(), False

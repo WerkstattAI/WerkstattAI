@@ -123,7 +123,7 @@ def build_completion_summary(state: IntakeState, score: int) -> str:
     name = getattr(state, "name", None)
 
     summary_lines = [
-        "Perfekt – die Anfrage ist vollständig. ✅",
+        "Perfekt – die Anfrage ist vollständig.",
         "",
         "Zusammenfassung:",
         f"- Fahrzeug: {fahrzeug}",
@@ -132,7 +132,6 @@ def build_completion_summary(state: IntakeState, score: int) -> str:
         f"- Anliegen: {problem}",
         f"- Typ: {request_type}",
         f"- Priorität: {priority}",
-        f"- Analyse-Score: {score}",
     ]
 
     if request_type != REQUEST_TYPE_SERVICE:
