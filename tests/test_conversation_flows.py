@@ -15,6 +15,7 @@ from app.conversation.intent import (
     detect_intent,
 )
 from app.models import IntakeState
+from app.main import whatsapp_session_id
 from app.tickets import (
     find_ticket_by_id,
     find_tickets_by_phone,
@@ -52,6 +53,14 @@ class IntentTests(unittest.TestCase):
         self.assertEqual(
             detect_intent(IntakeState(), "Wo ist eure Werkstatt?"),
             INTENT_GENERAL_QUESTION,
+        )
+
+
+class WhatsAppWebhookTests(unittest.TestCase):
+    def test_whatsapp_session_id_uses_normalized_phone(self) -> None:
+        self.assertEqual(
+            whatsapp_session_id("+49 176 123 456 78"),
+            "whatsapp:4917612345678",
         )
 
 

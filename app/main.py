@@ -10,7 +10,13 @@ from app.config import settings
 from app.db import default_workshop_id, init_db
 from app.conversation_sessions import load_session_state, save_session_state
 from app.conversation.router import next_step
-from app.models import ChatRequest, ChatResponse, IntakeState
+from app.models import (
+    ChatRequest,
+    ChatResponse,
+    IntakeState,
+    WhatsAppWebhookRequest,
+    WhatsAppWebhookResponse,
+)
 from app.tickets import (
     find_ticket_by_id,
     list_latest_tickets,
@@ -76,6 +82,77 @@ def _normalize_workshop_id(value: str | None = None) -> str:
     return (value or default_workshop_id()).strip() or default_workshop_id()
 
 
+def _normalize_phone_for_session(phone: str | None) -> str:
+    return "".join(ch for ch in str(phone or "") if ch.isdigit())
+
+
+def whatsapp_session_id(phone: str | None) -> str:
+    normalized_phone = _normalize_phone_for_session(phone)
+    return f"whatsapp:{normalized_phone or 'unknown'}"
+
+
+def process_chat_message(
+    *,
+    workshop_id: str,
+    session_id: str,
+    message: str | None,
+    channel: str,
+    phone: str | None = None,
+) -> ChatResponse:
+    state = load_session_state(session_id, workshop_id=workshop_id)
+    state.workshop_id = workshop_id
+
+    new_state, reply, done = next_step(state, message)
+    new_state.workshop_id = workshop_id
+
+    reply = polish_reply_de(reply)
+
+    if done and not new_state.ticket_id:
+        ticket_id = save_ticket(new_state, workshop_id=workshop_id)
+        new_state.ticket_id = ticket_id
+        reply = (
+            reply
+            + f"\n\nTicket-Nr.: **{ticket_id}**\n"
+            + "Bitte notieren Sie sich diese Nummer für Rückfragen."
+        )
+
+    save_session_state(
+        session_id,
+        new_state,
+        workshop_id=workshop_id,
+        channel=channel,
+        phone=phone,
+    )
+
+    return ChatResponse(
+        reply=reply,
+        done=done,
+        data=_dump_state(new_state),
+    )
+
+
+@app.post("/webhooks/whatsapp", response_model=WhatsAppWebhookResponse)
+def whatsapp_webhook(payload: WhatsAppWebhookRequest) -> WhatsAppWebhookResponse:
+    workshop_id = _normalize_workshop_id(payload.workshop_id)
+    session_id = whatsapp_session_id(payload.from_phone)
+
+    response = process_chat_message(
+        workshop_id=workshop_id,
+        session_id=session_id,
+        message=payload.text,
+        channel="whatsapp",
+        phone=payload.from_phone,
+    )
+
+    return WhatsAppWebhookResponse(
+        reply=response.reply,
+        done=response.done,
+        session_id=session_id,
+        workshop_id=workshop_id,
+        data=response.data,
+    )
+
+
 class StatusUpdate(BaseModel):
     status: str
 
@@ -134,33 +211,10 @@ def patch_ticket_status(ticket_id: str, payload: StatusUpdate, workshop_id: str 
 @app.post("/chat", response_model=ChatResponse)
 def chat(payload: ChatRequest) -> ChatResponse:
     workshop_id = _normalize_workshop_id(payload.workshop_id)
-    state = load_session_state(payload.session_id, workshop_id=workshop_id)
-    state.workshop_id = workshop_id
-
-    new_state, reply, done = next_step(state, payload.message)
-    new_state.workshop_id = workshop_id
-
-    reply = polish_reply_de(reply)
-
-    if done and not new_state.ticket_id:
-        ticket_id = save_ticket(new_state, workshop_id=workshop_id)
-        new_state.ticket_id = ticket_id
-        reply = (
-            reply
-            + f"\n\nTicket-Nr.: **{ticket_id}**\n"
-            + "Bitte notieren Sie sich diese Nummer für Rückfragen."
-        )
-
-    save_session_state(
-        payload.session_id,
-        new_state,
+    return process_chat_message(
         workshop_id=workshop_id,
+        session_id=payload.session_id,
+        message=payload.message,
         channel=payload.channel,
         phone=payload.phone,
-    )
-
-    return ChatResponse(
-        reply=reply,
-        done=done,
-        data=_dump_state(new_state),
     )

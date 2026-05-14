@@ -20,6 +20,23 @@ class ChatResponse(BaseModel):
     data: Dict[str, Any] = Field(default_factory=dict, description="Aktueller Session-Status")
 
 
+class WhatsAppWebhookRequest(BaseModel):
+    """Testformat fuer eingehende WhatsApp-Nachrichten."""
+    workshop_id: Optional[str] = Field(None, description="Werkstatt-ID fuer Multi-Tenant-Betrieb")
+    from_phone: str = Field(..., alias="from", description="Telefonnummer des WhatsApp-Nutzers")
+    text: Optional[str] = Field(None, description="Text der eingehenden Nachricht")
+
+
+class WhatsAppWebhookResponse(BaseModel):
+    """Antwortformat fuer den WhatsApp-Testwebhook."""
+    reply: str
+    done: bool
+    session_id: str
+    workshop_id: str
+    channel: str = "whatsapp"
+    data: Dict[str, Any] = Field(default_factory=dict)
+
+
 class IntakeState(BaseModel):
     """
     Zustand der Intake-Erfassung.

@@ -109,6 +109,35 @@ def _backend_status(ui_status: str) -> str:
     return _normalize_status(ui_status)
 
 
+def _status_label(value: str | None) -> str:
+    labels = {
+        "offen": "Offen",
+        "in_bearbeitung": "In Bearbeitung",
+        "erledigt": "Erledigt",
+        "archiviert": "Archiviert",
+    }
+    return labels.get(_normalize_status(value), "-")
+
+
+def _priority_label(value: str | None) -> str:
+    labels = {
+        "niedrig": "Niedrig",
+        "normal": "Normal",
+        "hoch": "Hoch",
+    }
+    return labels.get(_normalize_priority(value), "Normal")
+
+
+def _request_type_label(value: str | None) -> str:
+    labels = {
+        "service": "Service",
+        "diagnose": "Diagnose",
+        "notfall": "Notfall",
+        "kostenvoranschlag": "Kostenvoranschlag",
+    }
+    return labels.get(_normalize_request_type(value), "Diagnose")
+
+
 def _pick_first(d: dict, keys: list[str]) -> str:
     for k in keys:
         v = d.get(k)
@@ -216,6 +245,9 @@ def _prepare_tickets(limit: int, workshop_id: str | None = None) -> list[dict]:
         t["status_ui"] = _ui_status(t.get("status"))
         t["priority"] = _normalize_priority(t.get("priority"))
         t["request_type"] = _normalize_request_type(t.get("request_type"))
+        t["status_label"] = _status_label(t.get("status_ui"))
+        t["priority_label"] = _priority_label(t.get("priority"))
+        t["request_type_label"] = _request_type_label(t.get("request_type"))
         t["created_dt"] = _parse_iso(t.get("created_at"))
         t["updated_dt"] = _parse_iso(t.get("updated_at"))
         t["is_new"] = (t.get("created_at") == t.get("updated_at"))
@@ -545,6 +577,9 @@ def ticket_detail(request: Request, ticket_id: str, workshop_id: str | None = No
     t["status_ui"] = _ui_status(t.get("status"))
     t["priority"] = _normalize_priority(t.get("priority"))
     t["request_type"] = _normalize_request_type(t.get("request_type"))
+    t["status_label"] = _status_label(t.get("status_ui"))
+    t["priority_label"] = _priority_label(t.get("priority"))
+    t["request_type_label"] = _request_type_label(t.get("request_type"))
     t["kunde_name"] = _extract_name(t)
 
     notes = t.get("notes") if isinstance(t.get("notes"), list) else []

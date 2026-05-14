@@ -1074,7 +1074,7 @@
               <div class="status-value">
                 <span class="status s-{{ ticket.status_ui }}">
                   <span class="dot"></span>
-                  {{ (ticket.status_ui or "-") | replace("_", " ") }}
+                  {{ ticket.status_label or "-" }}
                 </span>
               </div>
             </div>
@@ -1082,16 +1082,16 @@
 
           <div style="display:flex; gap:8px; flex-wrap:wrap; margin-top:12px;">
             <span class="priority p-{{ ticket.priority or 'normal' }}">
-              {{ ticket.priority or "-" }}
+              {{ ticket.priority_label or "-" }}
             </span>
             <span class="request-type rt-{{ ticket.request_type or 'diagnose' }}">
-              {{ ticket.request_type or "-" }}
+              {{ ticket.request_type_label or "-" }}
             </span>
           </div>
 
           <div class="status-sub">
             Ticket-ID: {{ ticket.ticket_view_id or "-" }}<br>
-            Backend-Status: {{ ticket.status or "-" }}
+            Backend-Status: {{ ticket.status_label or "-" }}
           </div>
         </div>
       </div>
@@ -1148,9 +1148,9 @@
             <div class="field">
               <div class="muted">Status ändern</div>
               <select name="status" style="margin-top:6px; width:100%;">
-                <option value="offen" {% if ticket.status_ui=="offen" %}selected{% endif %}>offen</option>
-                <option value="in_bearbeitung" {% if ticket.status_ui=="in_bearbeitung" %}selected{% endif %}>in bearbeitung</option>
-                <option value="erledigt" {% if ticket.status_ui=="erledigt" %}selected{% endif %}>erledigt</option>
+                <option value="offen" {% if ticket.status_ui=="offen" %}selected{% endif %}>Offen</option>
+                <option value="in_bearbeitung" {% if ticket.status_ui=="in_bearbeitung" %}selected{% endif %}>In Bearbeitung</option>
+                <option value="erledigt" {% if ticket.status_ui=="erledigt" %}selected{% endif %}>Erledigt</option>
               </select>
             </div>
 
@@ -1180,8 +1180,8 @@
           <b>Baujahr</b><div class="muted">{{ ticket.baujahr or "-" }}</div>
           <b>Kilometerstand</b><div class="muted">{{ ticket.kilometerstand or "-" }}</div>
           <b>Telefon</b><div class="muted">{{ ticket.telefon or "-" }}</div>
-          <b>Priorität</b><div class="muted">{{ ticket.priority or "-" }}</div>
-          <b>Typ</b><div class="muted">{{ ticket.request_type or "-" }}</div>
+          <b>Priorität</b><div class="muted">{{ ticket.priority_label or "-" }}</div>
+          <b>Typ</b><div class="muted">{{ ticket.request_type_label or "-" }}</div>
           <b>Fahrbereit</b>
           <div class="muted">
             {% if ticket.fahrbereit is sameas true %}Ja
@@ -1340,15 +1340,15 @@
         <div class="debug-grid">
           <div class="debug-item">
             <div class="debug-label">Backend Status</div>
-            <div class="debug-value">{{ ticket.status or "-" }}</div>
+            <div class="debug-value">{{ ticket.status_label or "-" }}</div>
           </div>
           <div class="debug-item">
             <div class="debug-label">Priorität</div>
-            <div class="debug-value">{{ ticket.priority or "-" }}</div>
+            <div class="debug-value">{{ ticket.priority_label or "-" }}</div>
           </div>
           <div class="debug-item">
             <div class="debug-label">Request Type</div>
-            <div class="debug-value">{{ ticket.request_type or "-" }}</div>
+            <div class="debug-value">{{ ticket.request_type_label or "-" }}</div>
           </div>
           <div class="debug-item">
             <div class="debug-label">Fahrbereit</div>

@@ -1689,7 +1689,7 @@
                 </div>
                 <div class="attention-meta">
                   <span>{{ t.ticket_view_id }}</span>
-                  <span>{{ (t.status_ui or "-") | replace("_", " ") }}</span>
+                  <span>{{ t.status_label or "-" }}</span>
                 </div>
               </a>
             {% endfor %}
@@ -1743,7 +1743,7 @@
                 <td>
                   <span class="status s-{{ t.status_ui }}">
                     <span class="dot"></span>
-                    {{ (t.status_ui or "-") | replace("_", " ") }}
+                    {{ t.status_label or "-" }}
                   </span>
 
                   {% if t.is_new and not archive_mode %}
@@ -1763,12 +1763,12 @@
 
                 <td>
                   <span class="priority p-{{ t.priority or 'normal' }}">
-                    {{ t.priority or "normal" }}
+                    {{ t.priority_label or "Normal" }}
                   </span>
 
                   <div>
                     <span class="request-type rt-{{ t.request_type or 'diagnose' }}">
-                      {{ t.request_type or "diagnose" }}
+                      {{ t.request_type_label or "Diagnose" }}
                     </span>
                   </div>
                 </td>
@@ -1842,9 +1842,9 @@
                     <form class="quick" method="post" action="/dashboard/ticket/{{ t.ticket_view_id }}/status_quick">
                       <input type="hidden" name="workshop_id" value="{{ workshop_id }}" />
                       <select name="status">
-                        <option value="offen" {% if t.status_ui=="offen" %}selected{% endif %}>offen</option>
-                        <option value="in_bearbeitung" {% if t.status_ui=="in_bearbeitung" %}selected{% endif %}>in bearbeitung</option>
-                        <option value="erledigt" {% if t.status_ui=="erledigt" %}selected{% endif %}>erledigt</option>
+                        <option value="offen" {% if t.status_ui=="offen" %}selected{% endif %}>Offen</option>
+                        <option value="in_bearbeitung" {% if t.status_ui=="in_bearbeitung" %}selected{% endif %}>In Bearbeitung</option>
+                        <option value="erledigt" {% if t.status_ui=="erledigt" %}selected{% endif %}>Erledigt</option>
                       </select>
                       <button type="submit">Status speichern</button>
                     </form>
@@ -2032,7 +2032,29 @@
 
     function prettyStatus(val) {
       if (val === undefined || val === null || val === "") return "-";
-      return String(val).replaceAll("_", " ");
+      const labels = {
+        offen: "Offen",
+        in_bearbeitung: "In Bearbeitung",
+        erledigt: "Erledigt",
+        archiviert: "Archiviert",
+      };
+      const key = String(val);
+      return labels[key] || key.replaceAll("_", " ");
+    }
+
+    function prettyPriority(val) {
+      const labels = { niedrig: "Niedrig", normal: "Normal", hoch: "Hoch" };
+      return labels[val] || prettyValue(val);
+    }
+
+    function prettyRequestType(val) {
+      const labels = {
+        service: "Service",
+        diagnose: "Diagnose",
+        notfall: "Notfall",
+        kostenvoranschlag: "Kostenvoranschlag",
+      };
+      return labels[val] || prettyValue(val);
     }
 
     function prettyValue(val) {
@@ -2111,14 +2133,14 @@
         setText("mTelefon", data.telefon || "-");
         setText("mFahrzeug", data.fahrzeug || "-");
         setText("mBaujahr", data.baujahr || "-");
-        setText("mStatus", prettyStatus(data.status_ui || data.status || "-"));
-        setText("mPriority", prettyValue(data.priority || "-"));
-        setText("mRequestType", prettyValue(data.request_type || "-"));
+        setText("mStatus", data.status_label || prettyStatus(data.status_ui || data.status || "-"));
+        setText("mPriority", data.priority_label || prettyPriority(data.priority || "-"));
+        setText("mRequestType", data.request_type_label || prettyRequestType(data.request_type || "-"));
         setText("mProblem", data.problem || "-");
 
-        setText("dStatusBackend", prettyValue(data.status || "-"));
-        setText("dPriority", prettyValue(data.priority || "-"));
-        setText("dRequestType", prettyValue(data.request_type || "-"));
+        setText("dStatusBackend", data.status_label || prettyStatus(data.status || "-"));
+        setText("dPriority", data.priority_label || prettyPriority(data.priority || "-"));
+        setText("dRequestType", data.request_type_label || prettyRequestType(data.request_type || "-"));
         setText("dFahrbereit", prettyValue(data.fahrbereit || "-"));
         setText("dAbschleppdienst", prettyValue(data.abschleppdienst || "-"));
         setText("dKilometerstand", prettyValue(data.kilometerstand || "-"));
