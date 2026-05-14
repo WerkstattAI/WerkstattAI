@@ -1031,6 +1031,520 @@
         grid-template-columns:1fr;
       }
     }
+
+    /* Premium readability pass */
+    body{
+      background:
+        linear-gradient(90deg, rgba(255,255,255,.035) 1px, transparent 1px),
+        linear-gradient(180deg, rgba(255,255,255,.03) 1px, transparent 1px),
+        radial-gradient(900px 420px at 8% -10%, rgba(37,99,235,.32), transparent 64%),
+        radial-gradient(760px 360px at 92% -2%, rgba(245,158,11,.16), transparent 62%),
+        linear-gradient(135deg, #08111f 0%, #0d182b 50%, #090f1c 100%);
+      letter-spacing:0;
+    }
+
+    .wrap{
+      padding:26px;
+    }
+
+    .topbar{
+      border-radius:20px;
+      padding:22px;
+      background:linear-gradient(135deg, rgba(18,31,55,.94), rgba(11,20,36,.92));
+      box-shadow:0 18px 50px rgba(0,0,0,.34), inset 0 1px 0 rgba(255,255,255,.10);
+    }
+
+    .brand h1{
+      font-size:34px;
+      font-weight:850;
+    }
+
+    .brand .sub{
+      color:#c2ccdb;
+      max-width:680px;
+    }
+
+    .eyebrow,
+    .chip{
+      border-radius:12px;
+      background:rgba(255,255,255,.075);
+      letter-spacing:.03em;
+    }
+
+    .nav-btn,
+    .btn-secondary,
+    button,
+    input,
+    select{
+      border-radius:10px;
+    }
+
+    .cards{
+      grid-template-columns:repeat(auto-fit, minmax(150px, 1fr));
+      gap:10px;
+    }
+
+    .card{
+      border-radius:16px;
+      box-shadow:0 14px 34px rgba(0,0,0,.28), inset 0 1px 0 rgba(255,255,255,.08);
+      background:rgba(15,27,51,.82);
+    }
+
+    .card::after{
+      display:none;
+    }
+
+    .kpi{
+      min-height:118px;
+      padding:16px;
+      border-color:rgba(255,255,255,.12);
+    }
+
+    .kpi .label{
+      color:#c5d1e2;
+      font-size:11px;
+      letter-spacing:.06em;
+    }
+
+    .kpi .value{
+      margin-top:10px;
+      font-size:34px;
+      font-weight:850;
+    }
+
+    .kpi .hint{
+      color:#99a8bb;
+      font-size:12px;
+    }
+
+    .kpi-hot,
+    .kpi-warn,
+    .kpi-customer,
+    .kpi-quote{
+      background:rgba(15,27,51,.88);
+    }
+
+    .toolbar{
+      border-radius:16px;
+      padding:14px;
+      background:rgba(10,18,34,.82);
+      box-shadow:0 12px 34px rgba(0,0,0,.26);
+    }
+
+    .table-shell{
+      border-radius:18px;
+      background:rgba(8,15,28,.86);
+      box-shadow:0 18px 52px rgba(0,0,0,.36);
+    }
+
+    .table-head{
+      padding:18px 20px;
+      background:rgba(255,255,255,.045);
+    }
+
+    table{
+      border-spacing:0 6px;
+      padding:8px;
+    }
+
+    th{
+      color:#aebbd0;
+      font-size:10px;
+      letter-spacing:.08em;
+    }
+
+    th, td{
+      padding:13px 12px;
+    }
+
+    tbody td{
+      background:rgba(255,255,255,.055);
+      border-color:rgba(255,255,255,.065);
+    }
+
+    tbody tr:hover td{
+      background:rgba(96,165,250,.10);
+    }
+
+    tbody td:first-child{
+      border-top-left-radius:12px;
+      border-bottom-left-radius:12px;
+    }
+
+    tbody td:last-child{
+      border-top-right-radius:12px;
+      border-bottom-right-radius:12px;
+    }
+
+    .vehicle .title,
+    .problem-text{
+      font-weight:750;
+      color:#f2f6fc;
+    }
+
+    .status,
+    .priority,
+    .request-type,
+    .tiny-badge,
+    .customer-question-badge,
+    .new{
+      border-radius:10px;
+      letter-spacing:.03em;
+    }
+
+    .last-note-block{
+      border-radius:12px;
+      background:rgba(0,0,0,.12);
+    }
+
+    .actions{
+      gap:6px;
+    }
+
+    .open,
+    .details-btn,
+    .mini-action,
+    .quick,
+    .archive-btn{
+      border-radius:10px;
+    }
+
+    .quick{
+      padding:6px;
+      background:rgba(0,0,0,.10);
+    }
+
+    .modal{
+      border-radius:18px;
+      background:#0d182c;
+    }
+
+    .mini-card,
+    .debug-item,
+    details,
+    pre{
+      border-radius:12px;
+    }
+
+    .debug-grid{
+      grid-template-columns:repeat(2, minmax(180px, 1fr));
+    }
+
+    .debug-item{
+      padding:10px;
+      background:rgba(255,255,255,.045);
+    }
+
+    .debug-label{
+      color:#9daec3;
+      font-size:10px;
+    }
+
+    .debug-value,
+    pre{
+      font-size:12px;
+    }
+
+    /* Active ticket list refinement */
+    .table-wrap{
+      padding:0 8px 8px;
+    }
+
+    .attention{
+      border:1px solid rgba(255,255,255,.14);
+      border-radius:16px;
+      background:rgba(10,18,34,.82);
+      box-shadow:0 14px 34px rgba(0,0,0,.26);
+      overflow:hidden;
+    }
+
+    .attention-head{
+      display:flex;
+      justify-content:space-between;
+      gap:12px;
+      align-items:center;
+      padding:14px 16px;
+      border-bottom:1px solid rgba(255,255,255,.09);
+      background:rgba(255,255,255,.04);
+    }
+
+    .attention-title{
+      font-size:13px;
+      font-weight:900;
+      letter-spacing:.04em;
+      text-transform:uppercase;
+      color:#f2f7ff;
+    }
+
+    .attention-sub{
+      margin-top:3px;
+      color:#9fb0c6;
+      font-size:12px;
+    }
+
+    .attention-list{
+      display:grid;
+      grid-template-columns:repeat(auto-fit, minmax(240px, 1fr));
+      gap:8px;
+      padding:10px;
+    }
+
+    .attention-card{
+      display:grid;
+      gap:8px;
+      min-height:132px;
+      padding:12px;
+      border-radius:12px;
+      border:1px solid rgba(255,255,255,.10);
+      background:rgba(255,255,255,.05);
+      color:var(--text);
+      text-decoration:none;
+      transition:.18s ease;
+    }
+
+    .attention-card:hover{
+      transform:translateY(-1px);
+      background:rgba(96,165,250,.10);
+      border-color:rgba(96,165,250,.24);
+      text-decoration:none;
+    }
+
+    .attention-reason{
+      width:max-content;
+      max-width:100%;
+      padding:4px 8px;
+      border-radius:10px;
+      border:1px solid rgba(96,165,250,.28);
+      background:rgba(96,165,250,.13);
+      color:#dbeafe;
+      font-size:10px;
+      font-weight:900;
+      letter-spacing:.05em;
+      text-transform:uppercase;
+    }
+
+    .attention-main{
+      min-width:0;
+    }
+
+    .attention-car{
+      color:#f8fbff;
+      font-size:15px;
+      line-height:1.25;
+      font-weight:850;
+      overflow:hidden;
+      text-overflow:ellipsis;
+      white-space:nowrap;
+    }
+
+    .attention-problem{
+      margin-top:4px;
+      color:#cbd7e8;
+      font-size:12px;
+      line-height:1.4;
+      display:-webkit-box;
+      -webkit-line-clamp:2;
+      -webkit-box-orient:vertical;
+      overflow:hidden;
+    }
+
+    .attention-meta{
+      display:flex;
+      justify-content:space-between;
+      gap:8px;
+      align-items:center;
+      color:#93a4ba;
+      font-size:11px;
+      font-weight:750;
+    }
+
+    .attention-empty{
+      padding:14px 16px;
+      color:#9fb0c6;
+      font-size:13px;
+    }
+
+    table.ticket-table{
+      min-width:980px;
+      border-spacing:0 5px;
+      padding:4px 0 0;
+      table-layout:fixed;
+    }
+
+    .ticket-table th:nth-child(1){width:118px}
+    .ticket-table th:nth-child(2){width:118px}
+    .ticket-table th:nth-child(3){width:190px}
+    .ticket-table th:nth-child(4){width:auto}
+    .ticket-table th:nth-child(5){width:142px}
+    .ticket-table th:nth-child(6){width:132px}
+    .ticket-table th:nth-child(7){width:260px}
+
+    .ticket-table th{
+      padding:10px 10px 8px;
+      color:#9fb0c6;
+      font-size:10px;
+      font-weight:800;
+      letter-spacing:.06em;
+    }
+
+    .ticket-table td{
+      padding:11px 10px;
+      vertical-align:middle;
+    }
+
+    .ticket-table tbody td{
+      background:rgba(255,255,255,.048);
+    }
+
+    .ticket-table tbody tr:hover td{
+      background:rgba(96,165,250,.095);
+    }
+
+    .status{
+      padding:5px 8px;
+      gap:6px;
+      font-size:11px;
+      font-weight:800;
+    }
+
+    .dot{
+      width:7px;
+      height:7px;
+    }
+
+    .priority,
+    .request-type,
+    .tiny-badge,
+    .new,
+    .customer-question-badge{
+      padding:4px 7px;
+      font-size:10px;
+      font-weight:800;
+      letter-spacing:.035em;
+    }
+
+    .request-type{
+      margin-top:6px;
+      max-width:108px;
+      overflow:hidden;
+      text-overflow:ellipsis;
+    }
+
+    .id{
+      margin-top:6px;
+      color:#8798af;
+      font-size:11px;
+    }
+
+    .vehicle{
+      gap:3px;
+    }
+
+    .vehicle .title{
+      font-size:15px;
+      font-weight:850;
+      line-height:1.22;
+    }
+
+    .vehicle .muted{
+      font-size:11px;
+      line-height:1.35;
+    }
+
+    .problem{
+      max-width:none;
+    }
+
+    .problem-text{
+      -webkit-line-clamp:2;
+      font-size:14px;
+      line-height:1.38;
+      font-weight:700;
+      color:#f2f7ff;
+    }
+
+    .meta-row{
+      gap:5px;
+      margin-top:6px;
+    }
+
+    .last-note-block{
+      margin-top:7px;
+      padding:8px 10px;
+      border-radius:10px;
+    }
+
+    .last-note-label{
+      margin-bottom:4px;
+      font-size:10px;
+      letter-spacing:.05em;
+    }
+
+    .last-note-text{
+      font-size:12px;
+      line-height:1.38;
+    }
+
+    .last-note-date{
+      margin-top:4px;
+      font-size:10px;
+    }
+
+    .tel a,
+    .tel{
+      font-size:12px;
+      font-weight:750;
+      color:#dbeafe;
+    }
+
+    .date-cell{
+      font-size:11px;
+      line-height:1.35;
+      color:#95a6bb;
+    }
+
+    .actions{
+      align-items:center;
+      gap:6px;
+    }
+
+    .open,
+    .details-btn{
+      min-height:34px;
+      padding:7px 9px;
+      font-size:11px;
+      font-weight:850;
+    }
+
+    .quick{
+      gap:5px;
+      padding:5px;
+      border-radius:10px;
+      background:rgba(0,0,0,.08);
+    }
+
+    .quick select,
+    .quick button{
+      min-height:34px;
+      padding:6px 8px;
+      font-size:11px;
+    }
+
+    .archive-btn{
+      min-height:34px;
+      padding:7px 9px;
+      font-size:11px;
+    }
+
+    @media (max-width: 900px){
+      table.ticket-table{
+        min-width:880px;
+      }
+
+      .ticket-table th:nth-child(7){
+        width:230px;
+      }
+    }
   </style>
 </head>
 <body>
@@ -1057,8 +1571,9 @@
       </div>
 
       <div class="top-actions">
-        <a class="nav-btn {% if not archive_mode %}active{% endif %}" href="/dashboard">Aktive Tickets</a>
-        <a class="nav-btn {% if archive_mode %}active{% endif %}" href="/dashboard/archive">Archiv</a>
+        <a class="nav-btn {% if not archive_mode %}active{% endif %}" href="/dashboard?workshop_id={{ workshop_id }}">Aktive Tickets</a>
+        <a class="nav-btn {% if archive_mode %}active{% endif %}" href="/dashboard/archive?workshop_id={{ workshop_id }}">Archiv</a>
+        <a class="nav-btn" href="/dashboard/settings?workshop_id={{ workshop_id }}">Einstellungen</a>
         <div class="chip">🔒 MVP v1 • intern</div>
       </div>
     </div>
@@ -1116,6 +1631,7 @@
 
       <div class="toolbar">
         <form method="get" action="{% if archive_mode %}/dashboard/archive{% else %}/dashboard{% endif %}">
+          <input type="hidden" name="workshop_id" value="{{ workshop_id }}" />
           <div class="toolbar-left">
             <select name="status">
               <option value="all" {% if filters.status=="all" %}selected{% endif %}>Status: alle</option>
@@ -1142,10 +1658,49 @@
             </select>
 
             <button type="submit">Anwenden</button>
-            <a class="btn-secondary" href="{% if archive_mode %}/dashboard/archive{% else %}/dashboard{% endif %}">Reset</a>
+            <a class="btn-secondary" href="{% if archive_mode %}/dashboard/archive{% else %}/dashboard{% endif %}?workshop_id={{ workshop_id }}">Reset</a>
           </div>
         </form>
       </div>
+
+      {% if not archive_mode %}
+      <section class="attention">
+        <div class="attention-head">
+          <div>
+            <div class="attention-title">Braucht Aufmerksamkeit</div>
+            <div class="attention-sub">Kundenfragen, Notfälle, hohe Priorität und neue Kostenvoranschläge</div>
+          </div>
+        </div>
+
+        {% if attention_tickets %}
+          <div class="attention-list">
+            {% for t in attention_tickets %}
+              <a class="attention-card" href="/dashboard/ticket/{{ t.ticket_view_id }}?workshop_id={{ workshop_id }}">
+                <div class="attention-reason">{{ t.attention_reason }}</div>
+                <div class="attention-main">
+                  <div class="attention-car">{{ t.fahrzeug or "-" }}</div>
+                  <div class="attention-problem">
+                    {% if t.latest_customer_question_text %}
+                      {{ t.latest_customer_question_text }}
+                    {% else %}
+                      {{ t.problem or "-" }}
+                    {% endif %}
+                  </div>
+                </div>
+                <div class="attention-meta">
+                  <span>{{ t.ticket_view_id }}</span>
+                  <span>{{ (t.status_ui or "-") | replace("_", " ") }}</span>
+                </div>
+              </a>
+            {% endfor %}
+          </div>
+        {% else %}
+          <div class="attention-empty">
+            Aktuell gibt es keine dringenden Kundenfragen oder priorisierten Vorgänge.
+          </div>
+        {% endif %}
+      </section>
+      {% endif %}
 
       <div class="table-shell">
         <div class="table-head">
@@ -1164,14 +1719,14 @@
         </div>
 
         <div class="table-wrap">
-          <table>
-            <thead>
+          <table class="ticket-table">
+            <thead class="ticket-table-head">
               <tr>
                 <th>Status</th>
-                <th>Priorität</th>
+                <th>Typ</th>
                 <th>Fahrzeug / Kunde</th>
-                <th>Problem</th>
-                <th>Telefon</th>
+                <th>Anliegen</th>
+                <th>Kontakt</th>
                 <th>Erstellt</th>
                 <th class="right">Aktion</th>
               </tr>
@@ -1273,7 +1828,7 @@
 
                 <td class="right">
                   <div class="actions">
-                    <a class="open" href="/dashboard/ticket/{{ t.ticket_view_id }}">Ticket öffnen</a>
+                    <a class="open" href="/dashboard/ticket/{{ t.ticket_view_id }}?workshop_id={{ workshop_id }}">Ticket öffnen</a>
 
                     <button
                       class="details-btn"
@@ -1285,6 +1840,7 @@
 
                     {% if not archive_mode %}
                     <form class="quick" method="post" action="/dashboard/ticket/{{ t.ticket_view_id }}/status_quick">
+                      <input type="hidden" name="workshop_id" value="{{ workshop_id }}" />
                       <select name="status">
                         <option value="offen" {% if t.status_ui=="offen" %}selected{% endif %}>offen</option>
                         <option value="in_bearbeitung" {% if t.status_ui=="in_bearbeitung" %}selected{% endif %}>in bearbeitung</option>
@@ -1300,6 +1856,7 @@
                       action="/dashboard/ticket/{{ t.ticket_view_id }}/archive"
                       onsubmit="return confirm('Dieses Ticket wirklich archivieren?');"
                     >
+                      <input type="hidden" name="workshop_id" value="{{ workshop_id }}" />
                       <button class="archive-btn" type="submit">Archivieren</button>
                     </form>
                     {% endif %}

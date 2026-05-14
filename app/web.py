@@ -8,6 +8,7 @@ from fastapi import APIRouter, Form, Request
 from fastapi.responses import HTMLResponse, RedirectResponse
 from fastapi.templating import Jinja2Templates
 
+from app.db import default_workshop_id
 from app.tickets import (
     add_ticket_note,
     archive_ticket,
@@ -15,9 +16,14 @@ from app.tickets import (
     list_latest_tickets,
     update_ticket_status,
 )
+from app.workshops import get_workshop, update_workshop
 
 router = APIRouter()
 templates = Jinja2Templates(directory="templates")
+
+
+def _normalize_workshop_id(value: str | None = None) -> str:
+    return (value or default_workshop_id()).strip() or default_workshop_id()
 
 
 # -------------------------
@@ -200,8 +206,8 @@ def _details_payload(t: dict) -> dict:
     return safe
 
 
-def _prepare_tickets(limit: int) -> list[dict]:
-    raw = list_latest_tickets(limit=limit)
+def _prepare_tickets(limit: int, workshop_id: str | None = None) -> list[dict]:
+    raw = list_latest_tickets(limit=limit, workshop_id=_normalize_workshop_id(workshop_id))
     tickets = [_as_dict(t) for t in raw]
 
     for t in tickets:
@@ -289,6 +295,69 @@ def _priority_rank(priority: str) -> int:
     return mapping.get(priority, 9)
 
 
+def _attention_reason(t: dict) -> str:
+    if t.get("has_customer_question"):
+        count = int(t.get("customer_question_count") or 0)
+        if count > 1:
+            return f"{count} Kundenfragen"
+        return "Kundenfrage"
+
+    if t.get("request_type") == "notfall":
+        return "Notfall"
+
+    if t.get("priority") == "hoch":
+        return "Hohe Prioritaet"
+
+    if t.get("request_type") == "kostenvoranschlag":
+        return "Kostenvoranschlag"
+
+    return "Wichtig"
+
+
+def _attention_rank(t: dict) -> tuple[int, float]:
+    if t.get("has_customer_question"):
+        rank = 0
+    elif t.get("request_type") == "notfall":
+        rank = 1
+    elif t.get("priority") == "hoch":
+        rank = 2
+    elif t.get("request_type") == "kostenvoranschlag":
+        rank = 3
+    else:
+        rank = 9
+
+    updated = t.get("updated_dt")
+    timestamp = (
+        updated.timestamp()
+        if isinstance(updated, datetime) and updated != datetime.min.replace(tzinfo=timezone.utc)
+        else 0
+    )
+    return rank, -timestamp
+
+
+def _attention_tickets(tickets: list[dict], limit: int = 5) -> list[dict]:
+    important = [
+        t
+        for t in tickets
+        if t.get("status_ui") not in {"erledigt", "archiviert"}
+        and (
+            t.get("has_customer_question")
+            or t.get("priority") == "hoch"
+            or t.get("request_type") in {"notfall", "kostenvoranschlag"}
+        )
+    ]
+
+    important.sort(key=_attention_rank)
+
+    result = []
+    for ticket in important[:limit]:
+        item = dict(ticket)
+        item["attention_reason"] = _attention_reason(ticket)
+        result.append(item)
+
+    return result
+
+
 def _render_dashboard(
     request: Request,
     *,
@@ -297,8 +366,10 @@ def _render_dashboard(
     q: str | None,
     sort: str | None,
     limit: int,
+    workshop_id: str | None = None,
 ):
-    tickets = _prepare_tickets(limit=limit)
+    wid = _normalize_workshop_id(workshop_id)
+    tickets = _prepare_tickets(limit=limit, workshop_id=wid)
 
     if archive_mode:
         tickets = [t for t in tickets if t.get("status_ui") == "archiviert"]
@@ -306,6 +377,7 @@ def _render_dashboard(
         tickets = [t for t in tickets if t.get("status_ui") != "archiviert"]
 
     stats = _stats_for(tickets)
+    attention_tickets = _attention_tickets(tickets)
 
     normalized_filter_status = _normalize_status(status) if status and status != "all" else "all"
 
@@ -336,14 +408,17 @@ def _render_dashboard(
         {
             "request": request,
             "tickets": tickets,
+            "attention_tickets": attention_tickets,
             "stats": stats,
             "filters": {
                 "status": normalized_filter_status,
                 "q": q or "",
                 "sort": sort or "newest",
                 "limit": limit,
+                "workshop_id": wid,
             },
             "archive_mode": archive_mode,
+            "workshop_id": wid,
         },
     )
 
@@ -368,6 +443,7 @@ def dashboard(
     q: str | None = None,
     sort: str | None = None,
     limit: int = 250,
+    workshop_id: str | None = None,
 ):
     return _render_dashboard(
         request,
@@ -376,6 +452,7 @@ def dashboard(
         q=q,
         sort=sort,
         limit=limit,
+        workshop_id=workshop_id,
     )
 
 
@@ -386,6 +463,7 @@ def dashboard_archive(
     q: str | None = None,
     sort: str | None = None,
     limit: int = 250,
+    workshop_id: str | None = None,
 ):
     return _render_dashboard(
         request,
@@ -394,12 +472,70 @@ def dashboard_archive(
         q=q,
         sort=sort,
         limit=limit,
+        workshop_id=workshop_id,
+    )
+
+
+@router.get("/dashboard/settings", response_class=HTMLResponse)
+def dashboard_settings(
+    request: Request,
+    workshop_id: str | None = None,
+    saved: str | None = None,
+):
+    wid = _normalize_workshop_id(workshop_id)
+    workshop = get_workshop(wid)
+
+    return templates.TemplateResponse(
+        "settings.html",
+        {
+            "request": request,
+            "workshop": workshop,
+            "workshop_id": wid,
+            "saved": saved == "1",
+        },
+    )
+
+
+@router.post("/dashboard/settings")
+def dashboard_settings_save(
+    workshop_id: str | None = Form(None),
+    name: str = Form(...),
+    address: str = Form(""),
+    phone: str = Form(""),
+    email: str = Form(""),
+    opening_hours: str = Form(""),
+    services: str = Form(""),
+    pricing_info: str = Form(""),
+    towing_info: str = Form(""),
+):
+    wid = _normalize_workshop_id(workshop_id)
+    try:
+        update_workshop(
+            wid,
+            name=name,
+            address=address,
+            phone=phone,
+            email=email,
+            opening_hours=opening_hours,
+            services=services,
+            pricing_info=pricing_info,
+            towing_info=towing_info,
+        )
+    except ValueError as e:
+        return HTMLResponse(str(e), status_code=400)
+    except Exception:
+        return HTMLResponse("Einstellungen konnten nicht gespeichert werden", status_code=400)
+
+    return RedirectResponse(
+        url=f"/dashboard/settings?workshop_id={wid}&saved=1",
+        status_code=303,
     )
 
 
 @router.get("/dashboard/ticket/{ticket_id}", response_class=HTMLResponse)
-def ticket_detail(request: Request, ticket_id: str):
-    ticket = find_ticket_by_id(ticket_id)
+def ticket_detail(request: Request, ticket_id: str, workshop_id: str | None = None):
+    wid = _normalize_workshop_id(workshop_id)
+    ticket = find_ticket_by_id(ticket_id, workshop_id=wid)
     if not ticket:
         return HTMLResponse("Ticket nicht gefunden", status_code=404)
 
@@ -422,26 +558,37 @@ def ticket_detail(request: Request, ticket_id: str):
         {
             "request": request,
             "ticket": t,
+            "workshop_id": wid,
         },
     )
 
 
 @router.post("/dashboard/ticket/{ticket_id}/status")
-def ticket_set_status(ticket_id: str, status: str = Form(...)):
+def ticket_set_status(
+    ticket_id: str,
+    status: str = Form(...),
+    workshop_id: str | None = Form(None),
+):
+    wid = _normalize_workshop_id(workshop_id)
     try:
         normalized_status = _backend_status(status)
-        update_ticket_status(ticket_id, normalized_status)
+        update_ticket_status(ticket_id, normalized_status, workshop_id=wid)
     except Exception:
         return HTMLResponse("Status-Update fehlgeschlagen", status_code=400)
 
-    return RedirectResponse(url=f"/dashboard/ticket/{ticket_id}", status_code=303)
+    return RedirectResponse(url=f"/dashboard/ticket/{ticket_id}?workshop_id={wid}", status_code=303)
 
 
 @router.post("/dashboard/ticket/{ticket_id}/status_quick")
-def ticket_set_status_quick(ticket_id: str, status: str = Form(...)):
+def ticket_set_status_quick(
+    ticket_id: str,
+    status: str = Form(...),
+    workshop_id: str | None = Form(None),
+):
+    wid = _normalize_workshop_id(workshop_id)
     try:
         normalized_status = _backend_status(status)
-        update_ticket_status(ticket_id, normalized_status)
+        update_ticket_status(ticket_id, normalized_status, workshop_id=wid)
     except Exception:
         return HTMLResponse("Status-Update fehlgeschlagen", status_code=400)
 
@@ -453,7 +600,9 @@ def ticket_add_note(
     ticket_id: str,
     note_text: str = Form(...),
     note_type: str = Form("internal_note"),
+    workshop_id: str | None = Form(None),
 ):
+    wid = _normalize_workshop_id(workshop_id)
     try:
         text = (note_text or "").strip()
         if not text:
@@ -462,19 +611,20 @@ def ticket_add_note(
         if note_type not in {"internal_note", "customer_reply"}:
             return HTMLResponse("Ungültiger Notiztyp", status_code=400)
 
-        add_ticket_note(ticket_id, text, note_type=note_type)
+        add_ticket_note(ticket_id, text, note_type=note_type, workshop_id=wid)
     except KeyError:
         return HTMLResponse("Ticket nicht gefunden", status_code=404)
     except Exception:
         return HTMLResponse("Notiz konnte nicht gespeichert werden", status_code=400)
 
-    return RedirectResponse(url=f"/dashboard/ticket/{ticket_id}", status_code=303)
+    return RedirectResponse(url=f"/dashboard/ticket/{ticket_id}?workshop_id={wid}", status_code=303)
 
 
 @router.post("/dashboard/ticket/{ticket_id}/archive")
-def ticket_archive(ticket_id: str):
+def ticket_archive(ticket_id: str, workshop_id: str | None = Form(None)):
+    wid = _normalize_workshop_id(workshop_id)
     try:
-        archive_ticket(ticket_id)
+        archive_ticket(ticket_id, workshop_id=wid)
     except ValueError:
         return HTMLResponse("Nur erledigte Tickets können archiviert werden", status_code=400)
     except KeyError:
@@ -482,4 +632,4 @@ def ticket_archive(ticket_id: str):
     except Exception:
         return HTMLResponse("Archivierung fehlgeschlagen", status_code=400)
 
-    return RedirectResponse(url="/dashboard", status_code=303)
+    return RedirectResponse(url=f"/dashboard?workshop_id={wid}", status_code=303)

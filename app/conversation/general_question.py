@@ -4,6 +4,7 @@ from typing import Tuple
 
 from app.conversation.extractors import lower, normalize
 from app.models import IntakeState
+from app.workshops import get_workshop
 
 
 # =========================================================
@@ -13,11 +14,13 @@ from app.models import IntakeState
 def _is_opening_hours_question(text: str) -> bool:
     t = lower(text)
     return any(k in t for k in [
-        "öffnungszeiten",
         "oeffnungszeiten",
+        "offnungszeiten",
+        "öffnungszeiten",
         "wann offen",
         "wann habt ihr offen",
         "wann geöffnet",
+        "wann geoeffnet",
         "opening hours",
     ])
 
@@ -27,7 +30,10 @@ def _is_location_question(text: str) -> bool:
     return any(k in t for k in [
         "adresse",
         "wo seid ihr",
+        "wo ist eure werkstatt",
         "wo ist die werkstatt",
+        "wo finde ich euch",
+        "wo findet man euch",
         "standort",
         "location",
     ])
@@ -40,6 +46,7 @@ def _is_contact_question(text: str) -> bool:
         "telefon",
         "nummer",
         "email",
+        "e-mail",
         "wie erreichen",
     ])
 
@@ -51,7 +58,9 @@ def _is_service_question(text: str) -> bool:
         "leistungen",
         "service",
         "repariert ihr",
+        "reparaturen",
         "was könnt ihr",
+        "was koennt ihr",
     ])
 
 
@@ -79,51 +88,63 @@ def _is_towing_question(text: str) -> bool:
 # REPLIES
 # =========================================================
 
-def _reply_opening_hours() -> str:
+def _split_semicolon_list(value: str | None) -> list[str]:
+    return [item.strip() for item in str(value or "").split(";") if item.strip()]
+
+
+def _split_comma_list(value: str | None) -> list[str]:
+    return [item.strip() for item in str(value or "").split(",") if item.strip()]
+
+
+def _reply_opening_hours(workshop: dict) -> str:
+    opening_hours = _split_semicolon_list(workshop.get("opening_hours"))
+    if not opening_hours:
+        return "Die Öffnungszeiten sind aktuell noch nicht hinterlegt."
+
+    lines = [f"Die Öffnungszeiten von {workshop.get('name') or 'der Werkstatt'} sind:"]
+    lines.extend(f"- {item}" for item in opening_hours)
+    return "\n".join(lines)
+
+
+def _reply_location(workshop: dict) -> str:
     return (
-        "Unsere Öffnungszeiten sind aktuell:\n"
-        "- Montag bis Freitag: 08:00 – 17:00\n"
-        "- Samstag: nach Vereinbarung\n\n"
-        "Für Notfälle können Sie uns auch außerhalb der Zeiten kontaktieren."
+        f"{workshop.get('name') or 'Unsere Werkstatt'} befindet sich hier:\n"
+        f"{workshop.get('address') or 'Adresse noch nicht hinterlegt'}"
     )
 
 
-def _reply_location() -> str:
+def _reply_contact(workshop: dict) -> str:
     return (
-        "Unsere Werkstatt befindet sich in Ihrer Region.\n"
-        "Die genaue Adresse erhalten Sie bei Terminvereinbarung oder auf Anfrage."
+        f"Sie erreichen {workshop.get('name') or 'unsere Werkstatt'} so:\n"
+        f"- Telefon: {workshop.get('phone') or '-'}\n"
+        f"- E-Mail: {workshop.get('email') or '-'}\n"
+        "Sie können Ihr Anliegen auch direkt hier im Chat beschreiben."
     )
 
 
-def _reply_contact() -> str:
+def _reply_service(workshop: dict) -> str:
+    services = _split_comma_list(workshop.get("services"))
+    if not services:
+        return "Die Leistungen der Werkstatt sind aktuell noch nicht hinterlegt."
+
+    lines = [f"{workshop.get('name') or 'Unsere Werkstatt'} bietet unter anderem:"]
+    lines.extend(f"- {service}" for service in services)
+    lines.append("")
+    lines.append("Beschreiben Sie einfach Ihr Anliegen, dann helfen wir Ihnen weiter.")
+    return "\n".join(lines)
+
+
+def _reply_price(workshop: dict) -> str:
     return (
-        "Sie können uns telefonisch oder direkt über diesen Chat erreichen.\n"
-        "Wenn Sie möchten, kann ich auch direkt ein Ticket für Sie anlegen."
+        workshop.get("pricing_info")
+        or "Die Kosten hängen stark vom Fahrzeug und vom konkreten Anliegen ab."
     )
 
 
-def _reply_service() -> str:
+def _reply_towing(workshop: dict) -> str:
     return (
-        "Wir bieten unter anderem:\n"
-        "- Diagnose von Fahrzeugproblemen\n"
-        "- Reparaturen\n"
-        "- Wartung und Service\n"
-        "- Unterstützung bei Notfällen\n\n"
-        "Beschreiben Sie einfach Ihr Problem, ich helfe Ihnen direkt weiter."
-    )
-
-
-def _reply_price() -> str:
-    return (
-        "Die Kosten hängen stark vom Problem und Fahrzeug ab.\n"
-        "Am besten beschreiben Sie kurz Ihr Anliegen – dann kann ich eine Einschätzung geben."
-    )
-
-
-def _reply_towing() -> str:
-    return (
-        "Wenn Ihr Fahrzeug nicht fahrbereit ist, können wir auch einen Abschleppdienst organisieren.\n"
-        "Erstellen Sie einfach ein Ticket, dann kümmern wir uns darum."
+        workshop.get("towing_info")
+        or "Informationen zum Abschleppdienst sind aktuell noch nicht hinterlegt."
     )
 
 
@@ -133,6 +154,7 @@ def _reply_fallback() -> str:
         "Sie können:\n"
         "- ein Problem melden\n"
         "- eine Anfrage zu einem bestehenden Ticket stellen\n"
+        "- einen Kostenvoranschlag anfragen\n"
         "- oder eine allgemeine Frage stellen\n\n"
         "Wie kann ich Ihnen helfen?"
     )
@@ -152,23 +174,24 @@ def handle_general_question(
 
     msg = normalize(user_message)
     state.mode = "general"
+    workshop = get_workshop(getattr(state, "workshop_id", None))
 
     if _is_opening_hours_question(msg):
-        return state, _reply_opening_hours(), False
+        return state, _reply_opening_hours(workshop), False
 
     if _is_location_question(msg):
-        return state, _reply_location(), False
+        return state, _reply_location(workshop), False
 
     if _is_contact_question(msg):
-        return state, _reply_contact(), False
+        return state, _reply_contact(workshop), False
 
     if _is_service_question(msg):
-        return state, _reply_service(), False
+        return state, _reply_service(workshop), False
 
     if _is_price_question(msg):
-        return state, _reply_price(), False
+        return state, _reply_price(workshop), False
 
     if _is_towing_question(msg):
-        return state, _reply_towing(), False
+        return state, _reply_towing(workshop), False
 
     return state, _reply_fallback(), False

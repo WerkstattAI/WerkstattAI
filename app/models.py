@@ -6,6 +6,7 @@ from pydantic import BaseModel, Field
 
 class ChatRequest(BaseModel):
     """Eingabemodell für den /chat Endpoint."""
+    workshop_id: Optional[str] = Field(None, description="Werkstatt-ID fuer Multi-Tenant-Betrieb")
     session_id: str = Field(..., description="Eindeutige Session-ID (z.B. vom Frontend)")
     message: Optional[str] = Field(None, description="Nachricht des Nutzers; None = Gespräch starten")
     channel: str = Field("web_chat", description="Kanal der Unterhaltung, z.B. web_chat oder whatsapp")
@@ -57,5 +58,6 @@ class IntakeState(BaseModel):
     name: Optional[str] = None  # optional
 
     # Ticket / Meta
+    workshop_id: Optional[str] = None
     ticket_id: Optional[str] = None
     last_user_message: Optional[str] = None

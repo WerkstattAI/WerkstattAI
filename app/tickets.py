@@ -5,7 +5,7 @@ import threading
 from datetime import datetime
 from typing import Any, Dict, Optional
 
-from app.db import get_conn
+from app.db import default_workshop_id, get_conn
 from app.models import IntakeState
 
 _LOCK = threading.Lock()
@@ -147,6 +147,8 @@ def _normalize_ticket_record(obj: dict[str, Any]) -> dict[str, Any]:
     if ticket_id:
         obj["ticket_id"] = ticket_id
 
+    obj["workshop_id"] = str(obj.get("workshop_id") or default_workshop_id()).strip() or default_workshop_id()
+
     if not obj.get("created_at"):
         obj["created_at"] = _now_iso()
 
@@ -179,6 +181,7 @@ def _normalize_ticket_record(obj: dict[str, Any]) -> dict[str, Any]:
 
 def _row_to_ticket_dict(row: Any) -> dict[str, Any]:
     obj: dict[str, Any] = {
+        "workshop_id": row["workshop_id"],
         "ticket_id": row["ticket_id"],
         "created_at": row["created_at"],
         "updated_at": row["updated_at"],
@@ -222,7 +225,7 @@ def _next_sequence_for_today(today: str) -> int:
     return count + 1
 
 
-def generate_ticket_id() -> str:
+def generate_ticket_id(workshop_id: str | None = None) -> str:
     """
     Format: WS-YYYYMMDD-0001
     """
@@ -233,17 +236,20 @@ def generate_ticket_id() -> str:
         return f"WS-{today}-{seq:04d}"
 
 
-def save_ticket(state: IntakeState) -> str:
+def save_ticket(state: IntakeState, workshop_id: str | None = None) -> str:
     """
     Speichert ein Ticket in SQLite
     und gibt die ticket_id zurück.
     """
-    ticket_id = state.ticket_id or generate_ticket_id()
+    wid = str(workshop_id or state.workshop_id or default_workshop_id()).strip() or default_workshop_id()
+    state.workshop_id = wid
+    ticket_id = state.ticket_id or generate_ticket_id(wid)
     now_iso = _now_iso()
     kunde_name = state.name
 
     record: Dict[str, Any] = {
         "ticket_id": ticket_id,
+        "workshop_id": wid,
         "created_at": now_iso,
         "updated_at": now_iso,
 
@@ -284,6 +290,7 @@ def save_ticket(state: IntakeState) -> str:
             conn.execute(
                 """
                 INSERT INTO tickets (
+                    workshop_id,
                     ticket_id,
                     created_at,
                     updated_at,
@@ -303,9 +310,10 @@ def save_ticket(state: IntakeState) -> str:
                     followup_answers_json,
                     notes_json
                 )
-                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
                 """,
                 (
+                    record["workshop_id"],
                     record["ticket_id"],
                     record["created_at"],
                     record["updated_at"],
@@ -331,29 +339,34 @@ def save_ticket(state: IntakeState) -> str:
     return ticket_id
 
 
-def load_all_tickets() -> list[dict[str, Any]]:
+def load_all_tickets(workshop_id: str | None = None) -> list[dict[str, Any]]:
     """
     Lädt alle Tickets aus SQLite.
     """
+    wid = str(workshop_id or default_workshop_id()).strip() or default_workshop_id()
+
     with _LOCK:
         with get_conn() as conn:
             rows = conn.execute(
                 """
                 SELECT *
                 FROM tickets
+                WHERE workshop_id = ?
                 ORDER BY created_at ASC, id ASC
-                """
+                """,
+                (wid,),
             ).fetchall()
 
     return [_row_to_ticket_dict(row) for row in rows]
 
 
-def list_latest_tickets(limit: int = 50) -> list[dict[str, Any]]:
+def list_latest_tickets(limit: int = 50, workshop_id: str | None = None) -> list[dict[str, Any]]:
     """
     Gibt die neuesten Tickets zurück.
     Hard-Limit: 500
     """
     safe_limit = max(0, min(int(limit), 500))
+    wid = str(workshop_id or default_workshop_id()).strip() or default_workshop_id()
 
     with _LOCK:
         with get_conn() as conn:
@@ -361,10 +374,11 @@ def list_latest_tickets(limit: int = 50) -> list[dict[str, Any]]:
                 """
                 SELECT *
                 FROM tickets
+                WHERE workshop_id = ?
                 ORDER BY created_at DESC, id DESC
                 LIMIT ?
                 """,
-                (safe_limit,),
+                (wid, safe_limit),
             ).fetchall()
 
     return [_row_to_ticket_dict(row) for row in rows]
@@ -379,7 +393,7 @@ def normalize_phone_for_search(phone: str) -> str:
     return "".join(ch for ch in str(phone or "") if ch.isdigit())
 
 
-def find_tickets_by_phone(phone: str) -> list[dict[str, Any]]:
+def find_tickets_by_phone(phone: str, workshop_id: str | None = None) -> list[dict[str, Any]]:
     """
     Sucht Tickets tolerant anhand der Telefonnummer.
 
@@ -395,15 +409,18 @@ def find_tickets_by_phone(phone: str) -> list[dict[str, Any]]:
     if len(normalized_query) < 7:
         return []
 
+    wid = str(workshop_id or default_workshop_id()).strip() or default_workshop_id()
+
     with _LOCK:
         with get_conn() as conn:
             rows = conn.execute(
                 """
                 SELECT *
                 FROM tickets
-                WHERE telefon IS NOT NULL
+                WHERE workshop_id = ? AND telefon IS NOT NULL
                 ORDER BY created_at DESC, id DESC
-                """
+                """,
+                (wid,),
             ).fetchall()
 
     matches: list[dict[str, Any]] = []
@@ -425,15 +442,15 @@ def find_tickets_by_phone(phone: str) -> list[dict[str, Any]]:
     return matches
 
 
-def find_latest_ticket_by_phone(phone: str) -> Optional[dict[str, Any]]:
+def find_latest_ticket_by_phone(phone: str, workshop_id: str | None = None) -> Optional[dict[str, Any]]:
     """
     Gibt das neueste Ticket zu einer Telefonnummer zurück.
     """
-    matches = find_tickets_by_phone(phone)
+    matches = find_tickets_by_phone(phone, workshop_id=workshop_id)
     return matches[0] if matches else None
 
 
-def find_ticket_by_id(ticket_id: str) -> Optional[dict[str, Any]]:
+def find_ticket_by_id(ticket_id: str, workshop_id: str | None = None) -> Optional[dict[str, Any]]:
     """
     Sucht ein Ticket anhand der Ticket-ID.
     """
@@ -441,16 +458,18 @@ def find_ticket_by_id(ticket_id: str) -> Optional[dict[str, Any]]:
     if not tid:
         return None
 
+    wid = str(workshop_id or default_workshop_id()).strip() or default_workshop_id()
+
     with _LOCK:
         with get_conn() as conn:
             row = conn.execute(
                 """
                 SELECT *
                 FROM tickets
-                WHERE ticket_id = ?
+                WHERE workshop_id = ? AND ticket_id = ?
                 LIMIT 1
                 """,
-                (tid,),
+                (wid, tid),
             ).fetchone()
 
     if not row:
@@ -459,7 +478,7 @@ def find_ticket_by_id(ticket_id: str) -> Optional[dict[str, Any]]:
     return _row_to_ticket_dict(row)
 
 
-def update_ticket_status(ticket_id: str, new_status: str) -> dict[str, Any]:
+def update_ticket_status(ticket_id: str, new_status: str, workshop_id: str | None = None) -> dict[str, Any]:
     """
     Aktualisiert den Ticket-Status und updated_at in SQLite.
     Gibt das aktualisierte Ticket zurück.
@@ -473,6 +492,7 @@ def update_ticket_status(ticket_id: str, new_status: str) -> dict[str, Any]:
         raise ValueError(f"Ungültiger Status: {new_status}")
 
     now_iso = _now_iso()
+    wid = str(workshop_id or default_workshop_id()).strip() or default_workshop_id()
 
     with _LOCK:
         with get_conn() as conn:
@@ -480,9 +500,9 @@ def update_ticket_status(ticket_id: str, new_status: str) -> dict[str, Any]:
                 """
                 UPDATE tickets
                 SET status = ?, updated_at = ?
-                WHERE ticket_id = ?
+                WHERE workshop_id = ? AND ticket_id = ?
                 """,
-                (status, now_iso, tid),
+                (status, now_iso, wid, tid),
             )
 
             if cur.rowcount == 0:
@@ -494,10 +514,10 @@ def update_ticket_status(ticket_id: str, new_status: str) -> dict[str, Any]:
                 """
                 SELECT *
                 FROM tickets
-                WHERE ticket_id = ?
+                WHERE workshop_id = ? AND ticket_id = ?
                 LIMIT 1
                 """,
-                (tid,),
+                (wid, tid),
             ).fetchone()
 
     if not row:
@@ -506,7 +526,12 @@ def update_ticket_status(ticket_id: str, new_status: str) -> dict[str, Any]:
     return _row_to_ticket_dict(row)
 
 
-def add_ticket_note(ticket_id: str, note_text: str, note_type: str = "internal_note") -> dict[str, Any]:
+def add_ticket_note(
+    ticket_id: str,
+    note_text: str,
+    note_type: str = "internal_note",
+    workshop_id: str | None = None,
+) -> dict[str, Any]:
     """
     Fügt einem Ticket eine interne Notiz hinzu
     und aktualisiert updated_at.
@@ -521,6 +546,7 @@ def add_ticket_note(ticket_id: str, note_text: str, note_type: str = "internal_n
         raise ValueError("note_text ist leer")
 
     now_iso = _now_iso()
+    wid = str(workshop_id or default_workshop_id()).strip() or default_workshop_id()
 
     with _LOCK:
         with get_conn() as conn:
@@ -528,10 +554,10 @@ def add_ticket_note(ticket_id: str, note_text: str, note_type: str = "internal_n
                 """
                 SELECT *
                 FROM tickets
-                WHERE ticket_id = ?
+                WHERE workshop_id = ? AND ticket_id = ?
                 LIMIT 1
                 """,
-                (tid,),
+                (wid, tid),
             ).fetchone()
 
             if not row:
@@ -555,11 +581,12 @@ def add_ticket_note(ticket_id: str, note_text: str, note_type: str = "internal_n
                 """
                 UPDATE tickets
                 SET notes_json = ?, updated_at = ?
-                WHERE ticket_id = ?
+                WHERE workshop_id = ? AND ticket_id = ?
                 """,
                 (
                     json.dumps(notes, ensure_ascii=False),
                     now_iso,
+                    wid,
                     tid,
                 ),
             )
@@ -569,10 +596,10 @@ def add_ticket_note(ticket_id: str, note_text: str, note_type: str = "internal_n
                 """
                 SELECT *
                 FROM tickets
-                WHERE ticket_id = ?
+                WHERE workshop_id = ? AND ticket_id = ?
                 LIMIT 1
                 """,
-                (tid,),
+                (wid, tid),
             ).fetchone()
 
     if not updated_row:
@@ -581,16 +608,16 @@ def add_ticket_note(ticket_id: str, note_text: str, note_type: str = "internal_n
     return _row_to_ticket_dict(updated_row)
 
 
-def archive_ticket(ticket_id: str) -> dict[str, Any]:
+def archive_ticket(ticket_id: str, workshop_id: str | None = None) -> dict[str, Any]:
     """
     Archiviert ein Ticket (status -> archiviert).
     Erlaubt nur für erledigte Tickets.
     """
-    t = find_ticket_by_id(ticket_id)
+    t = find_ticket_by_id(ticket_id, workshop_id=workshop_id)
     if not t:
         raise KeyError("Ticket nicht gefunden")
 
     if _normalize_status(t.get("status")) != "erledigt":
         raise ValueError("Nur erledigte Tickets können archiviert werden")
 
-    return update_ticket_status(ticket_id, "archiviert")
+    return update_ticket_status(ticket_id, "archiviert", workshop_id=workshop_id)

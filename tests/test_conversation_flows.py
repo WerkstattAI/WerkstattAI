@@ -3,7 +3,10 @@ from __future__ import annotations
 import unittest
 from unittest.mock import patch
 
+from app.db import get_conn, init_db
 from app.conversation.existing_ticket import handle_existing_ticket
+from app.conversation.general_question import handle_general_question
+from app.conversation.new_request import handle_new_request
 from app.conversation.intent import (
     INTENT_EXISTING_TICKET,
     INTENT_GENERAL_QUESTION,
@@ -12,6 +15,12 @@ from app.conversation.intent import (
     detect_intent,
 )
 from app.models import IntakeState
+from app.tickets import (
+    find_ticket_by_id,
+    find_tickets_by_phone,
+    list_latest_tickets,
+    save_ticket,
+)
 
 
 class IntentTests(unittest.TestCase):
@@ -37,6 +46,12 @@ class IntentTests(unittest.TestCase):
         self.assertEqual(
             detect_intent(IntakeState(), "Was kostet ein Zahnriemenwechsel?"),
             INTENT_QUOTE_REQUEST,
+        )
+
+    def test_location_question_is_general(self) -> None:
+        self.assertEqual(
+            detect_intent(IntakeState(), "Wo ist eure Werkstatt?"),
+            INTENT_GENERAL_QUESTION,
         )
 
 
@@ -102,6 +117,93 @@ class ExistingTicketTests(unittest.TestCase):
         self.assertIn("Status", reply)
         add_note.assert_called_once()
         self.assertEqual(add_note.call_args.kwargs["note_type"], "customer_message")
+
+
+class GeneralQuestionTests(unittest.TestCase):
+    def test_opening_hours_use_workshop_profile(self) -> None:
+        init_db()
+
+        state = IntakeState(workshop_id="demo-werkstatt")
+        _, reply, done = handle_general_question(
+            state,
+            "Welche Öffnungszeiten habt ihr?",
+        )
+
+        self.assertFalse(done)
+        self.assertIn("Meier Werkstatt Family", reply)
+        self.assertIn("09:00-17:00", reply)
+
+
+class NewRequestTests(unittest.TestCase):
+    def test_early_phone_during_followup_is_stored_not_used_as_answer(self) -> None:
+        state = IntakeState(
+            mode="new",
+            step="followup",
+            problem="Motorkontrollleuchte leuchtet und das Auto ruckelt",
+            followup_questions=["Seit wann besteht das Problem ungefähr?"],
+            followup_answers=[],
+            followup_index=0,
+        )
+
+        new_state, reply, done = handle_new_request(state, "0176 11122233")
+
+        self.assertFalse(done)
+        self.assertEqual(new_state.telefon, "017611122233")
+        self.assertEqual(new_state.followup_answers, [])
+        self.assertIn("Telefonnummer ist gespeichert", reply)
+        self.assertIn("Seit wann besteht", reply)
+
+
+class TicketTenantTests(unittest.TestCase):
+    def test_ticket_reads_are_scoped_by_workshop(self) -> None:
+        init_db()
+
+        state_a = IntakeState(
+            fahrzeug="VW Golf",
+            baujahr="2018",
+            kilometerstand="95000",
+            request_type="diagnose",
+            priority="normal",
+            problem="Motorlampe leuchtet",
+            telefon="+4915112345678",
+            name="Lukas Weber",
+        )
+        state_b = IntakeState(
+            fahrzeug="BMW 320d",
+            baujahr="2019",
+            kilometerstand="88000",
+            request_type="service",
+            priority="normal",
+            problem="Service faellig",
+            telefon="+4915112345678",
+            name="Anna Klein",
+        )
+
+        ticket_a = save_ticket(state_a, workshop_id="tenant-a")
+        ticket_b = save_ticket(state_b, workshop_id="tenant-b")
+
+        try:
+            self.assertIsNotNone(find_ticket_by_id(ticket_a, workshop_id="tenant-a"))
+            self.assertIsNone(find_ticket_by_id(ticket_a, workshop_id="tenant-b"))
+
+            tenant_a_phone_matches = find_tickets_by_phone("+49 151 12345678", workshop_id="tenant-a")
+            tenant_b_phone_matches = find_tickets_by_phone("+49 151 12345678", workshop_id="tenant-b")
+
+            self.assertTrue(any(t["ticket_id"] == ticket_a for t in tenant_a_phone_matches))
+            self.assertFalse(any(t["ticket_id"] == ticket_b for t in tenant_a_phone_matches))
+            self.assertTrue(any(t["ticket_id"] == ticket_b for t in tenant_b_phone_matches))
+            self.assertFalse(any(t["ticket_id"] == ticket_a for t in tenant_b_phone_matches))
+
+            tenant_a_latest = list_latest_tickets(workshop_id="tenant-a")
+            self.assertTrue(any(t["ticket_id"] == ticket_a for t in tenant_a_latest))
+            self.assertFalse(any(t["ticket_id"] == ticket_b for t in tenant_a_latest))
+        finally:
+            with get_conn() as conn:
+                conn.execute(
+                    "DELETE FROM tickets WHERE ticket_id IN (?, ?)",
+                    (ticket_a, ticket_b),
+                )
+                conn.commit()
 
 
 if __name__ == "__main__":

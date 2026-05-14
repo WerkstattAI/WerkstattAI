@@ -285,6 +285,21 @@ def handle_new_request(state: IntakeState, user_message: str | None) -> Tuple[In
         if not msg:
             return new_state, ask_followup_invalid_reply(), False
 
+        early_phone = extract_phone(msg)
+        if early_phone and not getattr(new_state, "telefon", None):
+            new_state.telefon = early_phone
+            questions = list(cast(List[str], getattr(new_state, "followup_questions", []) or []))
+            idx = int(getattr(new_state, "followup_index", 0) or 0)
+            current_question = questions[idx] if idx < len(questions) else None
+            if current_question:
+                return (
+                    new_state,
+                    "Danke, die Telefonnummer ist gespeichert.\n"
+                    "Bitte beantworten Sie noch kurz diese Frage:\n"
+                    f"{current_question}",
+                    False,
+                )
+
         answers = list(cast(List[str], getattr(new_state, "followup_answers", []) or []))
         answers.append(msg)
         new_state.followup_answers = answers
@@ -295,6 +310,10 @@ def handle_new_request(state: IntakeState, user_message: str | None) -> Tuple[In
         questions = list(cast(List[str], getattr(new_state, "followup_questions", []) or []))
         if idx < len(questions):
             return new_state, questions[idx], False
+
+        if getattr(new_state, "telefon", None):
+            new_state.step = STEP_NAME
+            return new_state, ask_name_reply(), False
 
         new_state.step = STEP_TELEFON
         return new_state, ask_phone_with_thanks_reply(), False

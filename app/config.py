@@ -14,6 +14,7 @@ class Settings:
     """Zentrale Konfiguration via Umgebungsvariablen."""
     app_name: str = _env("APP_NAME", "WerkstattAI Intake API") or "WerkstattAI Intake API"
     log_level: str = _env("LOG_LEVEL", "INFO") or "INFO"
+    default_workshop_id: str = _env("DEFAULT_WORKSHOP_ID", "demo-werkstatt") or "demo-werkstatt"
 
     # Optional für später (AI):
     openai_api_key: str | None = _env("OPENAI_API_KEY", None)

@@ -222,6 +222,7 @@ def _record_customer_message(
     question: str,
     *,
     include_workshop_hint: bool = False,
+    workshop_id: str | None = None,
 ) -> None:
     ticket_id = str(ticket.get("ticket_id") or "").strip()
     if not ticket_id:
@@ -232,7 +233,7 @@ def _record_customer_message(
         text += "\nBitte den Kunden kontaktieren, sobald eine Einschätzung möglich ist."
 
     try:
-        add_ticket_note(ticket_id, text, note_type="customer_message")
+        add_ticket_note(ticket_id, text, note_type="customer_message", workshop_id=workshop_id)
     except Exception:
         pass
 
@@ -254,7 +255,10 @@ def _looks_like_summary_question(text: str) -> bool:
     )
 
 
-def _resolve_ticket_from_message(user_message: str) -> tuple[dict[str, Any] | None, str | None]:
+def _resolve_ticket_from_message(
+    user_message: str,
+    workshop_id: str | None = None,
+) -> tuple[dict[str, Any] | None, str | None]:
     """
     Versucht zuerst Ticket-ID, danach Telefonnummer.
     Gibt zurück:
@@ -264,14 +268,14 @@ def _resolve_ticket_from_message(user_message: str) -> tuple[dict[str, Any] | No
     """
     ticket_ref = extract_ticket_reference(user_message)
     if ticket_ref:
-        ticket = find_ticket_by_id(ticket_ref)
+        ticket = find_ticket_by_id(ticket_ref, workshop_id=workshop_id)
         if ticket:
             return ticket, None
         return None, f"Ich konnte kein Ticket mit der Nummer **{ticket_ref}** finden."
 
     phone_ref = extract_phone_reference(user_message)
     if phone_ref:
-        matches = find_tickets_by_phone(phone_ref)
+        matches = find_tickets_by_phone(phone_ref, workshop_id=workshop_id)
 
         if not matches:
             return None, "Ich konnte kein Ticket zu dieser Telefonnummer finden."
@@ -300,12 +304,13 @@ def _resolve_ticket_for_state(
     state: IntakeState,
     user_message: str,
 ) -> tuple[dict[str, Any] | None, str | None]:
-    ticket, error_reply = _resolve_ticket_from_message(user_message)
+    workshop_id = getattr(state, "workshop_id", None)
+    ticket, error_reply = _resolve_ticket_from_message(user_message, workshop_id=workshop_id)
     if ticket or extract_ticket_reference(user_message) or extract_phone_reference(user_message):
         return ticket, error_reply
 
     if getattr(state, "ticket_id", None):
-        remembered = find_ticket_by_id(state.ticket_id or "")
+        remembered = find_ticket_by_id(state.ticket_id or "", workshop_id=workshop_id)
         if remembered:
             return remembered, None
 
@@ -403,6 +408,7 @@ def handle_existing_ticket(
 
     msg = normalize(user_message)
     state.mode = "existing"
+    workshop_id = getattr(state, "workshop_id", None)
 
     ticket, error_reply = _resolve_ticket_for_state(state, msg)
     if error_reply:
@@ -416,6 +422,7 @@ def handle_existing_ticket(
         ticket,
         msg,
         include_workshop_hint=_looks_like_duration_question(msg),
+        workshop_id=workshop_id,
     )
     reply = _answer_ticket_question(ticket, msg)
     return state, reply, False

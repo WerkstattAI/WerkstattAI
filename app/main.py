@@ -7,7 +7,7 @@ from pydantic import BaseModel
 
 from app.ai_service import polish_reply_de
 from app.config import settings
-from app.db import init_db
+from app.db import default_workshop_id, init_db
 from app.conversation_sessions import load_session_state, save_session_state
 from app.conversation.router import next_step
 from app.models import ChatRequest, ChatResponse, IntakeState
@@ -72,6 +72,10 @@ def _normalize_status(status: str) -> str:
     return value
 
 
+def _normalize_workshop_id(value: str | None = None) -> str:
+    return (value or default_workshop_id()).strip() or default_workshop_id()
+
+
 class StatusUpdate(BaseModel):
     status: str
 
@@ -94,26 +98,32 @@ def health():
 
 
 @app.get("/tickets")
-def tickets(limit: int = 50):
+def tickets(limit: int = 50, workshop_id: str | None = None):
+    wid = _normalize_workshop_id(workshop_id)
     return {
-        "items": list_latest_tickets(limit=limit),
+        "items": list_latest_tickets(limit=limit, workshop_id=wid),
         "limit": limit,
+        "workshop_id": wid,
     }
 
 
 @app.get("/tickets/{ticket_id}")
-def ticket_by_id(ticket_id: str):
-    item = find_ticket_by_id(ticket_id)
+def ticket_by_id(ticket_id: str, workshop_id: str | None = None):
+    item = find_ticket_by_id(ticket_id, workshop_id=_normalize_workshop_id(workshop_id))
     if not item:
         raise HTTPException(status_code=404, detail="Ticket nicht gefunden")
     return item
 
 
 @app.patch("/tickets/{ticket_id}/status")
-def patch_ticket_status(ticket_id: str, payload: StatusUpdate):
+def patch_ticket_status(ticket_id: str, payload: StatusUpdate, workshop_id: str | None = None):
     try:
         normalized_status = _normalize_status(payload.status)
-        updated = update_ticket_status(ticket_id, normalized_status)
+        updated = update_ticket_status(
+            ticket_id,
+            normalized_status,
+            workshop_id=_normalize_workshop_id(workshop_id),
+        )
         return updated
     except ValueError as e:
         raise HTTPException(status_code=400, detail=str(e))
@@ -123,14 +133,17 @@ def patch_ticket_status(ticket_id: str, payload: StatusUpdate):
 
 @app.post("/chat", response_model=ChatResponse)
 def chat(payload: ChatRequest) -> ChatResponse:
-    state = load_session_state(payload.session_id)
+    workshop_id = _normalize_workshop_id(payload.workshop_id)
+    state = load_session_state(payload.session_id, workshop_id=workshop_id)
+    state.workshop_id = workshop_id
 
     new_state, reply, done = next_step(state, payload.message)
+    new_state.workshop_id = workshop_id
 
     reply = polish_reply_de(reply)
 
     if done and not new_state.ticket_id:
-        ticket_id = save_ticket(new_state)
+        ticket_id = save_ticket(new_state, workshop_id=workshop_id)
         new_state.ticket_id = ticket_id
         reply = (
             reply
@@ -141,6 +154,7 @@ def chat(payload: ChatRequest) -> ChatResponse:
     save_session_state(
         payload.session_id,
         new_state,
+        workshop_id=workshop_id,
         channel=payload.channel,
         phone=payload.phone,
     )
