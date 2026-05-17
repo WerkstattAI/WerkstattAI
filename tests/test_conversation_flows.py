@@ -18,7 +18,7 @@ from app.conversation.intent import (
 )
 from app.conversation.router import next_step
 from app.models import IntakeState
-from app.main import whatsapp_session_id
+from app.main import process_chat_message, whatsapp_session_id
 from app.tickets import (
     find_ticket_by_id,
     find_tickets_by_phone,
@@ -127,6 +127,47 @@ class IntentMatrixTests(unittest.TestCase):
                 self.assertEqual(detect_intent(IntakeState(), message), expected)
 
 
+class MessyCustomerIntentTests(unittest.TestCase):
+    CASES = [
+        # Potoczne lub niedokladne problemy
+        ("auto kaputt", INTENT_NEW_REQUEST),
+        ("karre geht nicht an", INTENT_NEW_REQUEST),
+        ("mein wagen macht komische geräusche", INTENT_NEW_REQUEST),
+        ("irgendwas stinkt beim fahren", INTENT_NEW_REQUEST),
+        ("motor leuchtet gelb und ruckelt", INTENT_NEW_REQUEST),
+        ("bremsen machen komische geraeusche", INTENT_NEW_REQUEST),
+        ("hilfe mein auto startet nicht", INTENT_NEW_REQUEST),
+        # Koszty pisane po ludzku, bez idealnej skladni
+        ("wieviel kostet ölwechsel", INTENT_QUOTE_REQUEST),
+        ("was kostet kupplung wechseln ungefähr", INTENT_QUOTE_REQUEST),
+        ("preis bremsen wechseln?", INTENT_QUOTE_REQUEST),
+        ("ungefähr kosten für reifenwechsel", INTENT_QUOTE_REQUEST),
+        ("angebot fuer service bitte", INTENT_QUOTE_REQUEST),
+        # Istniejacy ticket bez perfekcyjnej formy
+        ("ticket ws-20260505-0005 status?", INTENT_EXISTING_TICKET),
+        ("hab ticket WS-20260505-0005, auto fertig?", INTENT_EXISTING_TICKET),
+        ("auftrag 123 was ist los", INTENT_EXISTING_TICKET),
+        ("meine nummer wegen ticket ist 0176 1234567", INTENT_EXISTING_TICKET),
+        # Ogolne pytania klienta
+        ("wann habt ihr offen", INTENT_GENERAL_QUESTION),
+        ("wo genau seid ihr", INTENT_GENERAL_QUESTION),
+        ("habt ihr samstags offen?", INTENT_GENERAL_QUESTION),
+        ("macht ihr auch abschleppen?", INTENT_GENERAL_QUESTION),
+        ("was macht eure werkstatt alles?", INTENT_GENERAL_QUESTION),
+        # Ludzie pisza jak do ChatGPT lub bardzo niejasno
+        ("schreib mal bitte eine nachricht", INTENT_UNCLEAR),
+        ("antwort mir wie eine ki", INTENT_UNCLEAR),
+        ("ich weiss nicht was ich schreiben soll", INTENT_UNCLEAR),
+        ("hallo guten tag", INTENT_UNCLEAR),
+        ("???", INTENT_UNCLEAR),
+    ]
+
+    def test_messy_customer_messages_route_safely(self) -> None:
+        for message, expected in self.CASES:
+            with self.subTest(message=message):
+                self.assertEqual(detect_intent(IntakeState(), message), expected)
+
+
 class WhatsAppWebhookTests(unittest.TestCase):
     def test_whatsapp_session_id_uses_normalized_phone(self) -> None:
         self.assertEqual(
@@ -213,6 +254,19 @@ class GeneralQuestionTests(unittest.TestCase):
         self.assertIn("Meier Werkstatt Family", reply)
         self.assertIn("09:00-17:00", reply)
 
+    def test_informal_saturday_opening_hours_question_uses_workshop_profile(self) -> None:
+        init_db()
+
+        state = IntakeState(workshop_id="demo-werkstatt")
+        _, reply, done = handle_general_question(
+            state,
+            "habt ihr samstags offen?",
+        )
+
+        self.assertFalse(done)
+        self.assertIn("Meier Werkstatt Family", reply)
+        self.assertIn("Samstag", reply)
+
 
 class NewRequestTests(unittest.TestCase):
     def test_early_phone_during_followup_is_stored_not_used_as_answer(self) -> None:
@@ -232,6 +286,13 @@ class NewRequestTests(unittest.TestCase):
         self.assertEqual(new_state.followup_answers, [])
         self.assertIn("Telefonnummer ist gespeichert", reply)
         self.assertIn("Seit wann besteht", reply)
+
+    def test_problem_first_message_is_not_used_as_vehicle_name(self) -> None:
+        state, reply, done = handle_new_request(IntakeState(), "karre geht nicht an")
+
+        self.assertFalse(done)
+        self.assertIsNone(state.fahrzeug)
+        self.assertIn("Marke und Modell", reply)
 
     def test_switching_from_existing_ticket_to_new_request_clears_ticket_context(self) -> None:
         state = IntakeState(
@@ -264,6 +325,99 @@ class QuoteRequestTests(unittest.TestCase):
         self.assertIsNone(new_state.ticket_id)
         self.assertEqual(new_state.workshop_id, "demo-werkstatt")
         self.assertIn("Zu welchem Fahrzeug", reply)
+
+
+class EndToEndConversationTests(unittest.TestCase):
+    WORKSHOP_ID = "demo-werkstatt"
+
+    def _send(self, session_id: str, message: str):
+        return process_chat_message(
+            workshop_id=self.WORKSHOP_ID,
+            session_id=session_id,
+            message=message,
+            channel="test",
+        )
+
+    def _cleanup(self, session_ids: list[str], ticket_ids: list[str]) -> None:
+        with get_conn() as conn:
+            for session_id in session_ids:
+                conn.execute(
+                    "DELETE FROM conversation_sessions WHERE session_id = ?",
+                    (f"{self.WORKSHOP_ID}:{session_id}",),
+                )
+            for ticket_id in ticket_ids:
+                conn.execute("DELETE FROM tickets WHERE ticket_id = ?", (ticket_id,))
+            conn.commit()
+
+    def test_service_flow_creates_service_ticket(self) -> None:
+        init_db()
+        session_id = "test-e2e-service"
+        ticket_ids: list[str] = []
+
+        try:
+            self._send(session_id, "Audi A4 2019 120000 km")
+            self._send(session_id, "Inspektion und Ölwechsel")
+            self._send(session_id, "0176 44411122")
+            response = self._send(session_id, "Service Tester")
+
+            ticket_id = str(response.data.get("ticket_id") or "")
+            ticket_ids.append(ticket_id)
+            ticket = find_ticket_by_id(ticket_id, workshop_id=self.WORKSHOP_ID)
+
+            self.assertTrue(response.done)
+            self.assertIsNotNone(ticket)
+            self.assertEqual(ticket["request_type"], "service")
+            self.assertEqual(ticket["priority"], "niedrig")
+        finally:
+            self._cleanup([session_id], ticket_ids)
+
+    def test_notfall_flow_creates_high_priority_ticket(self) -> None:
+        init_db()
+        session_id = "test-e2e-notfall"
+        ticket_ids: list[str] = []
+
+        try:
+            self._send(session_id, "BMW 320d 2017 130000 km")
+            self._send(session_id, "Auto springt nicht an und steht auf der Straße")
+            self._send(session_id, "ja")
+            self._send(session_id, "nein")
+            self._send(session_id, "0176 44422233")
+            response = self._send(session_id, "Notfall Tester")
+
+            ticket_id = str(response.data.get("ticket_id") or "")
+            ticket_ids.append(ticket_id)
+            ticket = find_ticket_by_id(ticket_id, workshop_id=self.WORKSHOP_ID)
+
+            self.assertTrue(response.done)
+            self.assertIsNotNone(ticket)
+            self.assertEqual(ticket["request_type"], "notfall")
+            self.assertEqual(ticket["priority"], "hoch")
+            self.assertFalse(ticket["fahrbereit"])
+            self.assertTrue(ticket["abschleppdienst"])
+        finally:
+            self._cleanup([session_id], ticket_ids)
+
+    def test_quote_flow_creates_quote_ticket_from_messy_price_question(self) -> None:
+        init_db()
+        session_id = "test-e2e-quote"
+        ticket_ids: list[str] = []
+
+        try:
+            self._send(session_id, "wieviel kostet ölwechsel")
+            self._send(session_id, "VW Polo 2015")
+            self._send(session_id, "0176 44433344")
+            response = self._send(session_id, "Quote Tester")
+
+            ticket_id = str(response.data.get("ticket_id") or "")
+            ticket_ids.append(ticket_id)
+            ticket = find_ticket_by_id(ticket_id, workshop_id=self.WORKSHOP_ID)
+
+            self.assertTrue(response.done)
+            self.assertIsNotNone(ticket)
+            self.assertEqual(ticket["request_type"], "kostenvoranschlag")
+            self.assertEqual(ticket["fahrzeug"], "VW Polo")
+        finally:
+            self._cleanup([session_id], ticket_ids)
 
 
 class TicketTenantTests(unittest.TestCase):
