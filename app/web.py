@@ -8,6 +8,7 @@ from fastapi import APIRouter, Form, Request
 from fastapi.responses import HTMLResponse, RedirectResponse
 from fastapi.templating import Jinja2Templates
 
+from app.auth import authenticate_user, clear_session_cookie, get_current_user, set_session_cookie
 from app.db import default_workshop_id
 from app.models import IntakeState
 from app.tickets import (
@@ -26,6 +27,21 @@ templates = Jinja2Templates(directory="templates")
 
 def _normalize_workshop_id(value: str | None = None) -> str:
     return (value or default_workshop_id()).strip() or default_workshop_id()
+
+
+def _workshop_id_for_request(request: Request, value: str | None = None) -> str:
+    user = get_current_user(request)
+    if user:
+        return _normalize_workshop_id(str(user.get("workshop_id") or ""))
+    return _normalize_workshop_id(value)
+
+
+def _template_context(request: Request, **extra: Any) -> dict[str, Any]:
+    return {
+        "request": request,
+        "current_user": get_current_user(request),
+        **extra,
+    }
 
 
 # -------------------------
@@ -519,12 +535,12 @@ def _render_dashboard(
 
     return templates.TemplateResponse(
         "dashboard.html",
-        {
-            "request": request,
-            "tickets": tickets,
-            "attention_tickets": attention_tickets,
-            "stats": stats,
-            "filters": {
+        _template_context(
+            request,
+            tickets=tickets,
+            attention_tickets=attention_tickets,
+            stats=stats,
+            filters={
                 "status": normalized_filter_status,
                 "source": normalized_filter_source,
                 "question_state": normalized_filter_question_state,
@@ -533,9 +549,9 @@ def _render_dashboard(
                 "limit": limit,
                 "workshop_id": wid,
             },
-            "archive_mode": archive_mode,
-            "workshop_id": wid,
-        },
+            archive_mode=archive_mode,
+            workshop_id=wid,
+        ),
     )
 
 
@@ -552,6 +568,54 @@ def assistant_page(request: Request):
     )
 
 
+@router.get("/login", response_class=HTMLResponse)
+def login_page(
+    request: Request,
+    next: str | None = None,
+    error: str | None = None,
+):
+    return templates.TemplateResponse(
+        "login.html",
+        _template_context(
+            request,
+            next=next or "/dashboard",
+            error=error,
+        ),
+    )
+
+
+@router.post("/login")
+def login_submit(
+    request: Request,
+    email: str = Form(...),
+    password: str = Form(...),
+    next: str = Form("/dashboard"),
+):
+    user = authenticate_user(email, password)
+    if not user:
+        return templates.TemplateResponse(
+            "login.html",
+            _template_context(
+                request,
+                next=next or "/dashboard",
+                error="E-Mail oder Passwort ist falsch.",
+            ),
+            status_code=401,
+        )
+
+    target = next if next.startswith("/") and not next.startswith("//") else "/dashboard"
+    response = RedirectResponse(url=target, status_code=303)
+    set_session_cookie(response, user)
+    return response
+
+
+@router.post("/logout")
+def logout_submit():
+    response = RedirectResponse(url="/login", status_code=303)
+    clear_session_cookie(response)
+    return response
+
+
 @router.get("/dashboard", response_class=HTMLResponse)
 def dashboard(
     request: Request,
@@ -563,6 +627,7 @@ def dashboard(
     limit: int = 250,
     workshop_id: str | None = None,
 ):
+    wid = _workshop_id_for_request(request, workshop_id)
     return _render_dashboard(
         request,
         archive_mode=False,
@@ -572,7 +637,7 @@ def dashboard(
         q=q,
         sort=sort,
         limit=limit,
-        workshop_id=workshop_id,
+        workshop_id=wid,
     )
 
 
@@ -587,6 +652,7 @@ def dashboard_archive(
     limit: int = 250,
     workshop_id: str | None = None,
 ):
+    wid = _workshop_id_for_request(request, workshop_id)
     return _render_dashboard(
         request,
         archive_mode=True,
@@ -596,7 +662,7 @@ def dashboard_archive(
         q=q,
         sort=sort,
         limit=limit,
-        workshop_id=workshop_id,
+        workshop_id=wid,
     )
 
 
@@ -606,22 +672,23 @@ def dashboard_settings(
     workshop_id: str | None = None,
     saved: str | None = None,
 ):
-    wid = _normalize_workshop_id(workshop_id)
+    wid = _workshop_id_for_request(request, workshop_id)
     workshop = get_workshop(wid)
 
     return templates.TemplateResponse(
         "settings.html",
-        {
-            "request": request,
-            "workshop": workshop,
-            "workshop_id": wid,
-            "saved": saved == "1",
-        },
+        _template_context(
+            request,
+            workshop=workshop,
+            workshop_id=wid,
+            saved=saved == "1",
+        ),
     )
 
 
 @router.post("/dashboard/settings")
 def dashboard_settings_save(
+    request: Request,
     workshop_id: str | None = Form(None),
     name: str = Form(...),
     address: str = Form(""),
@@ -661,18 +728,19 @@ def dashboard_intake(
     request: Request,
     workshop_id: str | None = None,
 ):
-    wid = _normalize_workshop_id(workshop_id)
+    wid = _workshop_id_for_request(request, workshop_id)
     return templates.TemplateResponse(
         "intake.html",
-        {
-            "request": request,
-            "workshop_id": wid,
-        },
+        _template_context(
+            request,
+            workshop_id=wid,
+        ),
     )
 
 
 @router.post("/dashboard/intake")
 def dashboard_intake_save(
+    request: Request,
     workshop_id: str | None = Form(None),
     fahrzeug: str = Form(...),
     baujahr: str = Form(""),
@@ -685,7 +753,7 @@ def dashboard_intake_save(
     fahrbereit: str = Form(""),
     abschleppdienst: str = Form(""),
 ):
-    wid = _normalize_workshop_id(workshop_id)
+    wid = _workshop_id_for_request(request, workshop_id)
     fahrzeug_text = (fahrzeug or "").strip()
     problem_text = (problem or "").strip()
 
@@ -733,7 +801,7 @@ def dashboard_intake_save(
 
 @router.get("/dashboard/ticket/{ticket_id}", response_class=HTMLResponse)
 def ticket_detail(request: Request, ticket_id: str, workshop_id: str | None = None):
-    wid = _normalize_workshop_id(workshop_id)
+    wid = _workshop_id_for_request(request, workshop_id)
     ticket = find_ticket_by_id(ticket_id, workshop_id=wid)
     if not ticket:
         return HTMLResponse("Ticket nicht gefunden", status_code=404)
@@ -776,21 +844,22 @@ def ticket_detail(request: Request, ticket_id: str, workshop_id: str | None = No
 
     return templates.TemplateResponse(
         "ticket.html",
-        {
-            "request": request,
-            "ticket": t,
-            "workshop_id": wid,
-        },
+        _template_context(
+            request,
+            ticket=t,
+            workshop_id=wid,
+        ),
     )
 
 
 @router.post("/dashboard/ticket/{ticket_id}/status")
 def ticket_set_status(
+    request: Request,
     ticket_id: str,
     status: str = Form(...),
     workshop_id: str | None = Form(None),
 ):
-    wid = _normalize_workshop_id(workshop_id)
+    wid = _workshop_id_for_request(request, workshop_id)
     try:
         normalized_status = _backend_status(status)
         update_ticket_status(ticket_id, normalized_status, workshop_id=wid)
@@ -802,28 +871,30 @@ def ticket_set_status(
 
 @router.post("/dashboard/ticket/{ticket_id}/status_quick")
 def ticket_set_status_quick(
+    request: Request,
     ticket_id: str,
     status: str = Form(...),
     workshop_id: str | None = Form(None),
 ):
-    wid = _normalize_workshop_id(workshop_id)
+    wid = _workshop_id_for_request(request, workshop_id)
     try:
         normalized_status = _backend_status(status)
         update_ticket_status(ticket_id, normalized_status, workshop_id=wid)
     except Exception:
         return HTMLResponse("Status-Update fehlgeschlagen", status_code=400)
 
-    return RedirectResponse(url="/dashboard", status_code=303)
+    return RedirectResponse(url=f"/dashboard?workshop_id={wid}", status_code=303)
 
 
 @router.post("/dashboard/ticket/{ticket_id}/notes")
 def ticket_add_note(
+    request: Request,
     ticket_id: str,
     note_text: str = Form(...),
     note_type: str = Form("internal_note"),
     workshop_id: str | None = Form(None),
 ):
-    wid = _normalize_workshop_id(workshop_id)
+    wid = _workshop_id_for_request(request, workshop_id)
     try:
         text = (note_text or "").strip()
         if not text:
@@ -842,8 +913,8 @@ def ticket_add_note(
 
 
 @router.post("/dashboard/ticket/{ticket_id}/archive")
-def ticket_archive(ticket_id: str, workshop_id: str | None = Form(None)):
-    wid = _normalize_workshop_id(workshop_id)
+def ticket_archive(request: Request, ticket_id: str, workshop_id: str | None = Form(None)):
+    wid = _workshop_id_for_request(request, workshop_id)
     try:
         archive_ticket(ticket_id, workshop_id=wid)
     except ValueError:

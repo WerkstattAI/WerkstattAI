@@ -4,6 +4,7 @@ import os
 import sqlite3
 
 from app.config import settings
+from app.security import hash_password
 
 
 def _project_root() -> str:
@@ -65,6 +66,42 @@ def init_db() -> None:
         _add_column_if_missing(conn, "workshops", "services", "TEXT")
         _add_column_if_missing(conn, "workshops", "pricing_info", "TEXT")
         _add_column_if_missing(conn, "workshops", "towing_info", "TEXT")
+
+        conn.execute(
+            """
+            CREATE TABLE IF NOT EXISTS users (
+                email TEXT PRIMARY KEY,
+                password_hash TEXT NOT NULL,
+                workshop_id TEXT NOT NULL,
+                role TEXT NOT NULL DEFAULT 'owner',
+                created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+                updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
+            )
+            """
+        )
+
+        conn.execute(
+            """
+            INSERT INTO users (
+                email,
+                password_hash,
+                workshop_id,
+                role
+            )
+            VALUES (?, ?, ?, ?)
+            ON CONFLICT(email) DO UPDATE SET
+                password_hash = excluded.password_hash,
+                workshop_id = excluded.workshop_id,
+                role = excluded.role,
+                updated_at = CURRENT_TIMESTAMP
+            """,
+            (
+                settings.dashboard_admin_email.strip().lower(),
+                hash_password(settings.dashboard_admin_password),
+                default_workshop_id(),
+                settings.dashboard_admin_role,
+            ),
+        )
 
         conn.execute(
             """

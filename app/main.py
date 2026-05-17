@@ -2,10 +2,11 @@ from __future__ import annotations
 
 from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import JSONResponse
+from fastapi.responses import JSONResponse, RedirectResponse
 from pydantic import BaseModel
 
 from app.ai_service import polish_reply_de
+from app.auth import decode_session_token, is_dashboard_path, login_redirect_url
 from app.config import settings
 from app.db import default_workshop_id, init_db
 from app.conversation_sessions import load_session_state, save_session_state
@@ -47,6 +48,18 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
+
+@app.middleware("http")
+async def dashboard_auth_middleware(request, call_next):
+    if is_dashboard_path(request.url.path):
+        user = decode_session_token(request.cookies.get("werkstattai_session"))
+        if not user:
+            return RedirectResponse(url=login_redirect_url(request), status_code=303)
+        request.state.user = user
+
+    return await call_next(request)
+
 
 app.include_router(web_router)
 

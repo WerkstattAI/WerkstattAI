@@ -1608,6 +1608,9 @@
         <a class="nav-btn {% if archive_mode %}active{% endif %}" href="/dashboard/archive?workshop_id={{ workshop_id }}">Archiv</a>
         <a class="nav-btn" href="/dashboard/intake?workshop_id={{ workshop_id }}">+ Direktannahme</a>
         <a class="nav-btn" href="/dashboard/settings?workshop_id={{ workshop_id }}">Einstellungen</a>
+        <form method="post" action="/logout" style="margin:0;">
+          <button class="nav-btn" type="submit">Abmelden</button>
+        </form>
         <div class="chip">🔒 MVP v1 • intern</div>
       </div>
     </div>

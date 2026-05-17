@@ -3,7 +3,9 @@ from __future__ import annotations
 import unittest
 from unittest.mock import patch
 
+from app.auth import authenticate_user, create_session_token, decode_session_token
 from app.db import get_conn, init_db
+from app.config import settings
 from app.conversation.existing_ticket import handle_existing_ticket
 from app.conversation.general_question import handle_general_question
 from app.conversation.new_request import handle_new_request
@@ -175,6 +177,46 @@ class WhatsAppWebhookTests(unittest.TestCase):
             whatsapp_session_id("+49 176 123 456 78"),
             "whatsapp:4917612345678",
         )
+
+
+class AuthTests(unittest.TestCase):
+    def test_default_dashboard_admin_can_authenticate(self) -> None:
+        init_db()
+
+        user = authenticate_user(
+            settings.dashboard_admin_email,
+            settings.dashboard_admin_password,
+        )
+
+        self.assertIsNotNone(user)
+        self.assertEqual(user["workshop_id"], "demo-werkstatt")
+
+    def test_session_token_roundtrip(self) -> None:
+        user = {
+            "email": "admin@werkstatt.local",
+            "workshop_id": "demo-werkstatt",
+            "role": "owner",
+        }
+
+        token = create_session_token(user)
+        decoded = decode_session_token(token)
+
+        self.assertIsNotNone(decoded)
+        self.assertEqual(decoded["email"], user["email"])
+        self.assertEqual(decoded["workshop_id"], user["workshop_id"])
+        self.assertEqual(decoded["role"], user["role"])
+
+    def test_tampered_session_token_is_rejected(self) -> None:
+        user = {
+            "email": "admin@werkstatt.local",
+            "workshop_id": "demo-werkstatt",
+            "role": "owner",
+        }
+
+        token = create_session_token(user)
+        tampered = token[:-1] + ("A" if token[-1] != "A" else "B")
+
+        self.assertIsNone(decode_session_token(tampered))
 
 
 class ExistingTicketTests(unittest.TestCase):
