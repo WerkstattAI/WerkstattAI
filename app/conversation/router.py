@@ -3,12 +3,14 @@ from __future__ import annotations
 from typing import Tuple
 
 from app.conversation.existing_ticket import handle_existing_ticket
+from app.conversation.fallback import handle_unclear_request
 from app.conversation.general_question import handle_general_question
 from app.conversation.intent import (
     INTENT_EXISTING_TICKET,
     INTENT_GENERAL_QUESTION,
     INTENT_NEW_REQUEST,
     INTENT_QUOTE_REQUEST,
+    INTENT_UNCLEAR,
     detect_intent,
 )
 from app.conversation.new_request import handle_new_request
@@ -40,8 +42,10 @@ def next_step(
     if intent == INTENT_GENERAL_QUESTION:
         return handle_general_question(state, user_message)
 
-    # Fallback → Problem melden
     if intent == INTENT_QUOTE_REQUEST:
         return handle_quote_request(state, user_message)
 
-    return handle_new_request(state, user_message)
+    if intent == INTENT_UNCLEAR:
+        return handle_unclear_request(state, user_message)
+
+    return handle_unclear_request(state, user_message)

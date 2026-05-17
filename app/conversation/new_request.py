@@ -72,6 +72,13 @@ def reset_state() -> IntakeState:
     return IntakeState(step=STEP_FAHRZEUG, mode="unknown")
 
 
+def fresh_intake_state_from(state: IntakeState, mode: str = "new") -> IntakeState:
+    new_state = reset_state()
+    new_state.mode = mode
+    new_state.workshop_id = getattr(state, "workshop_id", None)
+    return new_state
+
+
 def is_cancel(text: str) -> bool:
     return lower(text) in CANCEL_VALUES
 
@@ -150,7 +157,11 @@ def handle_new_request(state: IntakeState, user_message: str | None) -> Tuple[In
     if is_cancel(msg):
         return reset_state(), reset_reply(), False
 
-    new_state = copy_state(state)
+    if (getattr(state, "mode", None) or "unknown").strip().lower() != "new":
+        new_state = fresh_intake_state_from(state, mode="new")
+    else:
+        new_state = copy_state(state)
+
     new_state.mode = "new"
     new_state.last_user_message = msg
 

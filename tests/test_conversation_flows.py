@@ -7,13 +7,16 @@ from app.db import get_conn, init_db
 from app.conversation.existing_ticket import handle_existing_ticket
 from app.conversation.general_question import handle_general_question
 from app.conversation.new_request import handle_new_request
+from app.conversation.quote_request import handle_quote_request
 from app.conversation.intent import (
     INTENT_EXISTING_TICKET,
     INTENT_GENERAL_QUESTION,
     INTENT_NEW_REQUEST,
     INTENT_QUOTE_REQUEST,
+    INTENT_UNCLEAR,
     detect_intent,
 )
+from app.conversation.router import next_step
 from app.models import IntakeState
 from app.main import whatsapp_session_id
 from app.tickets import (
@@ -53,6 +56,34 @@ class IntentTests(unittest.TestCase):
         self.assertEqual(
             detect_intent(IntakeState(), "Wo ist eure Werkstatt?"),
             INTENT_GENERAL_QUESTION,
+        )
+
+    def test_unclear_ai_style_request_is_not_new_ticket(self) -> None:
+        self.assertEqual(
+            detect_intent(IntakeState(), "Kannst du mir einen Text schreiben?"),
+            INTENT_UNCLEAR,
+        )
+
+    def test_generic_help_request_is_unclear(self) -> None:
+        self.assertEqual(
+            detect_intent(IntakeState(), "Kannst du helfen?"),
+            INTENT_UNCLEAR,
+        )
+
+    def test_unclear_message_does_not_start_new_request(self) -> None:
+        state, reply, done = next_step(IntakeState(), "Kannst du mir helfen?")
+
+        self.assertFalse(done)
+        self.assertEqual(state.mode, "unknown")
+        self.assertIn("kein freier KI-Chat", reply)
+        self.assertIn("Problem melden", reply)
+
+    def test_existing_ticket_mode_can_switch_to_new_request(self) -> None:
+        state = IntakeState(mode="existing", ticket_id="WS-20260505-0005")
+
+        self.assertEqual(
+            detect_intent(state, "Ich möchte ein Problem melden."),
+            INTENT_NEW_REQUEST,
         )
 
 
@@ -161,6 +192,38 @@ class NewRequestTests(unittest.TestCase):
         self.assertEqual(new_state.followup_answers, [])
         self.assertIn("Telefonnummer ist gespeichert", reply)
         self.assertIn("Seit wann besteht", reply)
+
+    def test_switching_from_existing_ticket_to_new_request_clears_ticket_context(self) -> None:
+        state = IntakeState(
+            mode="existing",
+            ticket_id="WS-20260505-0005",
+            workshop_id="demo-werkstatt",
+        )
+
+        new_state, reply, done = handle_new_request(state, "Ich möchte ein Problem melden.")
+
+        self.assertFalse(done)
+        self.assertEqual(new_state.mode, "new")
+        self.assertIsNone(new_state.ticket_id)
+        self.assertEqual(new_state.workshop_id, "demo-werkstatt")
+        self.assertIn("Welche Marke", reply)
+
+
+class QuoteRequestTests(unittest.TestCase):
+    def test_switching_from_existing_ticket_to_quote_clears_ticket_context(self) -> None:
+        state = IntakeState(
+            mode="existing",
+            ticket_id="WS-20260505-0005",
+            workshop_id="demo-werkstatt",
+        )
+
+        new_state, reply, done = handle_quote_request(state, "Was kostet ein Ölwechsel?")
+
+        self.assertFalse(done)
+        self.assertEqual(new_state.mode, "quote")
+        self.assertIsNone(new_state.ticket_id)
+        self.assertEqual(new_state.workshop_id, "demo-werkstatt")
+        self.assertIn("Zu welchem Fahrzeug", reply)
 
 
 class TicketTenantTests(unittest.TestCase):

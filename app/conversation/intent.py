@@ -17,7 +17,7 @@ from app.conversation.constants import (
     STEP_QUOTE_TELEFON,
     STEP_TELEFON,
 )
-from app.conversation.extractors import extract_km, extract_year, lower, normalize
+from app.conversation.extractors import can_extract_vehicle, extract_km, extract_year, lower, normalize
 from app.models import IntakeState
 
 
@@ -25,6 +25,7 @@ INTENT_NEW_REQUEST = "new_request"
 INTENT_EXISTING_TICKET = "existing_ticket"
 INTENT_GENERAL_QUESTION = "general_question"
 INTENT_QUOTE_REQUEST = "quote_request"
+INTENT_UNCLEAR = "unclear"
 
 
 ACTIVE_INTAKE_STEPS = {
@@ -157,6 +158,44 @@ NEW_REQUEST_HINTS = [
     "funktioniert nicht",
 ]
 
+AI_FREEFORM_HINTS = [
+    "chatgpt",
+    "ki",
+    "künstliche intelligenz",
+    "kuenstliche intelligenz",
+    "schreib mir",
+    "schreibe mir",
+    "formuliere",
+    "formuliere mir",
+    "kannst du helfen",
+    "kannst du mir helfen",
+    "hilf mir",
+    "antworte als",
+    "mach mir einen text",
+    "erstelle mir",
+]
+
+EXPLICIT_NEW_REQUEST_CHOICES = [
+    "problem melden",
+    "neues problem",
+    "neue meldung",
+    "ich möchte ein problem melden",
+    "ich moechte ein problem melden",
+]
+
+EXPLICIT_GENERAL_CHOICES = [
+    "allgemeine frage",
+    "eine allgemeine frage",
+    "ich habe eine allgemeine frage",
+]
+
+EXPLICIT_EXISTING_CHOICES = [
+    "bestehendes ticket",
+    "bestehenden ticket",
+    "anfrage zu einem bestehenden ticket",
+    "ich habe eine anfrage zu einem bestehenden ticket",
+]
+
 
 def is_active_intake_step(step: str | None) -> bool:
     return (step or "").strip().lower() in ACTIVE_INTAKE_STEPS
@@ -263,6 +302,30 @@ def looks_like_quote_request(text: str) -> bool:
     return any(keyword in t for keyword in QUOTE_REQUEST_KEYWORDS)
 
 
+def looks_like_ai_freeform_request(text: str) -> bool:
+    t = lower(text)
+    return any(keyword in t for keyword in AI_FREEFORM_HINTS)
+
+
+def looks_like_vehicle_intake_start(text: str) -> bool:
+    return can_extract_vehicle(text) and bool(extract_year(text) or extract_km(text))
+
+
+def has_explicit_new_request_choice(text: str) -> bool:
+    t = lower(text).rstrip(".")
+    return any(keyword in t for keyword in EXPLICIT_NEW_REQUEST_CHOICES)
+
+
+def has_explicit_general_choice(text: str) -> bool:
+    t = lower(text).rstrip(".")
+    return any(keyword in t for keyword in EXPLICIT_GENERAL_CHOICES)
+
+
+def has_explicit_existing_choice(text: str) -> bool:
+    t = lower(text).rstrip(".")
+    return any(keyword in t for keyword in EXPLICIT_EXISTING_CHOICES)
+
+
 def has_direct_ticket_reference(text: str) -> bool:
     return bool(extract_ticket_reference(text) or extract_phone_reference(text))
 
@@ -297,11 +360,23 @@ def detect_intent(state: IntakeState, user_message: str | None) -> str:
     damit der Flow nicht mitten drin kaputtgeht.
     """
     if user_message is None or normalize(user_message) == "":
-        return INTENT_NEW_REQUEST
+        return INTENT_UNCLEAR
 
     msg = normalize(user_message)
 
     mode = (getattr(state, "mode", None) or "unknown").strip().lower()
+
+    if has_explicit_new_request_choice(msg):
+        return INTENT_NEW_REQUEST
+
+    if has_explicit_existing_choice(msg):
+        return INTENT_EXISTING_TICKET
+
+    if looks_like_quote_request(msg):
+        return INTENT_QUOTE_REQUEST
+
+    if has_explicit_general_choice(msg):
+        return INTENT_GENERAL_QUESTION
 
     if mode == "new" and is_active_intake_step(getattr(state, "step", None)):
         return INTENT_NEW_REQUEST
@@ -315,8 +390,8 @@ def detect_intent(state: IntakeState, user_message: str | None) -> str:
     if has_direct_ticket_reference(msg):
         return INTENT_EXISTING_TICKET
 
-    if looks_like_quote_request(msg):
-        return INTENT_QUOTE_REQUEST
+    if looks_like_ai_freeform_request(msg):
+        return INTENT_UNCLEAR
 
     if looks_like_general_question(msg) and not has_explicit_ticket_context(msg):
         return INTENT_GENERAL_QUESTION
@@ -324,7 +399,7 @@ def detect_intent(state: IntakeState, user_message: str | None) -> str:
     if looks_like_existing_ticket_question(msg):
         return INTENT_EXISTING_TICKET
 
-    if looks_like_new_request(msg):
+    if looks_like_new_request(msg) or looks_like_vehicle_intake_start(msg):
         return INTENT_NEW_REQUEST
 
-    return INTENT_NEW_REQUEST
+    return INTENT_UNCLEAR

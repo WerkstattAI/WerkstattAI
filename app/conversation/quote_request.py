@@ -19,7 +19,7 @@ from app.conversation.extractors import (
     lower,
     normalize,
 )
-from app.conversation.new_request import copy_state, reset_state
+from app.conversation.new_request import copy_state, fresh_intake_state_from, reset_state
 from app.models import IntakeState
 
 
@@ -104,7 +104,11 @@ def handle_quote_request(
         return new_state, _quote_welcome_reply(), False
 
     msg = normalize(user_message)
-    new_state = copy_state(state)
+    if (getattr(state, "mode", None) or "unknown").strip().lower() != "quote":
+        new_state = fresh_intake_state_from(state, mode="quote")
+    else:
+        new_state = copy_state(state)
+
     new_state.mode = "quote"
     new_state.request_type = REQUEST_TYPE_KOSTENVORANSCHLAG
     new_state.priority = "normal"
