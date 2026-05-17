@@ -103,6 +103,27 @@ def _normalize_request_type(value: str | None) -> str:
     return "diagnose"
 
 
+def _normalize_source(value: str | None) -> str:
+    source = (value or "").strip().lower()
+    if source in {"web_chat", "whatsapp", "direktannahme"}:
+        return source
+    return "web_chat"
+
+
+def _normalize_filter_source(value: str | None) -> str:
+    source = (value or "").strip().lower()
+    if source in {"all", "web_chat", "whatsapp", "direktannahme"}:
+        return source
+    return "all"
+
+
+def _normalize_filter_question_state(value: str | None) -> str:
+    state = (value or "").strip().lower()
+    if state in {"all", "open", "answered"}:
+        return state
+    return "all"
+
+
 def _ui_status(backend_status: str | None) -> str:
     return _normalize_status(backend_status)
 
@@ -147,6 +168,15 @@ def _request_type_label(value: str | None) -> str:
         "kostenvoranschlag": "Kostenvoranschlag",
     }
     return labels.get(_normalize_request_type(value), "Diagnose")
+
+
+def _source_label(value: str | None) -> str:
+    labels = {
+        "web_chat": "Web-Chat",
+        "whatsapp": "WhatsApp",
+        "direktannahme": "Direktannahme",
+    }
+    return labels.get(_normalize_source(value), "Web-Chat")
 
 
 def _pick_first(d: dict, keys: list[str]) -> str:
@@ -256,9 +286,11 @@ def _prepare_tickets(limit: int, workshop_id: str | None = None) -> list[dict]:
         t["status_ui"] = _ui_status(t.get("status"))
         t["priority"] = _normalize_priority(t.get("priority"))
         t["request_type"] = _normalize_request_type(t.get("request_type"))
+        t["source"] = _normalize_source(t.get("source"))
         t["status_label"] = _status_label(t.get("status_ui"))
         t["priority_label"] = _priority_label(t.get("priority"))
         t["request_type_label"] = _request_type_label(t.get("request_type"))
+        t["source_label"] = _source_label(t.get("source"))
         t["created_dt"] = _parse_iso(t.get("created_at"))
         t["updated_dt"] = _parse_iso(t.get("updated_at"))
         t["is_new"] = (t.get("created_at") == t.get("updated_at"))
@@ -279,6 +311,7 @@ def _prepare_tickets(limit: int, workshop_id: str | None = None) -> list[dict]:
 
         t["has_customer_question"] = bool(customer_question_notes)
         t["customer_question_count"] = len(customer_question_notes)
+        t["customer_question_open"] = bool(t.get("customer_question_open"))
         t["latest_customer_question_text"] = (
             str(latest_customer_question.get("text", "")).strip()
             if latest_customer_question
@@ -300,6 +333,20 @@ def _prepare_tickets(limit: int, workshop_id: str | None = None) -> list[dict]:
             if isinstance(last_note, dict)
             else ""
         )
+
+        if t["has_customer_question"] and not t["customer_question_open"]:
+            latest_customer_question_at = _parse_iso(t.get("latest_customer_question_created_at"))
+            customer_replies = [
+                note for note in notes
+                if isinstance(note, dict) and _note_type(note) == "customer_reply"
+            ]
+            latest_customer_reply_at = _parse_iso(
+                customer_replies[-1].get("created_at")
+                if customer_replies
+                else None
+            )
+            if latest_customer_reply_at < latest_customer_question_at:
+                t["customer_question_open"] = True
 
         t["details_payload"] = _details_payload(t)
         t["details_json"] = json.dumps(
@@ -325,6 +372,7 @@ def _stats_for(tickets: list[dict]) -> dict:
         "notfall": sum(1 for t in tickets if t.get("request_type") == "notfall"),
         "kostenvoranschlag": sum(1 for t in tickets if t.get("request_type") == "kostenvoranschlag"),
         "kundenfragen": sum(1 for t in tickets if t.get("has_customer_question")),
+        "kundenfragen_offen": sum(1 for t in tickets if t.get("customer_question_open")),
         "all": len(tickets),
     }
 
@@ -339,6 +387,12 @@ def _priority_rank(priority: str) -> int:
 
 
 def _attention_reason(t: dict) -> str:
+    if t.get("customer_question_open"):
+        count = int(t.get("customer_question_count") or 0)
+        if count > 1:
+            return f"{count} offene Kundenfragen"
+        return "Offene Kundenfrage"
+
     if t.get("has_customer_question"):
         count = int(t.get("customer_question_count") or 0)
         if count > 1:
@@ -358,14 +412,16 @@ def _attention_reason(t: dict) -> str:
 
 
 def _attention_rank(t: dict) -> tuple[int, float]:
-    if t.get("has_customer_question"):
+    if t.get("customer_question_open"):
         rank = 0
-    elif t.get("request_type") == "notfall":
+    elif t.get("has_customer_question"):
         rank = 1
-    elif t.get("priority") == "hoch":
+    elif t.get("request_type") == "notfall":
         rank = 2
-    elif t.get("request_type") == "kostenvoranschlag":
+    elif t.get("priority") == "hoch":
         rank = 3
+    elif t.get("request_type") == "kostenvoranschlag":
+        rank = 4
     else:
         rank = 9
 
@@ -406,6 +462,8 @@ def _render_dashboard(
     *,
     archive_mode: bool,
     status: str | None,
+    source: str | None,
+    question_state: str | None,
     q: str | None,
     sort: str | None,
     limit: int,
@@ -423,9 +481,22 @@ def _render_dashboard(
     attention_tickets = _attention_tickets(tickets)
 
     normalized_filter_status = _normalize_status(status) if status and status != "all" else "all"
+    normalized_filter_source = _normalize_filter_source(source)
+    normalized_filter_question_state = _normalize_filter_question_state(question_state)
 
     if normalized_filter_status != "all":
         tickets = [t for t in tickets if t.get("status_ui") == normalized_filter_status]
+
+    if normalized_filter_source != "all":
+        tickets = [t for t in tickets if t.get("source") == normalized_filter_source]
+
+    if normalized_filter_question_state == "open":
+        tickets = [t for t in tickets if t.get("customer_question_open")]
+    elif normalized_filter_question_state == "answered":
+        tickets = [
+            t for t in tickets
+            if t.get("has_customer_question") and not t.get("customer_question_open")
+        ]
 
     if q and q.strip():
         tickets = [t for t in tickets if _matches_query(t, q)]
@@ -455,6 +526,8 @@ def _render_dashboard(
             "stats": stats,
             "filters": {
                 "status": normalized_filter_status,
+                "source": normalized_filter_source,
+                "question_state": normalized_filter_question_state,
                 "q": q or "",
                 "sort": sort or "newest",
                 "limit": limit,
@@ -483,6 +556,8 @@ def assistant_page(request: Request):
 def dashboard(
     request: Request,
     status: str | None = None,
+    source: str | None = None,
+    question_state: str | None = None,
     q: str | None = None,
     sort: str | None = None,
     limit: int = 250,
@@ -492,6 +567,8 @@ def dashboard(
         request,
         archive_mode=False,
         status=status,
+        source=source,
+        question_state=question_state,
         q=q,
         sort=sort,
         limit=limit,
@@ -503,6 +580,8 @@ def dashboard(
 def dashboard_archive(
     request: Request,
     status: str | None = None,
+    source: str | None = None,
+    question_state: str | None = None,
     q: str | None = None,
     sort: str | None = None,
     limit: int = 250,
@@ -512,6 +591,8 @@ def dashboard_archive(
         request,
         archive_mode=True,
         status=status,
+        source=source,
+        question_state=question_state,
         q=q,
         sort=sort,
         limit=limit,
@@ -630,6 +711,7 @@ def dashboard_intake_save(
         followup_questions=[],
         followup_answers=[],
         followup_index=0,
+        source="direktannahme",
     )
 
     try:
@@ -662,15 +744,34 @@ def ticket_detail(request: Request, ticket_id: str, workshop_id: str | None = No
     t["status_ui"] = _ui_status(t.get("status"))
     t["priority"] = _normalize_priority(t.get("priority"))
     t["request_type"] = _normalize_request_type(t.get("request_type"))
+    t["source"] = _normalize_source(t.get("source"))
     t["status_label"] = _status_label(t.get("status_ui"))
     t["priority_label"] = _priority_label(t.get("priority"))
     t["request_type_label"] = _request_type_label(t.get("request_type"))
+    t["source_label"] = _source_label(t.get("source"))
     t["kunde_name"] = _extract_name(t)
 
     notes = t.get("notes") if isinstance(t.get("notes"), list) else []
     t["internal_notes"] = [note for note in notes if _note_type(note) == "internal_note"]
     t["customer_messages"] = [note for note in notes if _note_type(note) == "customer_message"]
     t["customer_replies"] = [note for note in notes if _note_type(note) == "customer_reply"]
+    t["customer_question_open"] = bool(t.get("customer_question_open"))
+    t["has_customer_question"] = bool(t["customer_messages"])
+
+    if t["has_customer_question"] and not t["customer_question_open"]:
+        latest_customer_question_at = _parse_iso(
+            t["customer_messages"][-1].get("created_at")
+            if t["customer_messages"]
+            else None
+        )
+        latest_customer_reply_at = _parse_iso(
+            t["customer_replies"][-1].get("created_at")
+            if t["customer_replies"]
+            else None
+        )
+        if latest_customer_reply_at < latest_customer_question_at:
+            t["customer_question_open"] = True
+
     t["raw_json"] = json.dumps(t, ensure_ascii=False, default=str, indent=2)
 
     return templates.TemplateResponse(

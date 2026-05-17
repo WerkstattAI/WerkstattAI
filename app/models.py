@@ -77,4 +77,5 @@ class IntakeState(BaseModel):
     # Ticket / Meta
     workshop_id: Optional[str] = None
     ticket_id: Optional[str] = None
+    source: Optional[str] = None
     last_user_message: Optional[str] = None

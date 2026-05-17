@@ -1350,12 +1350,45 @@
 
     .attention-meta{
       display:flex;
-      justify-content:space-between;
+      justify-content:flex-start;
+      flex-wrap:wrap;
       gap:8px;
       align-items:center;
       color:#93a4ba;
       font-size:11px;
       font-weight:750;
+    }
+
+    .attention-source{
+      display:inline-flex;
+      align-items:center;
+      padding:2px 7px;
+      border-radius:999px;
+      border:1px solid rgba(255,255,255,.14);
+      background:rgba(255,255,255,.06);
+      color:#d8e3f3;
+      font-size:10px;
+      font-weight:850;
+      letter-spacing:.03em;
+      text-transform:uppercase;
+    }
+
+    .attention-source.web_chat{
+      border-color:rgba(96,165,250,.35);
+      background:rgba(96,165,250,.14);
+      color:#dbeafe;
+    }
+
+    .attention-source.whatsapp{
+      border-color:rgba(34,197,94,.40);
+      background:rgba(34,197,94,.16);
+      color:#bbf7d0;
+    }
+
+    .attention-source.direktannahme{
+      border-color:rgba(245,158,11,.42);
+      background:rgba(245,158,11,.18);
+      color:#fde68a;
     }
 
     .attention-empty{
@@ -1581,49 +1614,55 @@
 
     <div class="grid">
       <div class="cards">
-        <a class="card kpi" href="{% if archive_mode %}/dashboard/archive?status=offen&sort={{ filters.sort }}{% else %}/dashboard?status=offen&sort={{ filters.sort }}{% endif %}">
+        <a class="card kpi" href="{% if archive_mode %}/dashboard/archive?workshop_id={{ workshop_id }}&status=offen&source={{ filters.source }}&question_state={{ filters.question_state }}&sort={{ filters.sort }}{% else %}/dashboard?workshop_id={{ workshop_id }}&status=offen&source={{ filters.source }}&question_state={{ filters.question_state }}&sort={{ filters.sort }}{% endif %}">
           <div class="label">Offen</div>
           <div class="value">{{ stats.offen or 0 }}</div>
           <div class="hint">Neue oder noch unbehandelte Anfragen</div>
         </a>
 
-        <a class="card kpi" href="{% if archive_mode %}/dashboard/archive?status=in_bearbeitung&sort={{ filters.sort }}{% else %}/dashboard?status=in_bearbeitung&sort={{ filters.sort }}{% endif %}">
+        <a class="card kpi" href="{% if archive_mode %}/dashboard/archive?workshop_id={{ workshop_id }}&status=in_bearbeitung&source={{ filters.source }}&question_state={{ filters.question_state }}&sort={{ filters.sort }}{% else %}/dashboard?workshop_id={{ workshop_id }}&status=in_bearbeitung&source={{ filters.source }}&question_state={{ filters.question_state }}&sort={{ filters.sort }}{% endif %}">
           <div class="label">In Bearbeitung</div>
           <div class="value">{{ stats.in_bearbeitung or 0 }}</div>
           <div class="hint">Mechaniker oder Team arbeitet bereits daran</div>
         </a>
 
-        <a class="card kpi" href="{% if archive_mode %}/dashboard/archive?status=erledigt&sort={{ filters.sort }}{% else %}/dashboard?status=erledigt&sort={{ filters.sort }}{% endif %}">
+        <a class="card kpi" href="{% if archive_mode %}/dashboard/archive?workshop_id={{ workshop_id }}&status=erledigt&source={{ filters.source }}&question_state={{ filters.question_state }}&sort={{ filters.sort }}{% else %}/dashboard?workshop_id={{ workshop_id }}&status=erledigt&source={{ filters.source }}&question_state={{ filters.question_state }}&sort={{ filters.sort }}{% endif %}">
           <div class="label">Erledigt</div>
           <div class="value">{{ stats.erledigt or 0 }}</div>
           <div class="hint">Abgeschlossene oder fertige Fälle</div>
         </a>
 
-        <a class="card kpi kpi-hot" href="{% if archive_mode %}/dashboard/archive?status={{ filters.status }}&q=hoch&sort=priority{% else %}/dashboard?status={{ filters.status }}&q=hoch&sort=priority{% endif %}">
+        <a class="card kpi kpi-hot" href="{% if archive_mode %}/dashboard/archive?workshop_id={{ workshop_id }}&status={{ filters.status }}&source={{ filters.source }}&question_state={{ filters.question_state }}&q=hoch&sort=priority{% else %}/dashboard?workshop_id={{ workshop_id }}&status={{ filters.status }}&source={{ filters.source }}&question_state={{ filters.question_state }}&q=hoch&sort=priority{% endif %}">
           <div class="label">Hohe Priorität</div>
           <div class="value">{{ stats.hoch or 0 }}</div>
           <div class="hint">Sofort prüfen oder zuerst bearbeiten</div>
         </a>
 
-        <a class="card kpi kpi-warn" href="{% if archive_mode %}/dashboard/archive?status={{ filters.status }}&q=notfall&sort=priority{% else %}/dashboard?status={{ filters.status }}&q=notfall&sort=priority{% endif %}">
+        <a class="card kpi kpi-warn" href="{% if archive_mode %}/dashboard/archive?workshop_id={{ workshop_id }}&status={{ filters.status }}&source={{ filters.source }}&question_state={{ filters.question_state }}&q=notfall&sort=priority{% else %}/dashboard?workshop_id={{ workshop_id }}&status={{ filters.status }}&source={{ filters.source }}&question_state={{ filters.question_state }}&q=notfall&sort=priority{% endif %}">
           <div class="label">Notfall-Typ</div>
           <div class="value">{{ stats.notfall or 0 }}</div>
           <div class="hint">Kritische Anfragen mit erhöhter Dringlichkeit</div>
         </a>
 
-        <a class="card kpi kpi-customer" href="{% if archive_mode %}/dashboard/archive?status={{ filters.status }}&q=kundenfrage&sort=updated{% else %}/dashboard?status={{ filters.status }}&q=kundenfrage&sort=updated{% endif %}">
+        <a class="card kpi kpi-customer" href="{% if archive_mode %}/dashboard/archive?workshop_id={{ workshop_id }}&status={{ filters.status }}&source={{ filters.source }}&question_state={{ filters.question_state }}&q=kundenfrage&sort=updated{% else %}/dashboard?workshop_id={{ workshop_id }}&status={{ filters.status }}&source={{ filters.source }}&question_state={{ filters.question_state }}&q=kundenfrage&sort=updated{% endif %}">
           <div class="label">Kundenfragen</div>
           <div class="value">{{ stats.kundenfragen or 0 }}</div>
           <div class="hint">Neue Rückfragen aus dem Chat</div>
         </a>
 
-        <a class="card kpi kpi-quote" href="{% if archive_mode %}/dashboard/archive?status={{ filters.status }}&q=kostenvoranschlag&sort=updated{% else %}/dashboard?status={{ filters.status }}&q=kostenvoranschlag&sort=updated{% endif %}">
+        <a class="card kpi kpi-customer" href="{% if archive_mode %}/dashboard/archive?workshop_id={{ workshop_id }}&status={{ filters.status }}&source={{ filters.source }}&question_state=open&sort=updated{% else %}/dashboard?workshop_id={{ workshop_id }}&status={{ filters.status }}&source={{ filters.source }}&question_state=open&sort=updated{% endif %}">
+          <div class="label">Offene Fragen</div>
+          <div class="value">{{ stats.kundenfragen_offen or 0 }}</div>
+          <div class="hint">Kundenfragen ohne Antwort vom Team</div>
+        </a>
+
+        <a class="card kpi kpi-quote" href="{% if archive_mode %}/dashboard/archive?workshop_id={{ workshop_id }}&status={{ filters.status }}&source={{ filters.source }}&question_state={{ filters.question_state }}&q=kostenvoranschlag&sort=updated{% else %}/dashboard?workshop_id={{ workshop_id }}&status={{ filters.status }}&source={{ filters.source }}&question_state={{ filters.question_state }}&q=kostenvoranschlag&sort=updated{% endif %}">
           <div class="label">Kostenvoranschläge</div>
           <div class="value">{{ stats.kostenvoranschlag or 0 }}</div>
           <div class="hint">Preis- und Angebotsanfragen</div>
         </a>
 
-        <a class="card kpi" href="{% if archive_mode %}/dashboard/archive{% else %}/dashboard{% endif %}">
+        <a class="card kpi" href="{% if archive_mode %}/dashboard/archive?workshop_id={{ workshop_id }}{% else %}/dashboard?workshop_id={{ workshop_id }}{% endif %}">
           <div class="label">Alle</div>
           <div class="value">{{ stats.all or 0 }}</div>
           <div class="hint">Gesamtanzahl in der aktuellen Ansicht</div>
@@ -1639,6 +1678,19 @@
               <option value="offen" {% if filters.status=="offen" %}selected{% endif %}>offen</option>
               <option value="in_bearbeitung" {% if filters.status=="in_bearbeitung" %}selected{% endif %}>in bearbeitung</option>
               <option value="erledigt" {% if filters.status=="erledigt" %}selected{% endif %}>erledigt</option>
+            </select>
+
+            <select name="source">
+              <option value="all" {% if filters.source=="all" %}selected{% endif %}>Quelle: alle</option>
+              <option value="web_chat" {% if filters.source=="web_chat" %}selected{% endif %}>Web-Chat</option>
+              <option value="whatsapp" {% if filters.source=="whatsapp" %}selected{% endif %}>WhatsApp</option>
+              <option value="direktannahme" {% if filters.source=="direktannahme" %}selected{% endif %}>Direktannahme</option>
+            </select>
+
+            <select name="question_state">
+              <option value="all" {% if filters.question_state=="all" %}selected{% endif %}>Fragen: alle</option>
+              <option value="open" {% if filters.question_state=="open" %}selected{% endif %}>Fragen: offen</option>
+              <option value="answered" {% if filters.question_state=="answered" %}selected{% endif %}>Fragen: beantwortet</option>
             </select>
 
             <input
@@ -1691,6 +1743,7 @@
                 <div class="attention-meta">
                   <span>{{ t.ticket_view_id }}</span>
                   <span>{{ t.status_label or "-" }}</span>
+                  <span class="attention-source {{ t.source or 'web_chat' }}">{{ t.source_label or "-" }}</span>
                 </div>
               </a>
             {% endfor %}
@@ -1754,12 +1807,17 @@
                   {% if t.has_customer_question %}
                     <div>
                       <span class="customer-question-badge">
-                        Kundenfrage{% if t.customer_question_count > 1 %} {{ t.customer_question_count }}{% endif %}
+                        {% if t.customer_question_open %}
+                          Offene Kundenfrage{% if t.customer_question_count > 1 %} {{ t.customer_question_count }}{% endif %}
+                        {% else %}
+                          Kundenfrage beantwortet
+                        {% endif %}
                       </span>
                     </div>
                   {% endif %}
 
                   <div class="muted id">ID: {{ t.ticket_view_id }}</div>
+                  <div class="muted">Quelle: {{ t.source_label or "-" }}</div>
                 </td>
 
                 <td>
@@ -1800,7 +1858,9 @@
 
                   {% if t.has_customer_question %}
                     <div class="last-note-block">
-                      <div class="last-note-label">Neue Kundenfrage</div>
+                      <div class="last-note-label">
+                        {% if t.customer_question_open %}Neue Kundenfrage{% else %}Kundenfrage beantwortet{% endif %}
+                      </div>
                       <div class="last-note-text">{{ t.latest_customer_question_text }}</div>
                       {% if t.latest_customer_question_created_at %}
                         <div class="last-note-date">{{ t.latest_customer_question_created_at }}</div>
@@ -1921,6 +1981,7 @@
             <b>Status</b><div class="muted" id="mStatus">-</div>
             <b>Priorität</b><div class="muted" id="mPriority">-</div>
             <b>Typ</b><div class="muted" id="mRequestType">-</div>
+            <b>Quelle</b><div class="muted" id="mSource">-</div>
             <b>Problem</b><div class="muted" id="mProblem">-</div>
           </div>
         </div>
@@ -1941,6 +2002,10 @@
             <div class="debug-item">
               <div class="debug-label">Request Type</div>
               <div class="debug-value" id="dRequestType">-</div>
+            </div>
+            <div class="debug-item">
+              <div class="debug-label">Quelle</div>
+              <div class="debug-value" id="dSource">-</div>
             </div>
 
             <div class="debug-item">
@@ -2058,6 +2123,15 @@
       return labels[val] || prettyValue(val);
     }
 
+    function prettySource(val) {
+      const labels = {
+        web_chat: "Web-Chat",
+        whatsapp: "WhatsApp",
+        direktannahme: "Direktannahme",
+      };
+      return labels[val] || prettyValue(val);
+    }
+
     function prettyValue(val) {
       if (val === undefined || val === null || val === "") return "-";
       if (typeof val === "boolean") return val ? "Ja" : "Nein";
@@ -2137,11 +2211,13 @@
         setText("mStatus", data.status_label || prettyStatus(data.status_ui || data.status || "-"));
         setText("mPriority", data.priority_label || prettyPriority(data.priority || "-"));
         setText("mRequestType", data.request_type_label || prettyRequestType(data.request_type || "-"));
+        setText("mSource", data.source_label || prettySource(data.source || "-"));
         setText("mProblem", data.problem || "-");
 
         setText("dStatusBackend", data.status_label || prettyStatus(data.status || "-"));
         setText("dPriority", data.priority_label || prettyPriority(data.priority || "-"));
         setText("dRequestType", data.request_type_label || prettyRequestType(data.request_type || "-"));
+        setText("dSource", data.source_label || prettySource(data.source || "-"));
         setText("dFahrbereit", prettyValue(data.fahrbereit || "-"));
         setText("dAbschleppdienst", prettyValue(data.abschleppdienst || "-"));
         setText("dKilometerstand", prettyValue(data.kilometerstand || "-"));

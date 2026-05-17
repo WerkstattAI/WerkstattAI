@@ -147,6 +147,7 @@ def init_db() -> None:
                 name TEXT,
                 kunde_name TEXT,
                 telefon TEXT,
+                customer_question_open INTEGER NOT NULL DEFAULT 0,
 
                 followup_questions_json TEXT NOT NULL DEFAULT '[]',
                 followup_answers_json TEXT NOT NULL DEFAULT '[]',
@@ -161,6 +162,18 @@ def init_db() -> None:
             "workshop_id",
             "TEXT NOT NULL DEFAULT 'demo-werkstatt'",
         )
+        _add_column_if_missing(
+            conn,
+            "tickets",
+            "source",
+            "TEXT NOT NULL DEFAULT 'web_chat'",
+        )
+        _add_column_if_missing(
+            conn,
+            "tickets",
+            "customer_question_open",
+            "INTEGER NOT NULL DEFAULT 0",
+        )
         conn.execute(
             """
             UPDATE tickets
@@ -168,6 +181,20 @@ def init_db() -> None:
             WHERE workshop_id IS NULL OR workshop_id = ''
             """,
             (default_workshop_id(),),
+        )
+        conn.execute(
+            """
+            UPDATE tickets
+            SET source = 'web_chat'
+            WHERE source IS NULL OR source = ''
+            """
+        )
+        conn.execute(
+            """
+            UPDATE tickets
+            SET customer_question_open = 0
+            WHERE customer_question_open IS NULL
+            """
         )
 
         conn.execute(

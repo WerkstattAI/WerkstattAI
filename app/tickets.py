@@ -14,6 +14,7 @@ ALLOWED_STATUS = {"offen", "in_bearbeitung", "erledigt", "archiviert"}
 ALLOWED_PRIORITY = {"niedrig", "normal", "hoch"}
 ALLOWED_REQUEST_TYPE = {"service", "diagnose", "notfall", "kostenvoranschlag"}
 ALLOWED_NOTE_TYPE = {"internal_note", "customer_message", "customer_reply"}
+ALLOWED_SOURCE = {"web_chat", "whatsapp", "direktannahme"}
 
 
 def _now_iso() -> str:
@@ -67,6 +68,13 @@ def _normalize_request_type(value: Any) -> Optional[str]:
         return request_type
 
     return None
+
+
+def _normalize_source(value: Any) -> str:
+    source = str(value or "").strip().lower()
+    if source in ALLOWED_SOURCE:
+        return source
+    return "web_chat"
 
 
 def _safe_json_loads(value: Any, default: Any) -> Any:
@@ -158,6 +166,8 @@ def _normalize_ticket_record(obj: dict[str, Any]) -> dict[str, Any]:
     obj["status"] = _normalize_status(obj.get("status"))
     obj["priority"] = _normalize_priority(obj.get("priority"))
     obj["request_type"] = _normalize_request_type(obj.get("request_type"))
+    obj["source"] = _normalize_source(obj.get("source"))
+    obj["customer_question_open"] = bool(obj.get("customer_question_open"))
 
     if obj.get("followup_questions") is None or not isinstance(obj.get("followup_questions"), list):
         obj["followup_questions"] = []
@@ -188,6 +198,8 @@ def _row_to_ticket_dict(row: Any) -> dict[str, Any]:
         "status": row["status"],
         "priority": row["priority"],
         "request_type": row["request_type"],
+        "source": row["source"],
+        "customer_question_open": _db_to_bool(row["customer_question_open"]),
         "fahrzeug": row["fahrzeug"],
         "baujahr": row["baujahr"],
         "kilometerstand": row["kilometerstand"],
@@ -257,6 +269,8 @@ def save_ticket(state: IntakeState, workshop_id: str | None = None) -> str:
         "status": "offen",
         "request_type": _normalize_request_type(state.request_type),
         "priority": _normalize_priority(state.priority),
+        "source": _normalize_source(state.source),
+        "customer_question_open": False,
 
         # Fahrzeugdaten
         "fahrzeug": state.fahrzeug,
@@ -297,6 +311,8 @@ def save_ticket(state: IntakeState, workshop_id: str | None = None) -> str:
                     status,
                     priority,
                     request_type,
+                    source,
+                    customer_question_open,
                     fahrzeug,
                     baujahr,
                     kilometerstand,
@@ -310,7 +326,7 @@ def save_ticket(state: IntakeState, workshop_id: str | None = None) -> str:
                     followup_answers_json,
                     notes_json
                 )
-                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
                 """,
                 (
                     record["workshop_id"],
@@ -320,6 +336,8 @@ def save_ticket(state: IntakeState, workshop_id: str | None = None) -> str:
                     record["status"],
                     record["priority"],
                     record["request_type"],
+                    record["source"],
+                    _bool_to_db(record["customer_question_open"]),
                     record["fahrzeug"],
                     record["baujahr"],
                     record["kilometerstand"],
@@ -576,16 +594,23 @@ def add_ticket_note(
                     "created_at": now_iso,
                 }
             )
+            normalized_note_type = _normalize_note_type(note_type, text)
+            customer_question_open = bool(row["customer_question_open"])
+            if normalized_note_type == "customer_message":
+                customer_question_open = True
+            elif normalized_note_type == "customer_reply":
+                customer_question_open = False
 
             conn.execute(
                 """
                 UPDATE tickets
-                SET notes_json = ?, updated_at = ?
+                SET notes_json = ?, updated_at = ?, customer_question_open = ?
                 WHERE workshop_id = ? AND ticket_id = ?
                 """,
                 (
                     json.dumps(notes, ensure_ascii=False),
                     now_iso,
+                    _bool_to_db(customer_question_open),
                     wid,
                     tid,
                 ),

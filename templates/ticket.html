@@ -412,6 +412,32 @@
       line-height:1.5;
     }
 
+    .conversation-state{
+      display:inline-flex;
+      align-items:center;
+      gap:6px;
+      padding:6px 10px;
+      border-radius:999px;
+      border:1px solid rgba(255,255,255,.14);
+      font-size:11px;
+      font-weight:900;
+      letter-spacing:.04em;
+      text-transform:uppercase;
+      white-space:nowrap;
+    }
+
+    .conversation-state.open{
+      border-color:rgba(239,68,68,.32);
+      background:rgba(239,68,68,.14);
+      color:#fecaca;
+    }
+
+    .conversation-state.answered{
+      border-color:rgba(34,197,94,.34);
+      background:rgba(34,197,94,.14);
+      color:#bbf7d0;
+    }
+
     .grid{
       display:grid;
       grid-template-columns:repeat(3, minmax(220px, 1fr));
@@ -643,6 +669,54 @@
       font-weight:900;
       letter-spacing:.06em;
       text-transform:uppercase;
+    }
+
+    .channel-badge{
+      display:inline-flex;
+      align-items:center;
+      gap:6px;
+      padding:5px 10px;
+      border-radius:999px;
+      border:1px solid rgba(255,255,255,.14);
+      background:rgba(255,255,255,.06);
+      color:#dbe6f5;
+      font-size:11px;
+      font-weight:850;
+      letter-spacing:.03em;
+      text-transform:uppercase;
+    }
+
+    .channel-icon{
+      width:16px;
+      height:16px;
+      border-radius:999px;
+      display:inline-flex;
+      align-items:center;
+      justify-content:center;
+      font-size:10px;
+      line-height:1;
+      font-weight:900;
+      background:rgba(255,255,255,.14);
+      color:#f8fbff;
+      flex:0 0 auto;
+    }
+
+    .channel-badge.web_chat{
+      border-color:rgba(96,165,250,.35);
+      background:rgba(96,165,250,.14);
+      color:#dbeafe;
+    }
+
+    .channel-badge.whatsapp{
+      border-color:rgba(34,197,94,.40);
+      background:rgba(34,197,94,.16);
+      color:#bbf7d0;
+    }
+
+    .channel-badge.direktannahme{
+      border-color:rgba(245,158,11,.42);
+      background:rgba(245,158,11,.18);
+      color:#fde68a;
     }
 
     .note-text{
@@ -1087,10 +1161,19 @@
             <span class="request-type rt-{{ ticket.request_type or 'diagnose' }}">
               {{ ticket.request_type_label or "-" }}
             </span>
+            {% if ticket.has_customer_question %}
+              <span class="conversation-state {% if ticket.customer_question_open %}open{% else %}answered{% endif %}">
+                {% if ticket.customer_question_open %}Offene Kundenfrage{% else %}Kundenfrage beantwortet{% endif %}
+              </span>
+            {% endif %}
           </div>
 
           <div class="status-sub">
             Ticket-ID: {{ ticket.ticket_view_id or "-" }}<br>
+            Quelle: {{ ticket.source_label or "-" }}<br>
+            {% if ticket.has_customer_question %}
+            Kundenkommunikation: {% if ticket.customer_question_open %}Offen{% else %}Beantwortet{% endif %}<br>
+            {% endif %}
             Backend-Status: {{ ticket.status_label or "-" }}
           </div>
         </div>
@@ -1182,6 +1265,7 @@
           <b>Telefon</b><div class="muted">{{ ticket.telefon or "-" }}</div>
           <b>Priorität</b><div class="muted">{{ ticket.priority_label or "-" }}</div>
           <b>Typ</b><div class="muted">{{ ticket.request_type_label or "-" }}</div>
+          <b>Quelle</b><div class="muted">{{ ticket.source_label or "-" }}</div>
           <b>Fahrbereit</b>
           <div class="muted">
             {% if ticket.fahrbereit is sameas true %}Ja
@@ -1233,6 +1317,18 @@
 
           <div class="communication-panel">
             <h3 class="section-title">Antwort an den Kunden</h3>
+            <div style="margin-bottom:10px;">
+              <span class="channel-badge {{ ticket.source or 'web_chat' }}">
+                {% if ticket.source == "whatsapp" %}
+                  <span class="channel-icon">W</span>
+                {% elif ticket.source == "web_chat" %}
+                  <span class="channel-icon">C</span>
+                {% else %}
+                  <span class="channel-icon">D</span>
+                {% endif %}
+                Kanal: {{ ticket.source_label or "-" }}
+              </span>
+            </div>
 
             <form class="note-form" method="post" action="/dashboard/ticket/{{ ticket.ticket_view_id }}/notes">
               <input type="hidden" name="workshop_id" value="{{ workshop_id }}" />
@@ -1267,6 +1363,18 @@
 
           <div class="communication-panel full">
             <h3 class="section-title">Nachrichten vom Kunden</h3>
+            <div style="margin-bottom:10px;">
+              <span class="channel-badge {{ ticket.source or 'web_chat' }}">
+                {% if ticket.source == "whatsapp" %}
+                  <span class="channel-icon">W</span>
+                {% elif ticket.source == "web_chat" %}
+                  <span class="channel-icon">C</span>
+                {% else %}
+                  <span class="channel-icon">D</span>
+                {% endif %}
+                Kanal: {{ ticket.source_label or "-" }}
+              </span>
+            </div>
 
             {% if ticket.customer_messages %}
               <div class="note-stack">
@@ -1349,6 +1457,10 @@
           <div class="debug-item">
             <div class="debug-label">Request Type</div>
             <div class="debug-value">{{ ticket.request_type_label or "-" }}</div>
+          </div>
+          <div class="debug-item">
+            <div class="debug-label">Quelle</div>
+            <div class="debug-value">{{ ticket.source_label or "-" }}</div>
           </div>
           <div class="debug-item">
             <div class="debug-label">Fahrbereit</div>

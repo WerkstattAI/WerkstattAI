@@ -20,6 +20,7 @@ from app.conversation.router import next_step
 from app.models import IntakeState
 from app.main import process_chat_message, whatsapp_session_id
 from app.tickets import (
+    add_ticket_note,
     find_ticket_by_id,
     find_tickets_by_phone,
     list_latest_tickets,
@@ -495,6 +496,74 @@ class TicketTenantTests(unittest.TestCase):
                     "DELETE FROM tickets WHERE ticket_id IN (?, ?)",
                     (ticket_a, ticket_b),
                 )
+                conn.commit()
+
+
+class TicketMetadataTests(unittest.TestCase):
+    def test_ticket_source_is_saved(self) -> None:
+        init_db()
+
+        state = IntakeState(
+            fahrzeug="VW Golf",
+            baujahr="2018",
+            kilometerstand="95000",
+            request_type="diagnose",
+            priority="normal",
+            problem="Motorlampe leuchtet",
+            telefon="+4915112345678",
+            name="Lukas Weber",
+            source="whatsapp",
+        )
+
+        ticket_id = save_ticket(state, workshop_id="demo-werkstatt")
+
+        try:
+            ticket = find_ticket_by_id(ticket_id, workshop_id="demo-werkstatt")
+
+            self.assertIsNotNone(ticket)
+            self.assertEqual(ticket["source"], "whatsapp")
+            self.assertFalse(ticket["customer_question_open"])
+        finally:
+            with get_conn() as conn:
+                conn.execute("DELETE FROM tickets WHERE ticket_id = ?", (ticket_id,))
+                conn.commit()
+
+    def test_customer_question_open_toggles_with_customer_reply(self) -> None:
+        init_db()
+
+        state = IntakeState(
+            fahrzeug="BMW 320d",
+            baujahr="2019",
+            kilometerstand="88000",
+            request_type="diagnose",
+            priority="normal",
+            problem="Klimaanlage kuehlt nicht",
+            telefon="+4915112345678",
+            name="Anna Klein",
+            source="web_chat",
+        )
+
+        ticket_id = save_ticket(state, workshop_id="demo-werkstatt")
+
+        try:
+            ticket = add_ticket_note(
+                ticket_id,
+                "Kundenfrage über den Chat: Ist mein Auto morgen fertig?",
+                note_type="customer_message",
+                workshop_id="demo-werkstatt",
+            )
+            self.assertTrue(ticket["customer_question_open"])
+
+            ticket = add_ticket_note(
+                ticket_id,
+                "Wir melden uns morgen Vormittag mit einer Einschätzung.",
+                note_type="customer_reply",
+                workshop_id="demo-werkstatt",
+            )
+            self.assertFalse(ticket["customer_question_open"])
+        finally:
+            with get_conn() as conn:
+                conn.execute("DELETE FROM tickets WHERE ticket_id = ?", (ticket_id,))
                 conn.commit()
 
 

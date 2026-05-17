@@ -108,6 +108,7 @@ def process_chat_message(
     reply = polish_reply_de(reply)
 
     if done and not new_state.ticket_id:
+        new_state.source = channel
         ticket_id = save_ticket(new_state, workshop_id=workshop_id)
         new_state.ticket_id = ticket_id
         reply = (
