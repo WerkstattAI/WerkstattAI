@@ -87,6 +87,46 @@ class IntentTests(unittest.TestCase):
         )
 
 
+class IntentMatrixTests(unittest.TestCase):
+    CASES = [
+        # Problem melden
+        ("Mein Auto springt nicht an", INTENT_NEW_REQUEST),
+        ("Die Motorkontrollleuchte leuchtet", INTENT_NEW_REQUEST),
+        ("VW Golf 2018 95000 km", INTENT_NEW_REQUEST),
+        ("Ich habe ein Problem mit der Bremse", INTENT_NEW_REQUEST),
+        ("Problem melden", INTENT_NEW_REQUEST),
+        # Kostenvoranschlag anfragen
+        ("Was kostet ein Ölwechsel?", INTENT_QUOTE_REQUEST),
+        ("Ich brauche ein Angebot für Kupplung wechseln", INTENT_QUOTE_REQUEST),
+        ("Wie teuer ist ein Reifenwechsel?", INTENT_QUOTE_REQUEST),
+        ("Kostenvoranschlag anfragen", INTENT_QUOTE_REQUEST),
+        ("Preis für Bremsen wechseln bitte", INTENT_QUOTE_REQUEST),
+        # Anfrage zu einem bestehenden Ticket
+        ("Wie ist der Status von Ticket WS-20260505-0005?", INTENT_EXISTING_TICKET),
+        ("Ist mein Auto schon fertig? Ticket WS-20260505-0005", INTENT_EXISTING_TICKET),
+        ("Meine Telefonnummer ist 0176 1234567", INTENT_EXISTING_TICKET),
+        ("Anfrage zu einem bestehenden Ticket", INTENT_EXISTING_TICKET),
+        ("Kann ich mein Fahrzeug zu Auftrag 123 abholen?", INTENT_EXISTING_TICKET),
+        # Allgemeine Frage
+        ("Wie sind eure Öffnungszeiten?", INTENT_GENERAL_QUESTION),
+        ("Wo ist eure Werkstatt?", INTENT_GENERAL_QUESTION),
+        ("Welche Telefonnummer habt ihr?", INTENT_GENERAL_QUESTION),
+        ("Welche Leistungen bietet ihr an?", INTENT_GENERAL_QUESTION),
+        ("Habt ihr einen Abschleppdienst?", INTENT_GENERAL_QUESTION),
+        # Unclear / kontrollierter Fallback
+        ("Kannst du mir helfen?", INTENT_UNCLEAR),
+        ("Schreib mir eine Antwort", INTENT_UNCLEAR),
+        ("Formuliere mir bitte eine Nachricht", INTENT_UNCLEAR),
+        ("Hallo", INTENT_UNCLEAR),
+        ("Was soll ich machen?", INTENT_UNCLEAR),
+    ]
+
+    def test_common_customer_messages_route_to_expected_intent(self) -> None:
+        for message, expected in self.CASES:
+            with self.subTest(message=message):
+                self.assertEqual(detect_intent(IntakeState(), message), expected)
+
+
 class WhatsAppWebhookTests(unittest.TestCase):
     def test_whatsapp_session_id_uses_normalized_phone(self) -> None:
         self.assertEqual(

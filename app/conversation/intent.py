@@ -134,6 +134,10 @@ QUOTE_REQUEST_KEYWORDS = [
     "was kostet",
     "wie viel kostet",
     "wie teuer",
+    "preis für",
+    "preis fuer",
+    "kosten für",
+    "kosten fuer",
 ]
 
 NEW_REQUEST_HINTS = [
@@ -170,6 +174,7 @@ AI_FREEFORM_HINTS = [
     "kannst du helfen",
     "kannst du mir helfen",
     "hilf mir",
+    "was soll ich machen",
     "antworte als",
     "mach mir einen text",
     "erstelle mir",
@@ -375,6 +380,9 @@ def detect_intent(state: IntakeState, user_message: str | None) -> str:
     if looks_like_quote_request(msg):
         return INTENT_QUOTE_REQUEST
 
+    if looks_like_ai_freeform_request(msg):
+        return INTENT_UNCLEAR
+
     if has_explicit_general_choice(msg):
         return INTENT_GENERAL_QUESTION
 
@@ -389,9 +397,6 @@ def detect_intent(state: IntakeState, user_message: str | None) -> str:
 
     if has_direct_ticket_reference(msg):
         return INTENT_EXISTING_TICKET
-
-    if looks_like_ai_freeform_request(msg):
-        return INTENT_UNCLEAR
 
     if looks_like_general_question(msg) and not has_explicit_ticket_context(msg):
         return INTENT_GENERAL_QUESTION
