@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import os
 import sqlite3
+from typing import Any
 
 from app.config import settings
 from app.security import hash_password
@@ -19,7 +20,43 @@ def _db_path() -> str:
     return os.path.join(_data_dir(), "werkstattai.db")
 
 
-def get_conn() -> sqlite3.Connection:
+class PostgresConnection:
+    def __init__(self, database_url: str):
+        import psycopg
+        from psycopg.rows import dict_row
+
+        self._conn = psycopg.connect(database_url, row_factory=dict_row)
+
+    def __enter__(self) -> "PostgresConnection":
+        return self
+
+    def __exit__(self, exc_type: Any, exc: Any, tb: Any) -> None:
+        if exc_type:
+            self._conn.rollback()
+        self._conn.close()
+
+    @staticmethod
+    def _convert_placeholders(sql: str) -> str:
+        return sql.replace("?", "%s")
+
+    def execute(self, sql: str, params: tuple[Any, ...] | list[Any] = ()) -> Any:
+        return self._conn.execute(self._convert_placeholders(sql), params)
+
+    def commit(self) -> None:
+        self._conn.commit()
+
+    def rollback(self) -> None:
+        self._conn.rollback()
+
+
+def is_postgres() -> bool:
+    return bool(settings.database_url)
+
+
+def get_conn() -> sqlite3.Connection | PostgresConnection:
+    if settings.database_url:
+        return PostgresConnection(settings.database_url)
+
     os.makedirs(_data_dir(), exist_ok=True)
 
     conn = sqlite3.connect(_db_path())
@@ -31,18 +68,38 @@ def default_workshop_id() -> str:
     return settings.default_workshop_id
 
 
-def _column_exists(conn: sqlite3.Connection, table: str, column: str) -> bool:
+def _column_exists(conn: sqlite3.Connection | PostgresConnection, table: str, column: str) -> bool:
+    if is_postgres():
+        row = conn.execute(
+            """
+            SELECT 1
+            FROM information_schema.columns
+            WHERE table_name = ? AND column_name = ?
+            LIMIT 1
+            """,
+            (table, column),
+        ).fetchone()
+        return bool(row)
+
     rows = conn.execute(f"PRAGMA table_info({table})").fetchall()
     return any(row["name"] == column for row in rows)
 
 
-def _add_column_if_missing(conn: sqlite3.Connection, table: str, column: str, definition: str) -> None:
+def _add_column_if_missing(
+    conn: sqlite3.Connection | PostgresConnection,
+    table: str,
+    column: str,
+    definition: str,
+) -> None:
     if not _column_exists(conn, table, column):
         conn.execute(f"ALTER TABLE {table} ADD COLUMN {column} {definition}")
 
 
 def init_db() -> None:
-    os.makedirs(_data_dir(), exist_ok=True)
+    if not is_postgres():
+        os.makedirs(_data_dir(), exist_ok=True)
+
+    ticket_pk = "BIGSERIAL PRIMARY KEY" if is_postgres() else "INTEGER PRIMARY KEY AUTOINCREMENT"
 
     with get_conn() as conn:
         conn.execute(
@@ -105,7 +162,7 @@ def init_db() -> None:
 
         conn.execute(
             """
-            INSERT OR IGNORE INTO workshops (
+            INSERT INTO workshops (
                 id,
                 name,
                 address,
@@ -127,6 +184,7 @@ def init_db() -> None:
                 'Aktuell gibt es noch keine festen Preisangaben. Die Werkstatt prueft Anfragen individuell und meldet sich mit einer Einschaetzung.',
                 'Unsere Werkstatt kooperiert mit dem Abschleppdienst Mueller.'
             )
+            ON CONFLICT(id) DO NOTHING
             """,
             (default_workshop_id(),),
         )
@@ -162,7 +220,7 @@ def init_db() -> None:
         conn.execute(
             """
             CREATE TABLE IF NOT EXISTS tickets (
-                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                id {ticket_pk},
                 workshop_id TEXT NOT NULL DEFAULT 'demo-werkstatt',
                 ticket_id TEXT NOT NULL UNIQUE,
                 created_at TEXT NOT NULL,
@@ -190,7 +248,7 @@ def init_db() -> None:
                 followup_answers_json TEXT NOT NULL DEFAULT '[]',
                 notes_json TEXT NOT NULL DEFAULT '[]'
             )
-            """
+            """.format(ticket_pk=ticket_pk)
         )
 
         _add_column_if_missing(

@@ -15,6 +15,7 @@ class Settings:
     app_name: str = _env("APP_NAME", "WerkstattAI Intake API") or "WerkstattAI Intake API"
     log_level: str = _env("LOG_LEVEL", "INFO") or "INFO"
     default_workshop_id: str = _env("DEFAULT_WORKSHOP_ID", "demo-werkstatt") or "demo-werkstatt"
+    database_url: str | None = _env("DATABASE_URL", None)
     auth_secret: str = _env("AUTH_SECRET", "dev-change-me") or "dev-change-me"
     dashboard_admin_email: str = _env("DASHBOARD_ADMIN_EMAIL", "admin@werkstatt.local") or "admin@werkstatt.local"
     dashboard_admin_password: str = _env("DASHBOARD_ADMIN_PASSWORD", "werkstatt123") or "werkstatt123"
