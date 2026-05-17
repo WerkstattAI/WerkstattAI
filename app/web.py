@@ -9,11 +9,13 @@ from fastapi.responses import HTMLResponse, RedirectResponse
 from fastapi.templating import Jinja2Templates
 
 from app.db import default_workshop_id
+from app.models import IntakeState
 from app.tickets import (
     add_ticket_note,
     archive_ticket,
     find_ticket_by_id,
     list_latest_tickets,
+    save_ticket,
     update_ticket_status,
 )
 from app.workshops import get_workshop, update_workshop
@@ -107,6 +109,15 @@ def _ui_status(backend_status: str | None) -> str:
 
 def _backend_status(ui_status: str) -> str:
     return _normalize_status(ui_status)
+
+
+def _parse_ja_nein(value: str | None) -> str | None:
+    v = (value or "").strip().lower()
+    if v == "ja":
+        return "ja"
+    if v == "nein":
+        return "nein"
+    return None
 
 
 def _status_label(value: str | None) -> str:
@@ -560,6 +571,80 @@ def dashboard_settings_save(
 
     return RedirectResponse(
         url=f"/dashboard/settings?workshop_id={wid}&saved=1",
+        status_code=303,
+    )
+
+
+@router.get("/dashboard/intake", response_class=HTMLResponse)
+def dashboard_intake(
+    request: Request,
+    workshop_id: str | None = None,
+):
+    wid = _normalize_workshop_id(workshop_id)
+    return templates.TemplateResponse(
+        "intake.html",
+        {
+            "request": request,
+            "workshop_id": wid,
+        },
+    )
+
+
+@router.post("/dashboard/intake")
+def dashboard_intake_save(
+    workshop_id: str | None = Form(None),
+    fahrzeug: str = Form(...),
+    baujahr: str = Form(""),
+    kilometerstand: str = Form(""),
+    problem: str = Form(...),
+    telefon: str = Form(""),
+    name: str = Form(""),
+    request_type: str = Form("diagnose"),
+    priority: str = Form("normal"),
+    fahrbereit: str = Form(""),
+    abschleppdienst: str = Form(""),
+):
+    wid = _normalize_workshop_id(workshop_id)
+    fahrzeug_text = (fahrzeug or "").strip()
+    problem_text = (problem or "").strip()
+
+    if len(fahrzeug_text) < 2:
+        return HTMLResponse("Fahrzeug darf nicht leer sein", status_code=400)
+    if len(problem_text) < 3:
+        return HTMLResponse("Anliegen darf nicht leer sein", status_code=400)
+
+    state = IntakeState(
+        mode="new",
+        step="fertig",
+        workshop_id=wid,
+        fahrzeug=fahrzeug_text,
+        baujahr=(baujahr or "").strip() or None,
+        kilometerstand=(kilometerstand or "").strip() or None,
+        problem=problem_text,
+        telefon=(telefon or "").strip() or None,
+        name=(name or "").strip() or None,
+        request_type=_normalize_request_type(request_type),
+        priority=_normalize_priority(priority),
+        fahrbereit=_parse_ja_nein(fahrbereit),
+        abschleppdienst=_parse_ja_nein(abschleppdienst),
+        followup_questions=[],
+        followup_answers=[],
+        followup_index=0,
+    )
+
+    try:
+        ticket_id = save_ticket(state, workshop_id=wid)
+        add_ticket_note(
+            ticket_id,
+            "Direktannahme in der Werkstatt erfasst.",
+            note_type="internal_note",
+            workshop_id=wid,
+        )
+    except Exception:
+        return HTMLResponse("Direktannahme konnte nicht gespeichert werden", status_code=400)
+
+    return RedirectResponse(
+        url=f"/dashboard/ticket/{ticket_id}?workshop_id={wid}",
         status_code=303,
     )
 
