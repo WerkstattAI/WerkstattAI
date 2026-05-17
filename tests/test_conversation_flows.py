@@ -561,6 +561,45 @@ class TicketMetadataTests(unittest.TestCase):
                 workshop_id="demo-werkstatt",
             )
             self.assertFalse(ticket["customer_question_open"])
+            self.assertEqual(ticket["status"], "in_bearbeitung")
+        finally:
+            with get_conn() as conn:
+                conn.execute("DELETE FROM tickets WHERE ticket_id = ?", (ticket_id,))
+                conn.commit()
+
+    def test_customer_reply_does_not_reopen_done_ticket(self) -> None:
+        init_db()
+
+        state = IntakeState(
+            fahrzeug="Mercedes C-Klasse",
+            baujahr="2020",
+            kilometerstand="65000",
+            request_type="diagnose",
+            priority="normal",
+            problem="Bremse quietscht",
+            telefon="+4915112345678",
+            name="Tom Becker",
+            source="web_chat",
+        )
+
+        ticket_id = save_ticket(state, workshop_id="demo-werkstatt")
+
+        try:
+            with get_conn() as conn:
+                conn.execute(
+                    "UPDATE tickets SET status = ? WHERE ticket_id = ?",
+                    ("erledigt", ticket_id),
+                )
+                conn.commit()
+
+            ticket = add_ticket_note(
+                ticket_id,
+                "Ihr Fahrzeug ist fertig.",
+                note_type="customer_reply",
+                workshop_id="demo-werkstatt",
+            )
+
+            self.assertEqual(ticket["status"], "erledigt")
         finally:
             with get_conn() as conn:
                 conn.execute("DELETE FROM tickets WHERE ticket_id = ?", (ticket_id,))

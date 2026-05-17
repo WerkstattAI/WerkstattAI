@@ -600,17 +600,21 @@ def add_ticket_note(
                 customer_question_open = True
             elif normalized_note_type == "customer_reply":
                 customer_question_open = False
+            status = _normalize_status(row["status"])
+            if normalized_note_type == "customer_reply" and status == "offen":
+                status = "in_bearbeitung"
 
             conn.execute(
                 """
                 UPDATE tickets
-                SET notes_json = ?, updated_at = ?, customer_question_open = ?
+                SET notes_json = ?, updated_at = ?, customer_question_open = ?, status = ?
                 WHERE workshop_id = ? AND ticket_id = ?
                 """,
                 (
                     json.dumps(notes, ensure_ascii=False),
                     now_iso,
                     _bool_to_db(customer_question_open),
+                    status,
                     wid,
                     tid,
                 ),
