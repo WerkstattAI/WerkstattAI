@@ -292,7 +292,33 @@ class NewRequestTests(unittest.TestCase):
 
         self.assertFalse(done)
         self.assertIsNone(state.fahrzeug)
+        self.assertEqual(state.problem, "karre geht nicht an")
+        self.assertIn("Verstanden", reply)
         self.assertIn("Marke und Modell", reply)
+
+    def test_problem_first_flow_reuses_problem_after_vehicle_details(self) -> None:
+        state, _, done = handle_new_request(IntakeState(), "karre geht nicht an")
+        self.assertFalse(done)
+
+        state, reply, done = handle_new_request(state, "BMW 320d")
+        self.assertFalse(done)
+        self.assertEqual(state.fahrzeug, "BMW 320d")
+        self.assertEqual(state.problem, "karre geht nicht an")
+        self.assertIn("Baujahr", reply)
+
+        state, reply, done = handle_new_request(state, "2018")
+        self.assertFalse(done)
+        self.assertEqual(state.baujahr, "2018")
+        self.assertIn("Kilometerstand", reply)
+
+        state, reply, done = handle_new_request(state, "120000")
+        self.assertFalse(done)
+        self.assertEqual(state.kilometerstand, "120000")
+        self.assertEqual(state.problem, "karre geht nicht an")
+        self.assertEqual(state.request_type, "notfall")
+        self.assertEqual(state.priority, "hoch")
+        self.assertEqual(state.fahrbereit, "nein")
+        self.assertIn("Abschleppdienst", reply)
 
     def test_switching_from_existing_ticket_to_new_request_clears_ticket_context(self) -> None:
         state = IntakeState(

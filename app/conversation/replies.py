@@ -24,6 +24,18 @@ def ask_vehicle_clarify_reply() -> str:
     return "Könnten Sie bitte Marke und Modell etwas genauer angeben?"
 
 
+def ask_vehicle_after_problem_reply(problem: str | None = None) -> str:
+    prefix = "Verstanden, es geht um dieses Anliegen."
+    if problem:
+        prefix = f"Verstanden, es geht um: **{problem}**."
+
+    return (
+        f"{prefix}\n"
+        "Zu welchem Fahrzeug gehört das? Bitte nennen Sie Marke und Modell, "
+        "zum Beispiel: VW Golf."
+    )
+
+
 def ask_baujahr_reply(fahrzeug: str | None = None) -> str:
     if fahrzeug:
         return f"Verstanden: **{fahrzeug}**.\nWelches Baujahr hat das Fahrzeug? (z.B. 2008)"

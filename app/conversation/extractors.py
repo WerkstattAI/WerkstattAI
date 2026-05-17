@@ -118,6 +118,7 @@ def infer_fahrbereit_from_text(text: str) -> str | None:
         "springt nicht mehr an",
         "startet nicht",
         "startet nicht mehr",
+        "geht nicht an",
         "liegen geblieben",
         "bleibt liegen",
         "motor geht aus",

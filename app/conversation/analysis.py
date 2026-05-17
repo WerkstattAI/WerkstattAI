@@ -94,6 +94,7 @@ START_HINTS = [
     "springt nicht mehr an",
     "startet nicht",
     "startet nicht mehr",
+    "geht nicht an",
     "anlasser",
     "batterie leer",
     "klickt nur",
@@ -262,7 +263,7 @@ def build_problem_flags(text: str) -> ProblemFlags:
         "noise": any(k in t for k in NOISE_HINTS),
         "performance_issue": any(k in t for k in PERFORMANCE_HINTS),
         "fluid_leak": any(k in t for k in LEAK_HINTS),
-        "generic_problem": any(k in t for k in ["problem", "defekt", "funktioniert nicht"]),
+        "generic_problem": any(k in t for k in ["problem", "defekt", "funktioniert nicht", "kaputt"]),
     }
 
     return flags
