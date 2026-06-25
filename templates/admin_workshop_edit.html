@@ -1,0 +1,441 @@
+<!doctype html>
+<html lang="de">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>WerkstattAI - Werkstatt bearbeiten</title>
+  <style>
+    :root{
+      --bg:#09111f;
+      --panel:#101a31;
+      --line:rgba(255,255,255,.14);
+      --text:#e8eef8;
+      --muted:#97a3b6;
+      --ok:#22c55e;
+      --danger:#ef4444;
+      --info:#60a5fa;
+    }
+
+    *{box-sizing:border-box}
+
+    body{
+      margin:0;
+      min-height:100vh;
+      font-family:system-ui,-apple-system,Segoe UI,Roboto,Arial,sans-serif;
+      color:var(--text);
+      background:
+        linear-gradient(90deg, rgba(255,255,255,.055) 1px, transparent 1px),
+        linear-gradient(180deg, rgba(255,255,255,.045) 1px, transparent 1px),
+        radial-gradient(900px 420px at 10% -8%, rgba(37,99,235,.48), transparent 64%),
+        radial-gradient(760px 360px at 86% 4%, rgba(245,158,11,.24), transparent 62%),
+        linear-gradient(135deg, #08111f 0%, #101b31 42%, #0a1020 100%);
+      background-size:44px 44px,44px 44px,auto,auto,auto;
+    }
+
+    .wrap{
+      width:min(1180px,100%);
+      margin:0 auto;
+      padding:22px;
+    }
+
+    .topbar,
+    .panel{
+      border:1px solid rgba(255,255,255,.16);
+      background:rgba(16,26,49,.88);
+      box-shadow:0 24px 70px rgba(0,0,0,.38);
+    }
+
+    .topbar{
+      display:flex;
+      justify-content:space-between;
+      gap:16px;
+      flex-wrap:wrap;
+      align-items:flex-start;
+      margin-bottom:18px;
+      padding:24px;
+      border-radius:24px;
+    }
+
+    .eyebrow{
+      display:inline-flex;
+      padding:7px 11px;
+      border-radius:999px;
+      border:1px solid rgba(255,255,255,.18);
+      background:rgba(255,255,255,.08);
+      color:#dbeafe;
+      font-size:12px;
+      font-weight:900;
+      letter-spacing:.04em;
+      text-transform:uppercase;
+    }
+
+    h1{
+      margin:8px 0 0;
+      font-size:38px;
+      line-height:1.1;
+    }
+
+    .sub{
+      margin-top:8px;
+      max-width:720px;
+      color:#b9c6d8;
+      font-size:14px;
+      line-height:1.5;
+    }
+
+    .top-actions{
+      display:flex;
+      gap:10px;
+      flex-wrap:wrap;
+    }
+
+    .nav-btn,
+    button{
+      display:inline-flex;
+      align-items:center;
+      justify-content:center;
+      min-height:44px;
+      padding:10px 14px;
+      border-radius:14px;
+      border:1px solid var(--line);
+      background:rgba(255,255,255,.06);
+      color:var(--text);
+      text-decoration:none;
+      font-weight:850;
+      cursor:pointer;
+      font:inherit;
+    }
+
+    .primary{
+      border-color:rgba(96,165,250,.42);
+      background:rgba(96,165,250,.18);
+    }
+
+    .grid{
+      display:grid;
+      grid-template-columns:minmax(0, 1fr) minmax(320px, .62fr);
+      gap:16px;
+      align-items:start;
+    }
+
+    .panel{
+      border-radius:20px;
+      overflow:hidden;
+    }
+
+    .panel-head{
+      padding:16px 18px;
+      border-bottom:1px solid rgba(255,255,255,.10);
+      background:rgba(96,165,250,.10);
+    }
+
+    .panel-title{
+      font-size:14px;
+      font-weight:950;
+      letter-spacing:.03em;
+    }
+
+    .panel-sub{
+      margin-top:4px;
+      color:var(--muted);
+      font-size:12px;
+      line-height:1.45;
+    }
+
+    .form,
+    .side-content{
+      padding:18px;
+      display:grid;
+      gap:14px;
+    }
+
+    .row{
+      display:grid;
+      grid-template-columns:1fr 1fr;
+      gap:12px;
+    }
+
+    label{
+      display:grid;
+      gap:7px;
+      color:#dbe6f5;
+      font-size:13px;
+      font-weight:850;
+    }
+
+    input,
+    textarea,
+    select{
+      width:100%;
+      min-height:42px;
+      padding:10px 12px;
+      border-radius:13px;
+      border:1px solid var(--line);
+      background:rgba(10,18,34,.78);
+      color:var(--text);
+      outline:none;
+      font:inherit;
+    }
+
+    textarea{
+      min-height:88px;
+      resize:vertical;
+      line-height:1.45;
+    }
+
+    .hint,
+    .muted{
+      color:var(--muted);
+      font-size:12px;
+      line-height:1.4;
+      font-weight:650;
+      word-break:break-word;
+    }
+
+    .actions{
+      display:flex;
+      justify-content:flex-end;
+      gap:10px;
+      flex-wrap:wrap;
+      padding-top:4px;
+    }
+
+    .alert{
+      margin:0 0 2px;
+      padding:11px 12px;
+      border-radius:14px;
+      font-size:13px;
+      font-weight:850;
+      line-height:1.45;
+    }
+
+    .alert.ok{
+      border:1px solid rgba(34,197,94,.34);
+      background:rgba(34,197,94,.13);
+      color:#bbf7d0;
+    }
+
+    .alert.error{
+      border:1px solid rgba(239,68,68,.34);
+      background:rgba(239,68,68,.13);
+      color:#fecaca;
+    }
+
+    .item{
+      padding:13px;
+      border-radius:14px;
+      border:1px solid rgba(255,255,255,.10);
+      background:rgba(255,255,255,.055);
+    }
+
+    .item b{
+      display:block;
+      margin-bottom:5px;
+      color:#c7d2fe;
+      font-size:11px;
+      text-transform:uppercase;
+      letter-spacing:.06em;
+    }
+
+    .quick-links{
+      display:grid;
+      grid-template-columns:1fr 1fr;
+      gap:8px;
+    }
+
+    @media (max-width: 920px){
+      .grid,
+      .row,
+      .quick-links{
+        grid-template-columns:1fr;
+      }
+
+      h1{font-size:32px}
+    }
+  </style>
+</head>
+<body>
+  <div class="wrap">
+    <div class="topbar">
+      <div>
+        <div class="eyebrow">WerkstattAI - Admin</div>
+        <h1>{{ account.name }}</h1>
+        <div class="sub">
+          Werkstattkonto {{ account.id }} bearbeiten, Zugriff steuern und Owner-Passwort zuruecksetzen.
+        </div>
+      </div>
+
+      <div class="top-actions">
+        <a class="nav-btn" href="/dashboard/admin/workshops">Alle Werkstaetten</a>
+        <a class="nav-btn" href="/dashboard?workshop_id={{ account.id }}">Dashboard</a>
+        <a class="nav-btn" href="/dashboard/settings?workshop_id={{ account.id }}">Einstellungen</a>
+      </div>
+    </div>
+
+    <div class="grid">
+      <section class="panel">
+        <div class="panel-head">
+          <div class="panel-title">Konto & Werkstattdaten</div>
+          <div class="panel-sub">Diese Werte steuern den Kunden-Workspace, Abo-Zugriff und WhatsApp-Zuordnung.</div>
+        </div>
+
+        <form class="form" method="post" action="/dashboard/admin/workshops/{{ account.id }}">
+          {% if saved %}
+            <div class="alert ok">Werkstattkonto wurde gespeichert.</div>
+          {% endif %}
+          {% if reset %}
+            <div class="alert ok">Passwort fuer {{ reset }} wurde aktualisiert.</div>
+          {% endif %}
+          {% if error %}
+            <div class="alert error">{{ error }}</div>
+          {% endif %}
+
+          <div class="row">
+            <label>
+              Werkstattname
+              <input name="workshop_name" value="{{ account.name or '' }}" required />
+            </label>
+
+            <label>
+              Workshop-ID
+              <input value="{{ account.id }}" readonly />
+              <span class="hint">Die ID bleibt stabil, damit Links und Daten eindeutig bleiben.</span>
+            </label>
+          </div>
+
+          <div class="row">
+            <label>
+              Adresse
+              <input name="address" value="{{ account.address or '' }}" />
+            </label>
+
+            <label>
+              Telefon
+              <input name="phone" value="{{ account.phone or '' }}" />
+            </label>
+          </div>
+
+          <div class="row">
+            <label>
+              Kontakt E-Mail
+              <input name="email" type="email" value="{{ account.email or '' }}" />
+            </label>
+
+            <label>
+              Leistungen
+              <input name="services" value="{{ account.services or '' }}" />
+            </label>
+          </div>
+
+          <label>
+            Oeffnungszeiten
+            <textarea name="opening_hours">{{ account.opening_hours or '' }}</textarea>
+          </label>
+
+          <div class="row">
+            <label>
+              Plan
+              <select name="subscription_plan">
+                <option value="starter" {% if account.subscription_plan == "starter" %}selected{% endif %}>Starter</option>
+                <option value="pro" {% if account.subscription_plan == "pro" %}selected{% endif %}>Pro</option>
+                <option value="pilot" {% if account.subscription_plan == "pilot" %}selected{% endif %}>Pilot</option>
+              </select>
+            </label>
+
+            <label>
+              Status
+              <select name="subscription_status">
+                <option value="trialing" {% if account.subscription_status == "trialing" %}selected{% endif %}>Trialing</option>
+                <option value="active" {% if account.subscription_status == "active" %}selected{% endif %}>Active</option>
+                <option value="inactive" {% if account.subscription_status == "inactive" %}selected{% endif %}>Inactive</option>
+                <option value="past_due" {% if account.subscription_status == "past_due" %}selected{% endif %}>Past due</option>
+              </select>
+            </label>
+          </div>
+
+          <div class="row">
+            <label>
+              Trial endet
+              <input name="trial_ends_at" value="{{ account.trial_ends_at or '' }}" />
+            </label>
+
+            <label>
+              Abo endet
+              <input name="subscription_ends_at" value="{{ account.subscription_ends_at or '' }}" />
+            </label>
+          </div>
+
+          <div class="row">
+            <label>
+              WhatsApp Phone Number ID
+              <input name="whatsapp_phone_number_id" value="{{ account.whatsapp_phone_number_id or '' }}" autocomplete="off" />
+            </label>
+
+            <label>
+              WhatsApp Anzeigenummer
+              <input name="whatsapp_display_phone_number" value="{{ account.whatsapp_display_phone_number or '' }}" autocomplete="off" />
+            </label>
+          </div>
+
+          <label>
+            Preisinfo
+            <textarea name="pricing_info">{{ account.pricing_info or '' }}</textarea>
+          </label>
+
+          <label>
+            Abschleppdienst / Pannenhilfe
+            <textarea name="towing_info">{{ account.towing_info or '' }}</textarea>
+          </label>
+
+          <div class="actions">
+            <button class="primary" type="submit">Aenderungen speichern</button>
+          </div>
+        </form>
+      </section>
+
+      <aside class="panel">
+        <div class="panel-head">
+          <div class="panel-title">Zugriff & Schnellaktionen</div>
+          <div class="panel-sub">Owner-Login pruefen, Passwort neu setzen und direkt in Kundenbereiche springen.</div>
+        </div>
+
+        <div class="side-content">
+          <div class="item">
+            <b>Owner Login</b>
+            <div>{{ account.owner_email or '-' }}</div>
+            <div class="muted">{{ account.users|length }} Nutzer fuer dieses Konto</div>
+          </div>
+
+          <div class="quick-links">
+            <a class="nav-btn" href="/dashboard?workshop_id={{ account.id }}">Dashboard</a>
+            <a class="nav-btn" href="/dashboard/whatsapp?workshop_id={{ account.id }}">WhatsApp</a>
+            <a class="nav-btn" href="/dashboard/settings?workshop_id={{ account.id }}">Einstellungen</a>
+            <a class="nav-btn" href="/dashboard/billing?workshop_id={{ account.id }}">Abo</a>
+          </div>
+
+          <form class="form" method="post" action="/dashboard/admin/workshops/{{ account.id }}/reset-password" style="padding:0;">
+            <label>
+              Owner E-Mail
+              <select name="owner_email">
+                {% for user in account.users %}
+                  <option value="{{ user.email }}" {% if user.email == account.owner_email %}selected{% endif %}>{{ user.email }} ({{ user.role }})</option>
+                {% endfor %}
+              </select>
+            </label>
+
+            <label>
+              Neues Passwort
+              <input name="new_password" type="password" minlength="8" required />
+              <span class="hint">Das alte Passwort wird sofort ersetzt.</span>
+            </label>
+
+            <div class="actions">
+              <button class="primary" type="submit">Passwort zuruecksetzen</button>
+            </div>
+          </form>
+        </div>
+      </aside>
+    </div>
+  </div>
+</body>
+</html>

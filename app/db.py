@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import os
 import sqlite3
+from datetime import datetime, timedelta, timezone
 from typing import Any
 
 from app.config import settings
@@ -18,6 +19,10 @@ def _data_dir() -> str:
 
 def _db_path() -> str:
     return os.path.join(_data_dir(), "werkstattai.db")
+
+
+def _trial_ends_at() -> str:
+    return (datetime.now(timezone.utc) + timedelta(days=settings.trial_days)).isoformat()
 
 
 class PostgresConnection:
@@ -114,6 +119,12 @@ def init_db() -> None:
                 services TEXT,
                 pricing_info TEXT,
                 towing_info TEXT,
+                subscription_plan TEXT NOT NULL DEFAULT 'starter',
+                subscription_status TEXT NOT NULL DEFAULT 'trialing',
+                trial_ends_at TEXT,
+                subscription_ends_at TEXT,
+                whatsapp_phone_number_id TEXT,
+                whatsapp_display_phone_number TEXT,
                 created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
                 updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
             )
@@ -123,6 +134,12 @@ def init_db() -> None:
         _add_column_if_missing(conn, "workshops", "services", "TEXT")
         _add_column_if_missing(conn, "workshops", "pricing_info", "TEXT")
         _add_column_if_missing(conn, "workshops", "towing_info", "TEXT")
+        _add_column_if_missing(conn, "workshops", "subscription_plan", "TEXT NOT NULL DEFAULT 'starter'")
+        _add_column_if_missing(conn, "workshops", "subscription_status", "TEXT NOT NULL DEFAULT 'trialing'")
+        _add_column_if_missing(conn, "workshops", "trial_ends_at", "TEXT")
+        _add_column_if_missing(conn, "workshops", "subscription_ends_at", "TEXT")
+        _add_column_if_missing(conn, "workshops", "whatsapp_phone_number_id", "TEXT")
+        _add_column_if_missing(conn, "workshops", "whatsapp_display_phone_number", "TEXT")
 
         conn.execute(
             """
@@ -171,7 +188,11 @@ def init_db() -> None:
                 opening_hours,
                 services,
                 pricing_info,
-                towing_info
+                towing_info,
+                subscription_plan,
+                subscription_status,
+                trial_ends_at,
+                whatsapp_phone_number_id
             )
             VALUES (
                 ?,
@@ -182,11 +203,19 @@ def init_db() -> None:
                 'Montag bis Freitag: 09:00-17:00; Samstag: 09:00-14:00; Sonntag: geschlossen',
                 'Autoreparaturen, Reifenwechsel, Polieren',
                 'Aktuell gibt es noch keine festen Preisangaben. Die Werkstatt prueft Anfragen individuell und meldet sich mit einer Einschaetzung.',
-                'Unsere Werkstatt kooperiert mit dem Abschleppdienst Mueller.'
+                'Unsere Werkstatt kooperiert mit dem Abschleppdienst Mueller.',
+                'starter',
+                'trialing',
+                ?,
+                ?
             )
             ON CONFLICT(id) DO NOTHING
             """,
-            (default_workshop_id(),),
+            (
+                default_workshop_id(),
+                _trial_ends_at(),
+                settings.whatsapp_default_phone_number_id,
+            ),
         )
 
         conn.execute(
@@ -215,6 +244,14 @@ def init_db() -> None:
                 "Unsere Werkstatt kooperiert mit dem Abschleppdienst Mueller.",
                 default_workshop_id(),
             ),
+        )
+        conn.execute(
+            """
+            UPDATE workshops
+            SET trial_ends_at = ?
+            WHERE trial_ends_at IS NULL OR trial_ends_at = ''
+            """,
+            (_trial_ends_at(),),
         )
 
         conn.execute(
@@ -283,6 +320,23 @@ def init_db() -> None:
             SET source = 'web_chat'
             WHERE source IS NULL OR source = ''
             """
+        )
+
+        conn.execute(
+            """
+            UPDATE workshops
+            SET whatsapp_phone_number_id = ?
+            WHERE id = ?
+              AND (whatsapp_phone_number_id IS NULL OR whatsapp_phone_number_id = '')
+              AND ? IS NOT NULL
+              AND ? != ''
+            """,
+            (
+                settings.whatsapp_default_phone_number_id,
+                default_workshop_id(),
+                settings.whatsapp_default_phone_number_id,
+                settings.whatsapp_default_phone_number_id,
+            ),
         )
         conn.execute(
             """
@@ -374,6 +428,79 @@ def init_db() -> None:
             """
             CREATE INDEX IF NOT EXISTS idx_conversation_sessions_phone
             ON conversation_sessions(phone)
+            """
+        )
+
+        conn.execute(
+            """
+            CREATE TABLE IF NOT EXISTS whatsapp_events (
+                id {ticket_pk},
+                workshop_id TEXT NOT NULL,
+                phone_number_id TEXT,
+                display_phone_number TEXT,
+                wa_message_id TEXT,
+                from_phone TEXT,
+                event_type TEXT NOT NULL,
+                message_type TEXT,
+                text TEXT,
+                payload_json TEXT NOT NULL,
+                created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
+            )
+            """.format(ticket_pk=ticket_pk)
+        )
+
+        conn.execute(
+            """
+            CREATE INDEX IF NOT EXISTS idx_whatsapp_events_workshop_id
+            ON whatsapp_events(workshop_id)
+            """
+        )
+
+        conn.execute(
+            """
+            CREATE INDEX IF NOT EXISTS idx_whatsapp_events_wa_message_id
+            ON whatsapp_events(wa_message_id)
+            """
+        )
+
+        conn.execute(
+            """
+            CREATE TABLE IF NOT EXISTS whatsapp_messages (
+                id {ticket_pk},
+                workshop_id TEXT NOT NULL,
+                phone_number_id TEXT,
+                customer_phone TEXT NOT NULL,
+                direction TEXT NOT NULL,
+                message_type TEXT NOT NULL DEFAULT 'text',
+                text TEXT,
+                wa_message_id TEXT,
+                ticket_id TEXT,
+                status TEXT NOT NULL DEFAULT 'received',
+                payload_json TEXT NOT NULL DEFAULT '{{}}',
+                created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
+            )
+            """.format(ticket_pk=ticket_pk)
+        )
+
+        conn.execute(
+            """
+            CREATE INDEX IF NOT EXISTS idx_whatsapp_messages_workshop_phone
+            ON whatsapp_messages(workshop_id, customer_phone, created_at)
+            """
+        )
+
+        conn.execute(
+            """
+            CREATE INDEX IF NOT EXISTS idx_whatsapp_messages_ticket_id
+            ON whatsapp_messages(workshop_id, ticket_id)
+            """
+        )
+
+        conn.execute(
+            """
+            CREATE UNIQUE INDEX IF NOT EXISTS idx_whatsapp_messages_unique_wa_id
+            ON whatsapp_messages(workshop_id, direction, wa_message_id)
+            WHERE wa_message_id IS NOT NULL
             """
         )
 

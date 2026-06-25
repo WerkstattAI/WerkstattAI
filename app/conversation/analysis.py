@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import re
 from typing import List, TypedDict
 
 from app.conversation.constants import (
@@ -193,9 +194,16 @@ LEAK_HINTS = [
 # Kleine Helpers
 # =========================================================
 
+def _contains_keyword(text: str, keyword: str) -> bool:
+    key = lower(keyword)
+    if len(key) <= 3 and re.match(r"^[a-z0-9]+$", key):
+        return bool(re.search(rf"\b{re.escape(key)}\b", lower(text)))
+    return key in lower(text)
+
+
 def contains_any(text: str, keywords: List[str]) -> bool:
     t = lower(text)
-    return any(k in t for k in keywords)
+    return any(_contains_keyword(t, k) for k in keywords)
 
 
 def contains_all(text: str, keywords: List[str]) -> bool:
@@ -254,16 +262,16 @@ def build_problem_flags(text: str) -> ProblemFlags:
     flags: ProblemFlags = {
         "service_request": is_service_request(t),
         "start_problem": has_start_problem(t),
-        "not_drivable_hint": any(k in t for k in DRIVEABILITY_HINTS),
+        "not_drivable_hint": contains_any(t, DRIVEABILITY_HINTS),
         "critical_brake_or_steering": has_critical_brake_or_steering(t),
-        "overheat": any(k in t for k in OVERHEAT_HINTS),
-        "smoke_or_steam": any(k in t for k in SMOKE_HINTS),
-        "red_warning": any(k in t for k in RED_WARNING_HINTS),
-        "warning_light": any(k in t for k in WARNING_HINTS),
-        "noise": any(k in t for k in NOISE_HINTS),
-        "performance_issue": any(k in t for k in PERFORMANCE_HINTS),
-        "fluid_leak": any(k in t for k in LEAK_HINTS),
-        "generic_problem": any(k in t for k in ["problem", "defekt", "funktioniert nicht", "kaputt"]),
+        "overheat": contains_any(t, OVERHEAT_HINTS),
+        "smoke_or_steam": contains_any(t, SMOKE_HINTS),
+        "red_warning": contains_any(t, RED_WARNING_HINTS),
+        "warning_light": contains_any(t, WARNING_HINTS),
+        "noise": contains_any(t, NOISE_HINTS),
+        "performance_issue": contains_any(t, PERFORMANCE_HINTS),
+        "fluid_leak": contains_any(t, LEAK_HINTS),
+        "generic_problem": contains_any(t, ["problem", "defekt", "funktioniert nicht", "kaputt"]),
     }
 
     return flags

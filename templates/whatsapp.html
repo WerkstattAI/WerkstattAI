@@ -1,0 +1,791 @@
+<!doctype html>
+<html lang="de">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>WerkstattAI - WhatsApp</title>
+  <style>
+    :root{
+      --bg:#09111f;
+      --panel:#101a31;
+      --card:#0f1b33;
+      --line:rgba(255,255,255,.14);
+      --text:#e8eef8;
+      --muted:#97a3b6;
+      --soft:#c8d4e4;
+      --info:#60a5fa;
+      --ok:#22c55e;
+      --warn:#f59e0b;
+      --danger:#ef4444;
+    }
+
+    *{box-sizing:border-box}
+
+    body{
+      margin:0;
+      min-height:100vh;
+      font-family:system-ui,-apple-system,Segoe UI,Roboto,Arial,sans-serif;
+      color:var(--text);
+      background:
+        linear-gradient(90deg, rgba(255,255,255,.055) 1px, transparent 1px),
+        linear-gradient(180deg, rgba(255,255,255,.045) 1px, transparent 1px),
+        radial-gradient(900px 420px at 10% -8%, rgba(37,99,235,.48), transparent 64%),
+        radial-gradient(760px 360px at 86% 4%, rgba(245,158,11,.24), transparent 62%),
+        linear-gradient(135deg, #08111f 0%, #101b31 42%, #0a1020 100%);
+      background-size:44px 44px,44px 44px,auto,auto,auto;
+    }
+
+    .wrap{
+      width:min(1280px,100%);
+      margin:0 auto;
+      padding:22px;
+    }
+
+    .topbar{
+      display:flex;
+      justify-content:space-between;
+      align-items:flex-start;
+      gap:16px;
+      flex-wrap:wrap;
+      margin-bottom:18px;
+      padding:24px;
+      border:1px solid rgba(255,255,255,.18);
+      border-radius:24px;
+      background:rgba(8,15,28,.86);
+      box-shadow:0 30px 90px rgba(0,0,0,.42), inset 0 1px 0 rgba(255,255,255,.12);
+    }
+
+    .eyebrow{
+      display:inline-flex;
+      padding:7px 11px;
+      border-radius:999px;
+      border:1px solid rgba(255,255,255,.18);
+      background:rgba(255,255,255,.08);
+      color:#dbeafe;
+      font-size:12px;
+      font-weight:900;
+      letter-spacing:.04em;
+      text-transform:uppercase;
+    }
+
+    h1{
+      margin:8px 0 0;
+      font-size:38px;
+      line-height:1.1;
+    }
+
+    .sub{
+      margin-top:8px;
+      max-width:720px;
+      color:#b9c6d8;
+      font-size:14px;
+      line-height:1.5;
+    }
+
+    .top-actions{
+      display:flex;
+      gap:10px;
+      flex-wrap:wrap;
+    }
+
+    .nav-btn{
+      display:inline-flex;
+      align-items:center;
+      justify-content:center;
+      min-height:44px;
+      padding:10px 14px;
+      border-radius:14px;
+      border:1px solid var(--line);
+      background:rgba(255,255,255,.06);
+      color:var(--text);
+      text-decoration:none;
+      font-weight:850;
+    }
+
+    .nav-btn.active{
+      border-color:rgba(96,165,250,.42);
+      background:rgba(96,165,250,.18);
+    }
+
+    .inbox{
+      display:grid;
+      grid-template-columns:minmax(280px, 360px) minmax(0, 1fr);
+      gap:16px;
+      min-height:620px;
+    }
+
+    .diagnostics{
+      display:grid;
+      grid-template-columns:minmax(0, 1fr) minmax(320px, 420px);
+      gap:16px;
+      margin-bottom:16px;
+    }
+
+    .panel{
+      border:1px solid rgba(255,255,255,.16);
+      border-radius:20px;
+      background:rgba(16,26,49,.86);
+      box-shadow:0 24px 70px rgba(0,0,0,.34);
+      overflow:hidden;
+    }
+
+    .messages.panel{
+      background:
+        linear-gradient(180deg, rgba(96,165,250,.08), rgba(255,255,255,.035)),
+        rgba(11,18,34,.92);
+    }
+
+    .panel-head{
+      padding:16px 18px;
+      border-bottom:1px solid rgba(255,255,255,.10);
+      background:rgba(96,165,250,.10);
+    }
+
+    .status-grid{
+      display:grid;
+      grid-template-columns:repeat(4, minmax(0, 1fr));
+      gap:10px;
+      padding:14px;
+    }
+
+    .check{
+      padding:12px;
+      border-radius:14px;
+      border:1px solid rgba(255,255,255,.10);
+      background:rgba(255,255,255,.055);
+    }
+
+    .check-top{
+      display:flex;
+      justify-content:space-between;
+      align-items:center;
+      gap:8px;
+      margin-bottom:7px;
+      color:#e5eefc;
+      font-size:12px;
+      font-weight:950;
+    }
+
+    .dot{
+      width:10px;
+      height:10px;
+      border-radius:50%;
+      flex:0 0 auto;
+      background:var(--danger);
+      box-shadow:0 0 0 4px rgba(239,68,68,.12);
+    }
+
+    .dot.ok{
+      background:var(--ok);
+      box-shadow:0 0 0 4px rgba(34,197,94,.12);
+    }
+
+    .check-detail{
+      color:var(--muted);
+      font-size:12px;
+      line-height:1.4;
+      word-break:break-word;
+    }
+
+    .webhook-box{
+      display:grid;
+      gap:10px;
+      padding:14px;
+    }
+
+    .webhook-row{
+      display:grid;
+      grid-template-columns:minmax(0, 1fr) auto;
+      gap:10px;
+    }
+
+    .readonly-input,
+    .test-input,
+    .test-text{
+      width:100%;
+      min-height:42px;
+      padding:10px 12px;
+      border-radius:13px;
+      border:1px solid rgba(255,255,255,.14);
+      color:var(--text);
+      background:rgba(15,23,42,.82);
+      outline:none;
+      font:inherit;
+    }
+
+    .test-text{
+      min-height:78px;
+      resize:vertical;
+      line-height:1.45;
+    }
+
+    .copy-btn,
+    .test-btn{
+      min-height:42px;
+      padding:10px 13px;
+      border-radius:13px;
+      border:1px solid rgba(96,165,250,.40);
+      background:rgba(96,165,250,.16);
+      color:var(--text);
+      font-weight:950;
+      cursor:pointer;
+      white-space:nowrap;
+    }
+
+    .test-form{
+      display:grid;
+      gap:10px;
+      margin-top:2px;
+    }
+
+    .test-alert{
+      margin:0 14px 14px;
+      padding:11px 12px;
+      border-radius:14px;
+      border:1px solid rgba(255,255,255,.12);
+      color:#e5eefc;
+      font-size:12px;
+      font-weight:850;
+      line-height:1.45;
+    }
+
+    .test-alert.sent{
+      border-color:rgba(34,197,94,.34);
+      background:rgba(34,197,94,.13);
+      color:#bbf7d0;
+    }
+
+    .test-alert.failed{
+      border-color:rgba(239,68,68,.34);
+      background:rgba(239,68,68,.13);
+      color:#fecaca;
+    }
+
+    .panel-title{
+      font-size:14px;
+      font-weight:950;
+      letter-spacing:.03em;
+    }
+
+    .panel-sub{
+      margin-top:4px;
+      color:var(--muted);
+      font-size:12px;
+      line-height:1.4;
+    }
+
+    .conversation-list{
+      display:grid;
+      gap:8px;
+      padding:10px;
+      max-height:620px;
+      overflow:auto;
+    }
+
+    .conversation{
+      display:grid;
+      gap:6px;
+      padding:13px;
+      border-radius:14px;
+      border:1px solid rgba(255,255,255,.10);
+      background:rgba(255,255,255,.055);
+      color:var(--text);
+      text-decoration:none;
+    }
+
+    .conversation:hover,
+    .conversation.active{
+      border-color:rgba(96,165,250,.38);
+      background:rgba(96,165,250,.14);
+      text-decoration:none;
+    }
+
+    .conversation-top{
+      display:flex;
+      justify-content:space-between;
+      gap:10px;
+      align-items:center;
+    }
+
+    .phone{
+      font-weight:950;
+      word-break:break-word;
+    }
+
+    .badge{
+      display:inline-flex;
+      align-items:center;
+      padding:4px 8px;
+      border-radius:999px;
+      border:1px solid rgba(255,255,255,.12);
+      color:#dbeafe;
+      background:rgba(255,255,255,.06);
+      font-size:11px;
+      font-weight:900;
+      white-space:nowrap;
+    }
+
+    .preview{
+      color:#cbd5e1;
+      font-size:13px;
+      line-height:1.4;
+      display:-webkit-box;
+      -webkit-line-clamp:2;
+      -webkit-box-orient:vertical;
+      overflow:hidden;
+      word-break:break-word;
+    }
+
+    .muted{
+      color:var(--muted);
+      font-size:12px;
+      line-height:1.4;
+    }
+
+    .messages{
+      display:flex;
+      flex-direction:column;
+      min-height:620px;
+    }
+
+    .chat-head{
+      display:flex;
+      align-items:center;
+      justify-content:space-between;
+      gap:14px;
+      padding:16px 18px;
+      border-bottom:1px solid rgba(255,255,255,.10);
+      background:linear-gradient(135deg, rgba(15,23,42,.92), rgba(37,99,235,.16));
+    }
+
+    .contact-card{
+      display:flex;
+      gap:12px;
+      align-items:center;
+      min-width:0;
+    }
+
+    .avatar{
+      width:46px;
+      height:46px;
+      border-radius:50%;
+      display:grid;
+      place-items:center;
+      flex:0 0 auto;
+      border:1px solid rgba(34,197,94,.36);
+      background:linear-gradient(180deg, rgba(34,197,94,.28), rgba(96,165,250,.15));
+      color:#dcfce7;
+      font-weight:950;
+    }
+
+    .contact-main{
+      min-width:0;
+    }
+
+    .contact-title{
+      font-size:16px;
+      font-weight:950;
+      overflow:hidden;
+      text-overflow:ellipsis;
+      white-space:nowrap;
+    }
+
+    .contact-meta{
+      margin-top:4px;
+      color:#aebbd0;
+      font-size:12px;
+    }
+
+    .chat-stats{
+      display:flex;
+      gap:8px;
+      flex-wrap:wrap;
+      justify-content:flex-end;
+    }
+
+    .stat-pill{
+      display:inline-flex;
+      align-items:center;
+      min-height:30px;
+      padding:6px 10px;
+      border-radius:999px;
+      border:1px solid rgba(255,255,255,.12);
+      background:rgba(255,255,255,.06);
+      color:#dbeafe;
+      font-size:11px;
+      font-weight:900;
+      white-space:nowrap;
+    }
+
+    .thread{
+      flex:1;
+      display:flex;
+      flex-direction:column;
+      gap:12px;
+      padding:18px;
+      overflow:auto;
+      background:
+        linear-gradient(90deg, rgba(255,255,255,.028) 1px, transparent 1px),
+        linear-gradient(180deg, rgba(255,255,255,.022) 1px, transparent 1px);
+      background-size:34px 34px;
+    }
+
+    .bubble{
+      width:min(680px, 84%);
+      padding:12px 14px 10px;
+      border-radius:18px;
+      border:1px solid rgba(255,255,255,.12);
+      line-height:1.5;
+      word-break:break-word;
+      white-space:pre-wrap;
+      box-shadow:0 12px 30px rgba(0,0,0,.22);
+    }
+
+    .bubble.inbound{
+      align-self:flex-start;
+      border-top-left-radius:7px;
+      background:linear-gradient(180deg, rgba(255,255,255,.12), rgba(255,255,255,.07));
+    }
+
+    .bubble.outbound{
+      align-self:flex-end;
+      border-top-right-radius:7px;
+      background:linear-gradient(180deg, rgba(96,165,250,.28), rgba(37,99,235,.16));
+      border-color:rgba(96,165,250,.32);
+    }
+
+    .bubble-meta{
+      display:flex;
+      justify-content:space-between;
+      gap:10px;
+      margin-bottom:7px;
+      color:#bfdbfe;
+      font-size:11px;
+      font-weight:900;
+      text-transform:uppercase;
+      letter-spacing:.04em;
+    }
+
+    .message-text{
+      color:#f8fbff;
+      font-size:14px;
+    }
+
+    .message-footer{
+      display:flex;
+      justify-content:space-between;
+      gap:10px;
+      margin-top:9px;
+      color:#9fb0c6;
+      font-size:11px;
+      font-weight:750;
+    }
+
+    .status-local{
+      color:#fed7aa;
+    }
+
+    .status-ok{
+      color:#bbf7d0;
+    }
+
+    .status-failed{
+      color:#fecaca;
+    }
+
+    .message-error{
+      margin-top:8px;
+      padding:8px 10px;
+      border-radius:12px;
+      border:1px solid rgba(239,68,68,.24);
+      background:rgba(239,68,68,.10);
+      color:#fecaca;
+      font-size:12px;
+      line-height:1.35;
+      white-space:normal;
+    }
+
+    .composer{
+      padding:16px 18px 18px;
+      border-top:1px solid rgba(255,255,255,.10);
+      background:rgba(3,7,18,.42);
+    }
+
+    .reply-form{
+      display:grid;
+      gap:10px;
+    }
+
+    .reply-input{
+      width:100%;
+      min-height:92px;
+      resize:vertical;
+      padding:13px 14px;
+      border-radius:16px;
+      border:1px solid rgba(255,255,255,.14);
+      color:var(--text);
+      background:rgba(15,23,42,.82);
+      outline:none;
+      font:inherit;
+      line-height:1.5;
+    }
+
+    .reply-input:focus{
+      border-color:rgba(96,165,250,.44);
+      box-shadow:0 0 0 3px rgba(96,165,250,.12);
+    }
+
+    .composer-actions{
+      display:flex;
+      align-items:center;
+      justify-content:space-between;
+      gap:12px;
+      flex-wrap:wrap;
+    }
+
+    .composer-note{
+      color:#fed7aa;
+      font-size:12px;
+      line-height:1.4;
+    }
+
+    .send-btn{
+      min-height:42px;
+      padding:10px 14px;
+      border-radius:14px;
+      border:1px solid rgba(96,165,250,.40);
+      background:linear-gradient(180deg, rgba(96,165,250,.28), rgba(37,99,235,.18));
+      color:var(--text);
+      font-weight:950;
+      cursor:pointer;
+    }
+
+    .send-btn:hover{
+      background:linear-gradient(180deg, rgba(96,165,250,.36), rgba(37,99,235,.24));
+    }
+
+    .empty{
+      padding:18px;
+      color:var(--muted);
+      line-height:1.5;
+    }
+
+    @media (max-width: 900px){
+      .diagnostics,
+      .inbox{grid-template-columns:1fr}
+      .status-grid{grid-template-columns:1fr 1fr}
+      h1{font-size:32px}
+      .bubble{width:100%}
+    }
+
+    @media (max-width: 560px){
+      .status-grid,
+      .webhook-row{grid-template-columns:1fr}
+    }
+  </style>
+</head>
+<body>
+  <div class="wrap">
+    <div class="topbar">
+      <div>
+        <div class="eyebrow">WerkstattAI - WhatsApp</div>
+        <h1>WhatsApp Inbox</h1>
+        <div class="sub">
+          Verlauf eingehender WhatsApp-Nachrichten und Antworten aus dem Panel. Mit Access Token werden Antworten ueber Meta API versendet.
+        </div>
+      </div>
+
+      <div class="top-actions">
+        <a class="nav-btn" href="/dashboard?workshop_id={{ workshop_id }}">Dashboard</a>
+        <a class="nav-btn active" href="/dashboard/whatsapp?workshop_id={{ workshop_id }}">WhatsApp</a>
+        <a class="nav-btn" href="/dashboard/intake?workshop_id={{ workshop_id }}">Direktannahme</a>
+        <a class="nav-btn" href="/dashboard/settings?workshop_id={{ workshop_id }}">Einstellungen</a>
+        {% if current_user and current_user.role == "admin" %}
+          <a class="nav-btn" href="/dashboard/admin/workshops">Admin</a>
+        {% endif %}
+      </div>
+    </div>
+
+    <div class="diagnostics">
+      <section class="panel">
+        <div class="panel-head">
+          <div class="panel-title">
+            WhatsApp Bereitschaft:
+            {% if readiness.is_ready %}bereit{% else %}nicht vollstaendig{% endif %}
+          </div>
+          <div class="panel-sub">
+            Antworten laufen aktuell im Modus:
+            {% if readiness.reply_mode == "meta" %}Meta API{% else %}lokal speichern{% endif %}
+            {% if readiness.display_phone_number %}- {{ readiness.display_phone_number }}{% endif %}
+          </div>
+        </div>
+
+        <div class="status-grid">
+          {% for check in readiness.checks %}
+            <div class="check">
+              <div class="check-top">
+                <span>{{ check.label }}</span>
+                <span class="dot {% if check.configured %}ok{% endif %}"></span>
+              </div>
+              <div class="check-detail">{{ check.detail }}</div>
+            </div>
+          {% endfor %}
+        </div>
+      </section>
+
+      <section class="panel">
+        <div class="panel-head">
+          <div class="panel-title">Webhook & Test</div>
+          <div class="panel-sub">Diese URL in Meta als Callback URL verwenden.</div>
+        </div>
+
+        <div class="webhook-box">
+          <div class="webhook-row">
+            <input class="readonly-input" id="webhookUrl" value="{{ readiness.webhook_url }}" readonly />
+            <button class="copy-btn" type="button" data-copy-target="webhookUrl">Kopieren</button>
+          </div>
+
+          <form class="test-form" method="post" action="/dashboard/whatsapp/test">
+            <input type="hidden" name="workshop_id" value="{{ workshop_id }}" />
+            <input class="test-input" name="test_phone" placeholder="Testnummer im WhatsApp-Format, z.B. 4917612345678" value="{{ selected_phone }}" required />
+            <textarea class="test-text" name="test_text">WerkstattAI Testnachricht. WhatsApp Verbindung funktioniert.</textarea>
+            <button class="test-btn" type="submit">Testnachricht senden</button>
+          </form>
+        </div>
+
+        {% if test_status %}
+          <div class="test-alert {{ test_status }}">{{ test_detail or "-" }}</div>
+        {% endif %}
+      </section>
+    </div>
+
+    <div class="inbox">
+      <aside class="panel">
+        <div class="panel-head">
+          <div class="panel-title">Konversationen</div>
+          <div class="panel-sub">{{ conversations|length }} aktive WhatsApp-Verlaeufe</div>
+        </div>
+
+        <div class="conversation-list">
+          {% for c in conversations %}
+            <a
+              class="conversation {% if c.customer_phone == selected_phone %}active{% endif %}"
+              href="/dashboard/whatsapp?workshop_id={{ workshop_id }}&phone={{ c.customer_phone }}"
+            >
+              <div class="conversation-top">
+                <div class="phone">{{ c.customer_phone }}</div>
+                <span class="badge">{{ c.message_count }}</span>
+              </div>
+
+              <div class="preview">
+                {% if c.last_direction == "outbound" %}WerkstattAI: {% else %}Kunde: {% endif %}
+                {{ c.last_text or "-" }}
+              </div>
+
+              <div class="muted">{{ c.last_created_at or "-" }}</div>
+            </a>
+          {% endfor %}
+
+          {% if conversations|length == 0 %}
+            <div class="empty">Noch keine WhatsApp-Nachrichten fuer diese Werkstatt.</div>
+          {% endif %}
+        </div>
+      </aside>
+
+      <main class="panel messages">
+        <div class="chat-head">
+          <div class="contact-card">
+            <div class="avatar">WA</div>
+            <div class="contact-main">
+              <div class="contact-title">
+                {% if selected_phone %}{{ selected_phone }}{% else %}Keine Konversation{% endif %}
+              </div>
+              <div class="contact-meta">
+                {% if selected_conversation %}
+                  Zuletzt {{ selected_conversation.last_created_at }}
+                {% else %}
+                  Waehle links einen WhatsApp-Verlauf aus.
+                {% endif %}
+              </div>
+            </div>
+          </div>
+
+          <div class="chat-stats">
+            {% if selected_conversation %}
+              <span class="stat-pill">{{ selected_conversation.message_count }} Nachrichten</span>
+              <span class="stat-pill">{{ selected_conversation.inbound_count }} Kunde</span>
+              <span class="stat-pill">{{ selected_conversation.outbound_count }} WerkstattAI</span>
+            {% endif %}
+          </div>
+        </div>
+
+        <div class="thread">
+          {% for m in messages %}
+            <div class="bubble {{ m.direction }}">
+              <div class="bubble-meta">
+                <span>{% if m.direction == "outbound" %}WerkstattAI{% else %}Kunde{% endif %}</span>
+                <span class="{{ m.status_class }}">{{ m.status_label }}</span>
+              </div>
+              <div class="message-text">{{ m.text or "-" }}</div>
+              {% if m.message_error %}
+                <div class="message-error">{{ m.message_error }}</div>
+              {% endif %}
+              <div class="message-footer">
+                <span>{{ m.created_at }}</span>
+                {% if m.ticket_id %}<span>Ticket {{ m.ticket_id }}</span>{% endif %}
+              </div>
+            </div>
+          {% endfor %}
+
+          {% if selected_phone and messages|length == 0 %}
+            <div class="empty">Fuer diesen Kontakt wurden noch keine Nachrichten gespeichert.</div>
+          {% endif %}
+        </div>
+
+        <div class="composer">
+          {% if selected_phone %}
+            <form class="reply-form" method="post" action="/dashboard/whatsapp/reply">
+              <input type="hidden" name="workshop_id" value="{{ workshop_id }}" />
+              <input type="hidden" name="customer_phone" value="{{ selected_phone }}" />
+              <textarea
+                class="reply-input"
+                name="reply_text"
+                placeholder="Antwort an den Kunden schreiben..."
+                required
+              ></textarea>
+              <div class="composer-actions">
+                <div class="composer-note">
+                  {% if readiness.can_send %}
+                    Antwort wird ueber Meta API gesendet und im Verlauf gespeichert.
+                  {% else %}
+                    Aktuell wird lokal gespeichert. Fuer echten Versand fehlen Access Token oder Phone Number ID.
+                  {% endif %}
+                </div>
+                <button class="send-btn" type="submit">Antwort speichern</button>
+              </div>
+            </form>
+          {% else %}
+            <div class="composer-note">Waehle links eine Konversation aus, um eine Antwort vorzubereiten.</div>
+          {% endif %}
+        </div>
+      </main>
+    </div>
+  </div>
+  <script>
+    document.querySelectorAll("[data-copy-target]").forEach((button) => {
+      button.addEventListener("click", async () => {
+        const target = document.getElementById(button.dataset.copyTarget);
+        if (!target) return;
+        try {
+          await navigator.clipboard.writeText(target.value);
+          button.textContent = "Kopiert";
+          window.setTimeout(() => { button.textContent = "Kopieren"; }, 1400);
+        } catch {
+          target.select();
+          document.execCommand("copy");
+        }
+      });
+    });
+  </script>
+</body>
+</html>

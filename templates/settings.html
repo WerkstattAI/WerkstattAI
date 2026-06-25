@@ -289,7 +289,12 @@
       <div class="top-actions">
         <a class="nav-btn" href="/dashboard?workshop_id={{ workshop_id }}">Dashboard</a>
         <a class="nav-btn" href="/dashboard/archive?workshop_id={{ workshop_id }}">Archiv</a>
+        <a class="nav-btn" href="/dashboard/whatsapp?workshop_id={{ workshop_id }}">WhatsApp</a>
         <a class="nav-btn active" href="/dashboard/settings?workshop_id={{ workshop_id }}">Einstellungen</a>
+        <a class="nav-btn" href="/dashboard/billing?workshop_id={{ workshop_id }}">Abo</a>
+        {% if current_user and current_user.role == "admin" %}
+          <a class="nav-btn" href="/dashboard/admin/workshops">Admin</a>
+        {% endif %}
       </div>
     </div>
 
@@ -297,7 +302,7 @@
       <section class="card">
         <div class="card-head">
           <h2 class="card-title">Betriebsdaten</h2>
-          <div class="card-sub">Aenderungen werden sofort gespeichert und vom Chat-Assistenten verwendet.</div>
+          <div class="card-sub">Aenderungen werden sofort gespeichert und vom Chat-Assistenten sowie vom WhatsApp-Posteingang verwendet.</div>
         </div>
 
         <form class="form" method="post" action="/dashboard/settings">
@@ -349,6 +354,20 @@
             <textarea name="towing_info">{{ workshop.towing_info or '' }}</textarea>
           </label>
 
+          <div class="row">
+            <label>
+              WhatsApp Phone Number ID
+              <input name="whatsapp_phone_number_id" value="{{ workshop.whatsapp_phone_number_id or '' }}" autocomplete="off" />
+              <span class="hint">Aus Meta Cloud API. Damit wird der WhatsApp-Absender diesem Werkstattkonto zugeordnet.</span>
+            </label>
+
+            <label>
+              WhatsApp Anzeigenummer
+              <input name="whatsapp_display_phone_number" value="{{ workshop.whatsapp_display_phone_number or '' }}" autocomplete="off" />
+              <span class="hint">Nur zur Anzeige im Panel, z.B. +49 176 12345678.</span>
+            </label>
+          </div>
+
           <div class="actions">
             <a class="nav-btn" href="/dashboard?workshop_id={{ workshop_id }}">Abbrechen</a>
             <button class="primary" type="submit">Einstellungen speichern</button>
@@ -397,6 +416,12 @@ E-Mail: {{ workshop.email or '-' }}</div>
           <div class="item">
             <b>Abschleppdienst</b>
             <div>{{ workshop.towing_info or '-' }}</div>
+          </div>
+
+          <div class="item">
+            <b>WhatsApp</b>
+            <div>Phone Number ID: {{ workshop.whatsapp_phone_number_id or '-' }}
+Anzeigenummer: {{ workshop.whatsapp_display_phone_number or '-' }}</div>
           </div>
         </div>
       </aside>

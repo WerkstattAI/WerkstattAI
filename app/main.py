@@ -1,8 +1,8 @@
 from __future__ import annotations
 
-from fastapi import FastAPI, HTTPException
+from fastapi import FastAPI, HTTPException, Query, Request
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import JSONResponse, RedirectResponse
+from fastapi.responses import JSONResponse, PlainTextResponse, RedirectResponse
 from pydantic import BaseModel
 
 from app.ai_service import polish_reply_de
@@ -24,7 +24,17 @@ from app.tickets import (
     save_ticket,
     update_ticket_status,
 )
+from app.subscriptions import get_subscription, is_subscription_active
+from app.whatsapp import (
+    parse_meta_messages,
+    parse_meta_statuses,
+    save_whatsapp_event,
+    save_whatsapp_message,
+    update_whatsapp_message_status,
+    verify_signature,
+)
 from app.web import router as web_router
+from app.workshops import find_workshop_id_by_whatsapp_phone_number_id
 
 
 class UTF8JSONResponse(JSONResponse):
@@ -95,6 +105,25 @@ def _normalize_workshop_id(value: str | None = None) -> str:
     return (value or default_workshop_id()).strip() or default_workshop_id()
 
 
+def _current_user_from_request(request: Request) -> dict | None:
+    user = getattr(request.state, "user", None)
+    if isinstance(user, dict):
+        return user
+    return decode_session_token(request.cookies.get("werkstattai_session"))
+
+
+def _workshop_id_for_api_request(request: Request, value: str | None = None) -> str:
+    user = _current_user_from_request(request)
+    if not user:
+        raise HTTPException(status_code=401, detail="Login erforderlich")
+
+    role = str(user.get("role") or "").strip().lower()
+    if role == "admin" and value:
+        return _normalize_workshop_id(value)
+
+    return _normalize_workshop_id(str(user.get("workshop_id") or ""))
+
+
 def _normalize_phone_for_session(phone: str | None) -> str:
     return "".join(ch for ch in str(phone or "") if ch.isdigit())
 
@@ -102,6 +131,11 @@ def _normalize_phone_for_session(phone: str | None) -> str:
 def whatsapp_session_id(phone: str | None) -> str:
     normalized_phone = _normalize_phone_for_session(phone)
     return f"whatsapp:{normalized_phone or 'unknown'}"
+
+
+def _response_ticket_id(response: ChatResponse) -> str | None:
+    ticket_id = response.data.get("ticket_id") if isinstance(response.data, dict) else None
+    return str(ticket_id).strip() or None
 
 
 def process_chat_message(
@@ -112,6 +146,12 @@ def process_chat_message(
     channel: str,
     phone: str | None = None,
 ) -> ChatResponse:
+    if not is_subscription_active(workshop_id):
+        raise HTTPException(
+            status_code=402,
+            detail="WerkstattAI ist fuer diese Werkstatt nicht aktiv.",
+        )
+
     state = load_session_state(session_id, workshop_id=workshop_id)
     state.workshop_id = workshop_id
 
@@ -145,10 +185,34 @@ def process_chat_message(
     )
 
 
-@app.post("/webhooks/whatsapp", response_model=WhatsAppWebhookResponse)
-def whatsapp_webhook(payload: WhatsAppWebhookRequest) -> WhatsAppWebhookResponse:
+@app.get("/webhooks/whatsapp", response_class=PlainTextResponse)
+def whatsapp_webhook_verify(
+    mode: str | None = Query(None, alias="hub.mode"),
+    verify_token: str | None = Query(None, alias="hub.verify_token"),
+    challenge: str | None = Query(None, alias="hub.challenge"),
+):
+    expected = str(settings.whatsapp_verify_token or "").strip()
+    if mode == "subscribe" and expected and verify_token == expected and challenge:
+        return PlainTextResponse(challenge)
+
+    raise HTTPException(status_code=403, detail="WhatsApp webhook verification failed")
+
+
+def _process_test_whatsapp_webhook(payload: WhatsAppWebhookRequest) -> WhatsAppWebhookResponse:
     workshop_id = _normalize_workshop_id(payload.workshop_id)
     session_id = whatsapp_session_id(payload.from_phone)
+
+    if payload.text:
+        save_whatsapp_message(
+            workshop_id=workshop_id,
+            phone_number_id=None,
+            customer_phone=payload.from_phone,
+            direction="inbound",
+            message_type="text",
+            text=payload.text,
+            status="received",
+            payload={"test_payload": True},
+        )
 
     response = process_chat_message(
         workshop_id=workshop_id,
@@ -158,6 +222,18 @@ def whatsapp_webhook(payload: WhatsAppWebhookRequest) -> WhatsAppWebhookResponse
         phone=payload.from_phone,
     )
 
+    save_whatsapp_message(
+        workshop_id=workshop_id,
+        phone_number_id=None,
+        customer_phone=payload.from_phone,
+        direction="outbound",
+        message_type="text",
+        text=response.reply,
+        ticket_id=_response_ticket_id(response),
+        status="sent_local",
+        payload={"test_payload": True},
+    )
+
     return WhatsAppWebhookResponse(
         reply=response.reply,
         done=response.done,
@@ -165,6 +241,139 @@ def whatsapp_webhook(payload: WhatsAppWebhookRequest) -> WhatsAppWebhookResponse
         workshop_id=workshop_id,
         data=response.data,
     )
+
+
+@app.post("/webhooks/whatsapp")
+async def whatsapp_webhook(request: Request):
+    body = await request.body()
+    if not verify_signature(
+        body,
+        request.headers.get("X-Hub-Signature-256"),
+        settings.whatsapp_app_secret,
+    ):
+        raise HTTPException(status_code=403, detail="Invalid WhatsApp signature")
+
+    try:
+        payload = await request.json()
+    except Exception:
+        raise HTTPException(status_code=400, detail="Invalid JSON payload")
+
+    if not isinstance(payload, dict):
+        raise HTTPException(status_code=400, detail="Invalid WhatsApp payload")
+
+    if "entry" not in payload:
+        return _process_test_whatsapp_webhook(WhatsAppWebhookRequest.model_validate(payload))
+
+    processed = 0
+    ignored = 0
+    status_updates = 0
+    replies: list[dict] = []
+
+    for status_event in parse_meta_statuses(payload):
+        workshop_id = find_workshop_id_by_whatsapp_phone_number_id(status_event.phone_number_id)
+        if not workshop_id:
+            ignored += 1
+            continue
+
+        save_whatsapp_event(
+            workshop_id=workshop_id,
+            phone_number_id=status_event.phone_number_id,
+            display_phone_number=status_event.display_phone_number,
+            wa_message_id=status_event.wa_message_id,
+            from_phone=status_event.recipient_phone,
+            event_type="status",
+            message_type=status_event.status,
+            text=None,
+            payload=status_event.raw,
+        )
+
+        if update_whatsapp_message_status(
+            workshop_id=workshop_id,
+            wa_message_id=status_event.wa_message_id,
+            status=status_event.status,
+            payload=status_event.raw,
+        ):
+            status_updates += 1
+        else:
+            ignored += 1
+
+    for message in parse_meta_messages(payload):
+        workshop_id = find_workshop_id_by_whatsapp_phone_number_id(message.phone_number_id)
+        if not workshop_id:
+            ignored += 1
+            continue
+
+        save_whatsapp_event(
+            workshop_id=workshop_id,
+            phone_number_id=message.phone_number_id,
+            display_phone_number=message.display_phone_number,
+            wa_message_id=message.message_id,
+            from_phone=message.from_phone,
+            event_type="message",
+            message_type=message.message_type,
+            text=message.text,
+            payload=message.raw,
+        )
+
+        is_new_message = save_whatsapp_message(
+            workshop_id=workshop_id,
+            phone_number_id=message.phone_number_id,
+            customer_phone=message.from_phone,
+            direction="inbound",
+            message_type=message.message_type,
+            text=message.text,
+            wa_message_id=message.message_id,
+            status="received",
+            payload=message.raw,
+        )
+        if not is_new_message:
+            ignored += 1
+            continue
+
+        if message.message_type != "text" or not message.text:
+            ignored += 1
+            continue
+
+        session_id = whatsapp_session_id(message.from_phone)
+        response = process_chat_message(
+            workshop_id=workshop_id,
+            session_id=session_id,
+            message=message.text,
+            channel="whatsapp",
+            phone=message.from_phone,
+        )
+        save_whatsapp_message(
+            workshop_id=workshop_id,
+            phone_number_id=message.phone_number_id,
+            customer_phone=message.from_phone,
+            direction="outbound",
+            message_type="text",
+            text=response.reply,
+            ticket_id=_response_ticket_id(response),
+            status="sent_local",
+            payload={
+                "reply_to_wa_message_id": message.message_id,
+                "local_only": True,
+            },
+        )
+        processed += 1
+        replies.append(
+            {
+                "message_id": message.message_id,
+                "session_id": session_id,
+                "workshop_id": workshop_id,
+                "reply": response.reply,
+                "done": response.done,
+            }
+        )
+
+    return {
+        "ok": True,
+        "processed": processed,
+        "ignored": ignored,
+        "status_updates": status_updates,
+        "replies": replies,
+    }
 
 
 class StatusUpdate(BaseModel):
@@ -188,9 +397,14 @@ def health():
     }
 
 
+@app.get("/subscription")
+def subscription(request: Request, workshop_id: str | None = None):
+    return get_subscription(_workshop_id_for_api_request(request, workshop_id))
+
+
 @app.get("/tickets")
-def tickets(limit: int = 50, workshop_id: str | None = None):
-    wid = _normalize_workshop_id(workshop_id)
+def tickets(request: Request, limit: int = 50, workshop_id: str | None = None):
+    wid = _workshop_id_for_api_request(request, workshop_id)
     return {
         "items": list_latest_tickets(limit=limit, workshop_id=wid),
         "limit": limit,
@@ -199,21 +413,26 @@ def tickets(limit: int = 50, workshop_id: str | None = None):
 
 
 @app.get("/tickets/{ticket_id}")
-def ticket_by_id(ticket_id: str, workshop_id: str | None = None):
-    item = find_ticket_by_id(ticket_id, workshop_id=_normalize_workshop_id(workshop_id))
+def ticket_by_id(request: Request, ticket_id: str, workshop_id: str | None = None):
+    item = find_ticket_by_id(ticket_id, workshop_id=_workshop_id_for_api_request(request, workshop_id))
     if not item:
         raise HTTPException(status_code=404, detail="Ticket nicht gefunden")
     return item
 
 
 @app.patch("/tickets/{ticket_id}/status")
-def patch_ticket_status(ticket_id: str, payload: StatusUpdate, workshop_id: str | None = None):
+def patch_ticket_status(
+    request: Request,
+    ticket_id: str,
+    payload: StatusUpdate,
+    workshop_id: str | None = None,
+):
     try:
         normalized_status = _normalize_status(payload.status)
         updated = update_ticket_status(
             ticket_id,
             normalized_status,
-            workshop_id=_normalize_workshop_id(workshop_id),
+            workshop_id=_workshop_id_for_api_request(request, workshop_id),
         )
         return updated
     except ValueError as e:

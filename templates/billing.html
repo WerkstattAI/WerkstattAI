@@ -1,0 +1,240 @@
+<!doctype html>
+<html lang="de">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>WerkstattAI - Abo</title>
+  <style>
+    :root{
+      --bg:#09111f;
+      --panel:#101a31;
+      --line:rgba(255,255,255,.14);
+      --text:#e8eef8;
+      --muted:#97a3b6;
+      --ok:#22c55e;
+      --warn:#f59e0b;
+      --danger:#ef4444;
+      --info:#60a5fa;
+    }
+
+    *{box-sizing:border-box}
+
+    body{
+      margin:0;
+      min-height:100vh;
+      font-family:system-ui,-apple-system,Segoe UI,Roboto,Arial,sans-serif;
+      color:var(--text);
+      background:
+        linear-gradient(90deg, rgba(255,255,255,.055) 1px, transparent 1px),
+        linear-gradient(180deg, rgba(255,255,255,.045) 1px, transparent 1px),
+        radial-gradient(900px 420px at 10% -8%, rgba(37,99,235,.48), transparent 64%),
+        radial-gradient(760px 360px at 86% 4%, rgba(245,158,11,.24), transparent 62%),
+        linear-gradient(135deg, #08111f 0%, #101b31 42%, #0a1020 100%);
+      background-size:44px 44px,44px 44px,auto,auto,auto;
+    }
+
+    .wrap{
+      width:min(1000px,100%);
+      margin:0 auto;
+      padding:22px;
+    }
+
+    .topbar,
+    .card{
+      border:1px solid rgba(255,255,255,.16);
+      background:rgba(16,26,49,.88);
+      box-shadow:0 24px 70px rgba(0,0,0,.38);
+    }
+
+    .topbar{
+      display:flex;
+      justify-content:space-between;
+      gap:16px;
+      flex-wrap:wrap;
+      align-items:flex-start;
+      margin-bottom:18px;
+      padding:24px;
+      border-radius:24px;
+    }
+
+    h1{
+      margin:8px 0 0;
+      font-size:38px;
+      line-height:1.1;
+    }
+
+    .eyebrow{
+      display:inline-flex;
+      padding:7px 11px;
+      border-radius:999px;
+      border:1px solid rgba(255,255,255,.18);
+      background:rgba(255,255,255,.08);
+      color:#dbeafe;
+      font-size:12px;
+      font-weight:900;
+      letter-spacing:.04em;
+      text-transform:uppercase;
+    }
+
+    .sub{
+      margin-top:8px;
+      color:#b9c6d8;
+      font-size:14px;
+      line-height:1.5;
+      max-width:650px;
+    }
+
+    .top-actions{
+      display:flex;
+      gap:10px;
+      flex-wrap:wrap;
+    }
+
+    .nav-btn{
+      display:inline-flex;
+      align-items:center;
+      justify-content:center;
+      min-height:44px;
+      padding:10px 14px;
+      border-radius:14px;
+      border:1px solid var(--line);
+      background:rgba(255,255,255,.06);
+      color:var(--text);
+      text-decoration:none;
+      font-weight:850;
+    }
+
+    .nav-btn.active{
+      border-color:rgba(96,165,250,.42);
+      background:rgba(96,165,250,.18);
+    }
+
+    .grid{
+      display:grid;
+      grid-template-columns:1fr 1fr;
+      gap:16px;
+    }
+
+    .card{
+      border-radius:20px;
+      padding:20px;
+    }
+
+    .status{
+      display:inline-flex;
+      align-items:center;
+      gap:8px;
+      padding:8px 12px;
+      border-radius:999px;
+      border:1px solid rgba(255,255,255,.14);
+      font-weight:900;
+      text-transform:uppercase;
+      letter-spacing:.04em;
+      font-size:12px;
+    }
+
+    .active{background:rgba(34,197,94,.14);color:#bbf7d0;border-color:rgba(34,197,94,.32)}
+    .trialing{background:rgba(96,165,250,.14);color:#dbeafe;border-color:rgba(96,165,250,.32)}
+    .past_due{background:rgba(245,158,11,.14);color:#fed7aa;border-color:rgba(245,158,11,.32)}
+    .blocked{background:rgba(239,68,68,.14);color:#fecaca;border-color:rgba(239,68,68,.32)}
+
+    .metric{
+      margin-top:16px;
+      display:grid;
+      gap:6px;
+    }
+
+    .label{
+      color:var(--muted);
+      font-size:12px;
+      text-transform:uppercase;
+      letter-spacing:.06em;
+      font-weight:900;
+    }
+
+    .value{
+      color:#f8fbff;
+      font-size:24px;
+      font-weight:950;
+      word-break:break-word;
+    }
+
+    .note{
+      margin-top:12px;
+      color:#b9c6d8;
+      line-height:1.55;
+      font-size:14px;
+    }
+
+    @media (max-width: 820px){
+      .grid{grid-template-columns:1fr}
+      h1{font-size:32px}
+    }
+  </style>
+</head>
+<body>
+  <div class="wrap">
+    <div class="topbar">
+      <div>
+        <div class="eyebrow">WerkstattAI - Konto</div>
+        <h1>Abo & Zugriff</h1>
+        <div class="sub">
+          Status des Werkstatt-Kontos. Dieser Zustand steuert, ob Chat und Ticket-Erfassung fuer Kunden aktiv sind.
+        </div>
+      </div>
+
+      <div class="top-actions">
+        <a class="nav-btn" href="/dashboard?workshop_id={{ workshop_id }}">Dashboard</a>
+        <a class="nav-btn" href="/dashboard/archive?workshop_id={{ workshop_id }}">Archiv</a>
+        <a class="nav-btn" href="/dashboard/whatsapp?workshop_id={{ workshop_id }}">WhatsApp</a>
+        <a class="nav-btn" href="/dashboard/settings?workshop_id={{ workshop_id }}">Einstellungen</a>
+        <a class="nav-btn active" href="/dashboard/billing?workshop_id={{ workshop_id }}">Abo</a>
+        {% if current_user and current_user.role == "admin" %}
+          <a class="nav-btn" href="/dashboard/admin/workshops">Admin</a>
+        {% endif %}
+      </div>
+    </div>
+
+    <div class="grid">
+      <section class="card">
+        {% set status_class = subscription.status if subscription.is_active else 'blocked' %}
+        <span class="status {{ status_class }}">{{ subscription.status }}</span>
+
+        <div class="metric">
+          <div class="label">Plan</div>
+          <div class="value">{{ subscription.plan }}</div>
+        </div>
+
+        <div class="metric">
+          <div class="label">Trial endet</div>
+          <div class="value">{{ subscription.trial_ends_at or '-' }}</div>
+        </div>
+
+        <div class="metric">
+          <div class="label">Trial Tage uebrig</div>
+          <div class="value">
+            {% if subscription.trial_days_left is not none %}
+              {{ subscription.trial_days_left }}
+            {% else %}
+              -
+            {% endif %}
+          </div>
+        </div>
+      </section>
+
+      <aside class="card">
+        <div class="label">Naechster Verkaufsschritt</div>
+        <div class="note">
+          Sobald Stripe angebunden ist, aktualisiert ein Webhook hier Plan, Status und Laufzeit.
+          Bis dahin kann der Status direkt in der Datenbank gesetzt werden, um Testkunden freizuschalten oder zu sperren.
+        </div>
+
+        <div class="metric">
+          <div class="label">Aktiver Zugriff</div>
+          <div class="value">{% if subscription.is_active %}Ja{% else %}Nein{% endif %}</div>
+        </div>
+      </aside>
+    </div>
+  </div>
+</body>
+</html>

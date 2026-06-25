@@ -408,7 +408,22 @@ def normalize_phone_for_search(phone: str) -> str:
     - entfernt Leerzeichen, Bindestriche, Klammern usw.
     - behält nur Ziffern
     """
-    return "".join(ch for ch in str(phone or "") if ch.isdigit())
+    digits = "".join(ch for ch in str(phone or "") if ch.isdigit())
+
+    if digits.startswith("00") and len(digits) > 4:
+        digits = digits[2:]
+
+    if digits.startswith("49") and len(digits) >= 10:
+        return digits
+
+    if digits.startswith("0") and len(digits) >= 8:
+        return f"49{digits[1:]}"
+
+    # Deutsche Mobilnummern werden oft ohne fuehrende 0 notiert.
+    if digits.startswith(("15", "16", "17")) and 10 <= len(digits) <= 11:
+        return f"49{digits}"
+
+    return digits
 
 
 def find_tickets_by_phone(phone: str, workshop_id: str | None = None) -> list[dict[str, Any]]:

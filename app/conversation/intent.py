@@ -107,6 +107,7 @@ GENERAL_QUESTION_KEYWORDS = [
     "email",
     "preise",
     "preis",
+    "preisliste",
     "kosten",
     "leistungen",
     "was macht eure werkstatt",
@@ -327,13 +328,61 @@ def looks_like_quote_request(text: str) -> bool:
     return any(keyword in t for keyword in QUOTE_REQUEST_KEYWORDS)
 
 
+def looks_like_price_overview_question(text: str) -> bool:
+    t = lower(text)
+    return any(
+        keyword in t
+        for keyword in [
+            "preisliste",
+            "preisuebersicht",
+            "preisübersicht",
+            "preis liste",
+            "feste preise",
+        ]
+    )
+
+
 def looks_like_ai_freeform_request(text: str) -> bool:
     t = lower(text)
     return any(keyword in t for keyword in AI_FREEFORM_HINTS)
 
 
 def looks_like_vehicle_intake_start(text: str) -> bool:
-    return can_extract_vehicle(text) and bool(extract_year(text) or extract_km(text))
+    if not can_extract_vehicle(text):
+        return False
+
+    if extract_year(text) or extract_km(text):
+        return True
+
+    t = lower(text)
+    vehicle_brands = {
+        "vw",
+        "volkswagen",
+        "audi",
+        "bmw",
+        "mercedes",
+        "opel",
+        "ford",
+        "toyota",
+        "renault",
+        "peugeot",
+        "citroen",
+        "citroën",
+        "skoda",
+        "seat",
+        "fiat",
+        "hyundai",
+        "kia",
+        "mazda",
+        "nissan",
+        "honda",
+        "volvo",
+        "mini",
+        "porsche",
+        "tesla",
+    }
+    tokens = {token.strip(".,;:!?()[]{}") for token in t.split()}
+    return bool(tokens & vehicle_brands)
 
 
 def has_explicit_new_request_choice(text: str) -> bool:
@@ -397,12 +446,6 @@ def detect_intent(state: IntakeState, user_message: str | None) -> str:
     if has_explicit_existing_choice(msg):
         return INTENT_EXISTING_TICKET
 
-    if looks_like_quote_request(msg):
-        return INTENT_QUOTE_REQUEST
-
-    if looks_like_ai_freeform_request(msg):
-        return INTENT_UNCLEAR
-
     if has_explicit_general_choice(msg):
         return INTENT_GENERAL_QUESTION
 
@@ -412,14 +455,23 @@ def detect_intent(state: IntakeState, user_message: str | None) -> str:
     if mode == "quote" and is_active_quote_step(getattr(state, "step", None)):
         return INTENT_QUOTE_REQUEST
 
-    if mode == "existing" and getattr(state, "ticket_id", None):
-        return INTENT_EXISTING_TICKET
+    if looks_like_price_overview_question(msg):
+        return INTENT_GENERAL_QUESTION
+
+    if looks_like_quote_request(msg):
+        return INTENT_QUOTE_REQUEST
+
+    if looks_like_ai_freeform_request(msg):
+        return INTENT_UNCLEAR
 
     if has_direct_ticket_reference(msg):
         return INTENT_EXISTING_TICKET
 
     if looks_like_general_question(msg) and not has_explicit_ticket_context(msg):
         return INTENT_GENERAL_QUESTION
+
+    if mode == "existing" and getattr(state, "ticket_id", None):
+        return INTENT_EXISTING_TICKET
 
     if looks_like_existing_ticket_question(msg):
         return INTENT_EXISTING_TICKET

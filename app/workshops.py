@@ -18,6 +18,12 @@ DEFAULT_WORKSHOP = {
         "Die Werkstatt prueft Anfragen individuell und meldet sich mit einer Einschaetzung."
     ),
     "towing_info": "Unsere Werkstatt kooperiert mit dem Abschleppdienst Mueller.",
+    "subscription_plan": "starter",
+    "subscription_status": "trialing",
+    "trial_ends_at": None,
+    "subscription_ends_at": None,
+    "whatsapp_phone_number_id": None,
+    "whatsapp_display_phone_number": None,
 }
 
 
@@ -36,6 +42,12 @@ def _row_to_workshop(row: Any) -> dict[str, Any]:
         "services": row["services"],
         "pricing_info": row["pricing_info"],
         "towing_info": row["towing_info"],
+        "subscription_plan": row["subscription_plan"],
+        "subscription_status": row["subscription_status"],
+        "trial_ends_at": row["trial_ends_at"],
+        "subscription_ends_at": row["subscription_ends_at"],
+        "whatsapp_phone_number_id": row["whatsapp_phone_number_id"],
+        "whatsapp_display_phone_number": row["whatsapp_display_phone_number"],
     }
 
 
@@ -54,7 +66,13 @@ def get_workshop(workshop_id: str | None = None) -> dict[str, Any]:
                 opening_hours,
                 services,
                 pricing_info,
-                towing_info
+                towing_info,
+                subscription_plan,
+                subscription_status,
+                trial_ends_at,
+                subscription_ends_at,
+                whatsapp_phone_number_id,
+                whatsapp_display_phone_number
             FROM workshops
             WHERE id = ?
             LIMIT 1
@@ -73,6 +91,25 @@ def get_workshop(workshop_id: str | None = None) -> dict[str, Any]:
     return workshop
 
 
+def find_workshop_id_by_whatsapp_phone_number_id(phone_number_id: str | None) -> str | None:
+    normalized = str(phone_number_id or "").strip()
+    if not normalized:
+        return None
+
+    with get_conn() as conn:
+        row = conn.execute(
+            """
+            SELECT id
+            FROM workshops
+            WHERE whatsapp_phone_number_id = ?
+            LIMIT 1
+            """,
+            (normalized,),
+        ).fetchone()
+
+    return str(row["id"]) if row else None
+
+
 def update_workshop(
     workshop_id: str | None = None,
     *,
@@ -84,6 +121,8 @@ def update_workshop(
     services: str,
     pricing_info: str,
     towing_info: str,
+    whatsapp_phone_number_id: str = "",
+    whatsapp_display_phone_number: str = "",
 ) -> dict[str, Any]:
     wid = _normalize_workshop_id(workshop_id)
     values = {
@@ -95,6 +134,8 @@ def update_workshop(
         "services": services.strip(),
         "pricing_info": pricing_info.strip(),
         "towing_info": towing_info.strip(),
+        "whatsapp_phone_number_id": whatsapp_phone_number_id.strip(),
+        "whatsapp_display_phone_number": whatsapp_display_phone_number.strip(),
     }
 
     if not values["name"]:
@@ -112,9 +153,11 @@ def update_workshop(
                 opening_hours,
                 services,
                 pricing_info,
-                towing_info
+                towing_info,
+                whatsapp_phone_number_id,
+                whatsapp_display_phone_number
             )
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
             ON CONFLICT(id) DO UPDATE SET
                 name = excluded.name,
                 address = excluded.address,
@@ -124,6 +167,8 @@ def update_workshop(
                 services = excluded.services,
                 pricing_info = excluded.pricing_info,
                 towing_info = excluded.towing_info,
+                whatsapp_phone_number_id = excluded.whatsapp_phone_number_id,
+                whatsapp_display_phone_number = excluded.whatsapp_display_phone_number,
                 updated_at = CURRENT_TIMESTAMP
             """,
             (
@@ -136,6 +181,8 @@ def update_workshop(
                 values["services"],
                 values["pricing_info"],
                 values["towing_info"],
+                values["whatsapp_phone_number_id"],
+                values["whatsapp_display_phone_number"],
             ),
         )
         conn.commit()

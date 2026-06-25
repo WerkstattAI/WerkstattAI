@@ -3,14 +3,24 @@ from __future__ import annotations
 import json
 from datetime import datetime, timezone
 from typing import Any
+from urllib.parse import urlencode
 
 from fastapi import APIRouter, Form, Request
 from fastapi.responses import HTMLResponse, RedirectResponse
 from fastapi.templating import Jinja2Templates
 
+from app.admin import (
+    create_workshop_account,
+    get_workshop_account,
+    list_workshop_accounts,
+    reset_workshop_owner_password,
+    update_workshop_account,
+)
 from app.auth import authenticate_user, clear_session_cookie, get_current_user, set_session_cookie
+from app.config import settings
 from app.db import default_workshop_id
 from app.models import IntakeState
+from app.subscriptions import get_subscription
 from app.tickets import (
     add_ticket_note,
     archive_ticket,
@@ -18,6 +28,12 @@ from app.tickets import (
     list_latest_tickets,
     save_ticket,
     update_ticket_status,
+)
+from app.whatsapp import (
+    list_whatsapp_conversations,
+    list_whatsapp_messages,
+    save_whatsapp_message,
+    send_whatsapp_text_message,
 )
 from app.workshops import get_workshop, update_workshop
 
@@ -32,16 +48,29 @@ def _normalize_workshop_id(value: str | None = None) -> str:
 def _workshop_id_for_request(request: Request, value: str | None = None) -> str:
     user = get_current_user(request)
     if user:
+        if str(user.get("role") or "").strip().lower() == "admin" and value:
+            return _normalize_workshop_id(value)
         return _normalize_workshop_id(str(user.get("workshop_id") or ""))
     return _normalize_workshop_id(value)
 
 
 def _template_context(request: Request, **extra: Any) -> dict[str, Any]:
+    user = get_current_user(request)
+    subscription = None
+    if user:
+        subscription = get_subscription(str(user.get("workshop_id") or ""))
+
     return {
         "request": request,
-        "current_user": get_current_user(request),
+        "current_user": user,
+        "subscription": subscription,
         **extra,
     }
+
+
+def _is_admin_user(request: Request) -> bool:
+    user = get_current_user(request)
+    return str((user or {}).get("role") or "").strip().lower() == "admin"
 
 
 # -------------------------
@@ -193,6 +222,109 @@ def _source_label(value: str | None) -> str:
         "direktannahme": "Direktannahme",
     }
     return labels.get(_normalize_source(value), "Web-Chat")
+
+
+def _message_status_label(value: str | None) -> str:
+    labels = {
+        "received": "Empfangen",
+        "sent_local": "Lokal gespeichert",
+        "sent": "Gesendet",
+        "delivered": "Zugestellt",
+        "read": "Gelesen",
+        "failed": "Fehler",
+    }
+    return labels.get(str(value or "").strip().lower(), str(value or "-"))
+
+
+def _message_status_class(value: str | None) -> str:
+    status = str(value or "").strip().lower()
+    if status in {"sent", "delivered", "read", "received"}:
+        return "status-ok"
+    if status == "failed":
+        return "status-failed"
+    return "status-local"
+
+
+def _message_error(payload_json: str | None) -> str:
+    if not payload_json:
+        return ""
+
+    try:
+        payload = json.loads(payload_json)
+    except Exception:
+        return ""
+
+    if not isinstance(payload, dict):
+        return ""
+
+    error = payload.get("meta_error")
+    if isinstance(error, str) and error.strip():
+        return error.strip()
+
+    response = payload.get("meta_response")
+    if isinstance(response, dict):
+        meta_error = response.get("error")
+        if isinstance(meta_error, dict):
+            message = str(meta_error.get("message") or "").strip()
+            code = str(meta_error.get("code") or "").strip()
+            if message and code:
+                return f"{message} ({code})"
+            return message
+
+    return ""
+
+
+def _decorate_whatsapp_messages(messages: list[dict[str, Any]]) -> list[dict[str, Any]]:
+    decorated = []
+    for message in messages:
+        item = dict(message)
+        item["status_label"] = _message_status_label(item.get("status"))
+        item["status_class"] = _message_status_class(item.get("status"))
+        item["message_error"] = _message_error(item.get("payload_json"))
+        decorated.append(item)
+    return decorated
+
+
+def _whatsapp_readiness(request: Request, workshop: dict[str, Any]) -> dict[str, Any]:
+    access_token_ready = bool(str(settings.whatsapp_access_token or "").strip())
+    verify_token_ready = bool(str(settings.whatsapp_verify_token or "").strip())
+    app_secret_ready = bool(str(settings.whatsapp_app_secret or "").strip())
+    phone_number_id = str(workshop.get("whatsapp_phone_number_id") or "").strip()
+    display_phone_number = str(workshop.get("whatsapp_display_phone_number") or "").strip()
+    webhook_url = f"{str(request.base_url).rstrip('/')}/webhooks/whatsapp"
+
+    checks = [
+        {
+            "label": "Access Token",
+            "configured": access_token_ready,
+            "detail": "WHATSAPP_ACCESS_TOKEN",
+        },
+        {
+            "label": "Verify Token",
+            "configured": verify_token_ready,
+            "detail": "WHATSAPP_VERIFY_TOKEN",
+        },
+        {
+            "label": "App Secret",
+            "configured": app_secret_ready,
+            "detail": "WHATSAPP_APP_SECRET",
+        },
+        {
+            "label": "Phone Number ID",
+            "configured": bool(phone_number_id),
+            "detail": phone_number_id or "In Einstellungen eintragen",
+        },
+    ]
+
+    return {
+        "is_ready": all(check["configured"] for check in checks),
+        "can_send": access_token_ready and bool(phone_number_id),
+        "reply_mode": "meta" if access_token_ready and phone_number_id else "local",
+        "webhook_url": webhook_url,
+        "phone_number_id": phone_number_id,
+        "display_phone_number": display_phone_number,
+        "checks": checks,
+    }
 
 
 def _pick_first(d: dict, keys: list[str]) -> str:
@@ -686,6 +818,413 @@ def dashboard_settings(
     )
 
 
+@router.get("/dashboard/billing", response_class=HTMLResponse)
+def dashboard_billing(
+    request: Request,
+    workshop_id: str | None = None,
+):
+    wid = _workshop_id_for_request(request, workshop_id)
+
+    return templates.TemplateResponse(
+        "billing.html",
+        _template_context(
+            request,
+            workshop_id=wid,
+            subscription=get_subscription(wid),
+        ),
+    )
+
+
+@router.get("/dashboard/admin/workshops", response_class=HTMLResponse)
+def dashboard_admin_workshops(
+    request: Request,
+    created: str | None = None,
+    updated: str | None = None,
+    reset: str | None = None,
+    error: str | None = None,
+):
+    if not _is_admin_user(request):
+        return HTMLResponse("Nur Admins duerfen Werkstattkonten verwalten.", status_code=403)
+
+    return templates.TemplateResponse(
+        "admin_workshops.html",
+        _template_context(
+            request,
+            workshop_id=str((get_current_user(request) or {}).get("workshop_id") or ""),
+            workshops=list_workshop_accounts(),
+            created=(created or "").strip(),
+            updated=(updated or "").strip(),
+            reset=(reset or "").strip(),
+            error=(error or "").strip(),
+        ),
+    )
+
+
+@router.post("/dashboard/admin/workshops")
+def dashboard_admin_workshops_create(
+    request: Request,
+    workshop_id: str = Form(""),
+    workshop_name: str = Form(...),
+    admin_email: str = Form(...),
+    admin_password: str = Form(...),
+    address: str = Form(""),
+    phone: str = Form(""),
+    email: str = Form(""),
+    opening_hours: str = Form(""),
+    services: str = Form(""),
+    pricing_info: str = Form(""),
+    towing_info: str = Form(""),
+    subscription_plan: str = Form("starter"),
+    subscription_status: str = Form("trialing"),
+    whatsapp_phone_number_id: str = Form(""),
+    whatsapp_display_phone_number: str = Form(""),
+):
+    if not _is_admin_user(request):
+        return HTMLResponse("Nur Admins duerfen Werkstattkonten verwalten.", status_code=403)
+
+    try:
+        account = create_workshop_account(
+            workshop_id=workshop_id,
+            workshop_name=workshop_name,
+            admin_email=admin_email,
+            admin_password=admin_password,
+            address=address,
+            phone=phone,
+            email=email,
+            opening_hours=opening_hours,
+            services=services,
+            pricing_info=pricing_info,
+            towing_info=towing_info,
+            subscription_plan=subscription_plan,
+            subscription_status=subscription_status,
+            whatsapp_phone_number_id=whatsapp_phone_number_id,
+            whatsapp_display_phone_number=whatsapp_display_phone_number,
+        )
+    except ValueError as exc:
+        return RedirectResponse(
+            url="/dashboard/admin/workshops?" + urlencode({"error": str(exc)}),
+            status_code=303,
+        )
+    except Exception:
+        return RedirectResponse(
+            url="/dashboard/admin/workshops?" + urlencode({"error": "Werkstattkonto konnte nicht erstellt werden."}),
+            status_code=303,
+        )
+
+    return RedirectResponse(
+        url="/dashboard/admin/workshops?" + urlencode({"created": account["id"]}),
+        status_code=303,
+    )
+
+
+@router.get("/dashboard/admin/workshops/{admin_workshop_id}", response_class=HTMLResponse)
+def dashboard_admin_workshop_edit(
+    request: Request,
+    admin_workshop_id: str,
+    saved: str | None = None,
+    reset: str | None = None,
+    error: str | None = None,
+):
+    if not _is_admin_user(request):
+        return HTMLResponse("Nur Admins duerfen Werkstattkonten verwalten.", status_code=403)
+
+    account = get_workshop_account(admin_workshop_id)
+    if not account:
+        return HTMLResponse("Werkstattkonto wurde nicht gefunden.", status_code=404)
+
+    return templates.TemplateResponse(
+        "admin_workshop_edit.html",
+        _template_context(
+            request,
+            workshop_id=str((get_current_user(request) or {}).get("workshop_id") or ""),
+            account=account,
+            saved=(saved or "").strip(),
+            reset=(reset or "").strip(),
+            error=(error or "").strip(),
+        ),
+    )
+
+
+@router.post("/dashboard/admin/workshops/{admin_workshop_id}")
+def dashboard_admin_workshop_update(
+    request: Request,
+    admin_workshop_id: str,
+    workshop_name: str = Form(...),
+    address: str = Form(""),
+    phone: str = Form(""),
+    email: str = Form(""),
+    opening_hours: str = Form(""),
+    services: str = Form(""),
+    pricing_info: str = Form(""),
+    towing_info: str = Form(""),
+    subscription_plan: str = Form("starter"),
+    subscription_status: str = Form("trialing"),
+    trial_ends_at: str = Form(""),
+    subscription_ends_at: str = Form(""),
+    whatsapp_phone_number_id: str = Form(""),
+    whatsapp_display_phone_number: str = Form(""),
+):
+    if not _is_admin_user(request):
+        return HTMLResponse("Nur Admins duerfen Werkstattkonten verwalten.", status_code=403)
+
+    try:
+        update_workshop_account(
+            workshop_id=admin_workshop_id,
+            workshop_name=workshop_name,
+            address=address,
+            phone=phone,
+            email=email,
+            opening_hours=opening_hours,
+            services=services,
+            pricing_info=pricing_info,
+            towing_info=towing_info,
+            subscription_plan=subscription_plan,
+            subscription_status=subscription_status,
+            trial_ends_at=trial_ends_at,
+            subscription_ends_at=subscription_ends_at,
+            whatsapp_phone_number_id=whatsapp_phone_number_id,
+            whatsapp_display_phone_number=whatsapp_display_phone_number,
+        )
+    except ValueError as exc:
+        return RedirectResponse(
+            url=f"/dashboard/admin/workshops/{admin_workshop_id}?" + urlencode({"error": str(exc)}),
+            status_code=303,
+        )
+    except Exception:
+        return RedirectResponse(
+            url=f"/dashboard/admin/workshops/{admin_workshop_id}?"
+            + urlencode({"error": "Werkstattkonto konnte nicht gespeichert werden."}),
+            status_code=303,
+        )
+
+    return RedirectResponse(
+        url=f"/dashboard/admin/workshops/{admin_workshop_id}?" + urlencode({"saved": "1"}),
+        status_code=303,
+    )
+
+
+@router.post("/dashboard/admin/workshops/{admin_workshop_id}/reset-password")
+def dashboard_admin_workshop_reset_password(
+    request: Request,
+    admin_workshop_id: str,
+    owner_email: str = Form(...),
+    new_password: str = Form(...),
+):
+    if not _is_admin_user(request):
+        return HTMLResponse("Nur Admins duerfen Werkstattkonten verwalten.", status_code=403)
+
+    try:
+        reset_workshop_owner_password(
+            workshop_id=admin_workshop_id,
+            owner_email=owner_email,
+            new_password=new_password,
+        )
+    except ValueError as exc:
+        return RedirectResponse(
+            url=f"/dashboard/admin/workshops/{admin_workshop_id}?" + urlencode({"error": str(exc)}),
+            status_code=303,
+        )
+    except Exception:
+        return RedirectResponse(
+            url=f"/dashboard/admin/workshops/{admin_workshop_id}?"
+            + urlencode({"error": "Passwort konnte nicht aktualisiert werden."}),
+            status_code=303,
+        )
+
+    return RedirectResponse(
+        url=f"/dashboard/admin/workshops/{admin_workshop_id}?" + urlencode({"reset": owner_email}),
+        status_code=303,
+    )
+
+
+@router.get("/dashboard/whatsapp", response_class=HTMLResponse)
+def dashboard_whatsapp(
+    request: Request,
+    phone: str | None = None,
+    workshop_id: str | None = None,
+    test_status: str | None = None,
+    test_detail: str | None = None,
+):
+    wid = _workshop_id_for_request(request, workshop_id)
+    workshop = get_workshop(wid)
+    readiness = _whatsapp_readiness(request, workshop)
+    conversations = list_whatsapp_conversations(workshop_id=wid)
+    selected_phone = (phone or "").strip()
+
+    if not selected_phone and conversations:
+        selected_phone = str(conversations[0].get("customer_phone") or "")
+
+    messages = []
+    selected_conversation = None
+    if selected_phone:
+        messages = _decorate_whatsapp_messages(
+            list_whatsapp_messages(
+                workshop_id=wid,
+                customer_phone=selected_phone,
+                limit=250,
+            )
+        )
+        selected_conversation = next(
+            (
+                conversation
+                for conversation in conversations
+                if conversation.get("customer_phone") == selected_phone
+            ),
+            None,
+        )
+
+    return templates.TemplateResponse(
+        "whatsapp.html",
+        _template_context(
+            request,
+            workshop_id=wid,
+            workshop=workshop,
+            readiness=readiness,
+            conversations=conversations,
+            selected_phone=selected_phone,
+            selected_conversation=selected_conversation,
+            messages=messages,
+            test_status=(test_status or "").strip(),
+            test_detail=(test_detail or "").strip(),
+        ),
+    )
+
+
+@router.post("/dashboard/whatsapp/test")
+def dashboard_whatsapp_test(
+    request: Request,
+    test_phone: str = Form(...),
+    test_text: str = Form("WerkstattAI Testnachricht. WhatsApp Verbindung funktioniert."),
+    workshop_id: str | None = Form(None),
+):
+    wid = _workshop_id_for_request(request, workshop_id)
+    phone = (test_phone or "").strip()
+    text = (test_text or "").strip() or "WerkstattAI Testnachricht. WhatsApp Verbindung funktioniert."
+
+    def redirect(status: str, detail: str) -> RedirectResponse:
+        query = urlencode(
+            {
+                "workshop_id": wid,
+                "phone": phone,
+                "test_status": status,
+                "test_detail": detail,
+            }
+        )
+        return RedirectResponse(url=f"/dashboard/whatsapp?{query}", status_code=303)
+
+    if not phone:
+        return redirect("failed", "Testnummer fehlt.")
+
+    workshop = get_workshop(wid)
+    phone_number_id = str(workshop.get("whatsapp_phone_number_id") or "").strip()
+    access_token = str(settings.whatsapp_access_token or "").strip()
+    if not access_token:
+        return redirect("failed", "WHATSAPP_ACCESS_TOKEN fehlt.")
+    if not phone_number_id:
+        return redirect("failed", "Phone Number ID fehlt in den Werkstatt-Einstellungen.")
+
+    send_result = send_whatsapp_text_message(
+        phone_number_id=phone_number_id,
+        customer_phone=phone,
+        text=text,
+        access_token=access_token,
+        graph_api_version=settings.whatsapp_graph_api_version,
+    )
+
+    status = "sent" if send_result.ok else "failed"
+    save_whatsapp_message(
+        workshop_id=wid,
+        phone_number_id=phone_number_id,
+        customer_phone=phone,
+        direction="outbound",
+        message_type="text",
+        text=text,
+        wa_message_id=send_result.wa_message_id,
+        status=status,
+        payload={
+            "source": "dashboard_test",
+            "local_only": False,
+            "user": (get_current_user(request) or {}).get("email"),
+            "meta_status_code": send_result.status_code,
+            "meta_response": send_result.payload,
+            "meta_error": send_result.error,
+        },
+    )
+
+    if send_result.ok:
+        return redirect("sent", "Testnachricht wurde ueber Meta API gesendet.")
+
+    return redirect("failed", send_result.error or "Meta API hat die Testnachricht abgelehnt.")
+
+
+@router.post("/dashboard/whatsapp/reply")
+def dashboard_whatsapp_reply(
+    request: Request,
+    customer_phone: str = Form(...),
+    reply_text: str = Form(...),
+    workshop_id: str | None = Form(None),
+):
+    wid = _workshop_id_for_request(request, workshop_id)
+    phone = (customer_phone or "").strip()
+    text = (reply_text or "").strip()
+
+    if not phone:
+        return HTMLResponse("WhatsApp Kontakt fehlt", status_code=400)
+    if not text:
+        return HTMLResponse("Antwort darf nicht leer sein", status_code=400)
+
+    try:
+        workshop = get_workshop(wid)
+        phone_number_id = str(workshop.get("whatsapp_phone_number_id") or "").strip()
+        access_token = str(settings.whatsapp_access_token or "").strip()
+        send_result = None
+        status = "sent_local"
+        wa_message_id = None
+        payload: dict[str, Any] = {
+            "source": "dashboard",
+            "local_only": True,
+            "user": (get_current_user(request) or {}).get("email"),
+        }
+
+        if access_token and phone_number_id:
+            send_result = send_whatsapp_text_message(
+                phone_number_id=phone_number_id,
+                customer_phone=phone,
+                text=text,
+                access_token=access_token,
+                graph_api_version=settings.whatsapp_graph_api_version,
+            )
+            status = "sent" if send_result.ok else "failed"
+            wa_message_id = send_result.wa_message_id
+            payload = {
+                "source": "dashboard",
+                "local_only": False,
+                "user": (get_current_user(request) or {}).get("email"),
+                "meta_status_code": send_result.status_code,
+                "meta_response": send_result.payload,
+                "meta_error": send_result.error,
+            }
+
+        save_whatsapp_message(
+            workshop_id=wid,
+            phone_number_id=phone_number_id or None,
+            customer_phone=phone,
+            direction="outbound",
+            message_type="text",
+            text=text,
+            wa_message_id=wa_message_id,
+            status=status,
+            payload=payload,
+        )
+    except Exception:
+        return HTMLResponse("Antwort konnte nicht gespeichert werden", status_code=400)
+
+    return RedirectResponse(
+        url=f"/dashboard/whatsapp?workshop_id={wid}&phone={phone}",
+        status_code=303,
+    )
+
+
 @router.post("/dashboard/settings")
 def dashboard_settings_save(
     request: Request,
@@ -698,8 +1237,10 @@ def dashboard_settings_save(
     services: str = Form(""),
     pricing_info: str = Form(""),
     towing_info: str = Form(""),
+    whatsapp_phone_number_id: str = Form(""),
+    whatsapp_display_phone_number: str = Form(""),
 ):
-    wid = _normalize_workshop_id(workshop_id)
+    wid = _workshop_id_for_request(request, workshop_id)
     try:
         update_workshop(
             wid,
@@ -711,6 +1252,8 @@ def dashboard_settings_save(
             services=services,
             pricing_info=pricing_info,
             towing_info=towing_info,
+            whatsapp_phone_number_id=whatsapp_phone_number_id,
+            whatsapp_display_phone_number=whatsapp_display_phone_number,
         )
     except ValueError as e:
         return HTMLResponse(str(e), status_code=400)
