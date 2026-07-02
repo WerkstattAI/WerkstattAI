@@ -30,6 +30,7 @@ from app.whatsapp import (
     parse_meta_statuses,
     save_whatsapp_event,
     save_whatsapp_message,
+    send_whatsapp_text_message,
     update_whatsapp_message_status,
     verify_signature,
 )
@@ -243,6 +244,68 @@ def _process_test_whatsapp_webhook(payload: WhatsAppWebhookRequest) -> WhatsAppW
     )
 
 
+def _save_or_send_whatsapp_reply(
+    *,
+    workshop_id: str,
+    phone_number_id: str,
+    customer_phone: str,
+    text: str,
+    ticket_id: str | None,
+    reply_to_wa_message_id: str,
+) -> dict:
+    access_token = str(settings.whatsapp_access_token or "").strip()
+    payload = {
+        "source": "webhook",
+        "reply_to_wa_message_id": reply_to_wa_message_id,
+        "local_only": True,
+    }
+    status = "sent_local"
+    wa_message_id = None
+    meta_status_code = None
+    meta_error = None
+
+    if access_token and phone_number_id:
+        send_result = send_whatsapp_text_message(
+            phone_number_id=phone_number_id,
+            customer_phone=customer_phone,
+            text=text,
+            access_token=access_token,
+            graph_api_version=settings.whatsapp_graph_api_version,
+        )
+        status = "sent" if send_result.ok else "failed"
+        wa_message_id = send_result.wa_message_id
+        meta_status_code = send_result.status_code
+        meta_error = send_result.error
+        payload = {
+            "source": "webhook",
+            "reply_to_wa_message_id": reply_to_wa_message_id,
+            "local_only": False,
+            "meta_status_code": send_result.status_code,
+            "meta_response": send_result.payload,
+            "meta_error": send_result.error,
+        }
+
+    save_whatsapp_message(
+        workshop_id=workshop_id,
+        phone_number_id=phone_number_id,
+        customer_phone=customer_phone,
+        direction="outbound",
+        message_type="text",
+        text=text,
+        wa_message_id=wa_message_id,
+        ticket_id=ticket_id,
+        status=status,
+        payload=payload,
+    )
+
+    return {
+        "status": status,
+        "wa_message_id": wa_message_id,
+        "meta_status_code": meta_status_code,
+        "meta_error": meta_error,
+    }
+
+
 @app.post("/webhooks/whatsapp")
 async def whatsapp_webhook(request: Request):
     body = await request.body()
@@ -342,19 +405,13 @@ async def whatsapp_webhook(request: Request):
             channel="whatsapp",
             phone=message.from_phone,
         )
-        save_whatsapp_message(
+        send_info = _save_or_send_whatsapp_reply(
             workshop_id=workshop_id,
             phone_number_id=message.phone_number_id,
             customer_phone=message.from_phone,
-            direction="outbound",
-            message_type="text",
             text=response.reply,
             ticket_id=_response_ticket_id(response),
-            status="sent_local",
-            payload={
-                "reply_to_wa_message_id": message.message_id,
-                "local_only": True,
-            },
+            reply_to_wa_message_id=message.message_id,
         )
         processed += 1
         replies.append(
@@ -364,6 +421,8 @@ async def whatsapp_webhook(request: Request):
                 "workshop_id": workshop_id,
                 "reply": response.reply,
                 "done": response.done,
+                "send_status": send_info["status"],
+                "outbound_wa_message_id": send_info["wa_message_id"],
             }
         )
 

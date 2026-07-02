@@ -535,7 +535,9 @@ class WhatsAppWebhookTests(unittest.TestCase):
             conn.commit()
 
         old_secret = settings.whatsapp_app_secret
+        old_token = settings.whatsapp_access_token
         object.__setattr__(settings, "whatsapp_app_secret", "secret-test")
+        object.__setattr__(settings, "whatsapp_access_token", "")
         body = json.dumps(self.META_PAYLOAD, separators=(",", ":")).encode("utf-8")
         try:
             request = _asgi_request(
@@ -580,6 +582,85 @@ class WhatsAppWebhookTests(unittest.TestCase):
             self.assertIn("kein freier KI-Chat", messages[1]["text"])
         finally:
             object.__setattr__(settings, "whatsapp_app_secret", old_secret)
+            object.__setattr__(settings, "whatsapp_access_token", old_token)
+
+    def test_meta_webhook_sends_auto_reply_when_access_token_is_configured(self) -> None:
+        init_db()
+        trial_ends_at = (datetime.now(timezone.utc) + timedelta(days=14)).isoformat()
+
+        with get_conn() as conn:
+            conn.execute(
+                """
+                UPDATE workshops
+                SET
+                    whatsapp_phone_number_id = ?,
+                    whatsapp_display_phone_number = ?,
+                    subscription_status = 'trialing',
+                    trial_ends_at = ?
+                WHERE id = ?
+                """,
+                ("wa-phone-123", "49123456789", trial_ends_at, "demo-werkstatt"),
+            )
+            conn.execute(
+                """
+                DELETE FROM conversation_sessions
+                WHERE session_id = ?
+                """,
+                ("demo-werkstatt:whatsapp:4917612345678",),
+            )
+            conn.execute(
+                """
+                DELETE FROM whatsapp_messages
+                WHERE workshop_id = ? AND customer_phone = ?
+                """,
+                ("demo-werkstatt", "4917612345678"),
+            )
+            conn.commit()
+
+        old_secret = settings.whatsapp_app_secret
+        old_token = settings.whatsapp_access_token
+        object.__setattr__(settings, "whatsapp_app_secret", "secret-test")
+        object.__setattr__(settings, "whatsapp_access_token", "test-access-token")
+        body = json.dumps(self.META_PAYLOAD, separators=(",", ":")).encode("utf-8")
+        try:
+            with patch("app.main.send_whatsapp_text_message") as send_mock:
+                send_mock.return_value = WhatsAppSendResult(
+                    ok=True,
+                    status_code=200,
+                    wa_message_id="wamid.auto-reply-1",
+                    payload={"messages": [{"id": "wamid.auto-reply-1"}]},
+                )
+                payload = asyncio.run(
+                    whatsapp_webhook(
+                        _asgi_request(
+                            body,
+                            headers={
+                                "content-type": "application/json",
+                                "x-hub-signature-256": build_signature(body, "secret-test"),
+                            },
+                        )
+                    )
+                )
+
+            self.assertEqual(payload["processed"], 1)
+            self.assertEqual(payload["replies"][0]["send_status"], "sent")
+            self.assertEqual(payload["replies"][0]["outbound_wa_message_id"], "wamid.auto-reply-1")
+            self.assertEqual(send_mock.call_args.kwargs["phone_number_id"], "wa-phone-123")
+            self.assertEqual(send_mock.call_args.kwargs["customer_phone"], "4917612345678")
+            self.assertEqual(send_mock.call_args.kwargs["access_token"], "test-access-token")
+
+            messages = list_whatsapp_messages(
+                workshop_id="demo-werkstatt",
+                customer_phone="4917612345678",
+            )
+            self.assertEqual(len(messages), 2)
+            self.assertEqual(messages[1]["direction"], "outbound")
+            self.assertEqual(messages[1]["status"], "sent")
+            self.assertEqual(messages[1]["wa_message_id"], "wamid.auto-reply-1")
+            self.assertIn('"local_only": false', messages[1]["payload_json"])
+        finally:
+            object.__setattr__(settings, "whatsapp_app_secret", old_secret)
+            object.__setattr__(settings, "whatsapp_access_token", old_token)
 
     def test_meta_webhook_duplicate_message_is_not_reprocessed(self) -> None:
         init_db()
