@@ -322,22 +322,22 @@ def init_db() -> None:
             """
         )
 
-        conn.execute(
-            """
-            UPDATE workshops
-            SET whatsapp_phone_number_id = ?
-            WHERE id = ?
-              AND (whatsapp_phone_number_id IS NULL OR whatsapp_phone_number_id = '')
-              AND ? IS NOT NULL
-              AND ? != ''
-            """,
-            (
-                settings.whatsapp_default_phone_number_id,
-                default_workshop_id(),
-                settings.whatsapp_default_phone_number_id,
-                settings.whatsapp_default_phone_number_id,
-            ),
-        )
+        default_whatsapp_phone_number_id = str(
+            settings.whatsapp_default_phone_number_id or ""
+        ).strip()
+        if default_whatsapp_phone_number_id:
+            conn.execute(
+                """
+                UPDATE workshops
+                SET whatsapp_phone_number_id = ?
+                WHERE id = ?
+                  AND (whatsapp_phone_number_id IS NULL OR whatsapp_phone_number_id = '')
+                """,
+                (
+                    default_whatsapp_phone_number_id,
+                    default_workshop_id(),
+                ),
+            )
         conn.execute(
             """
             UPDATE tickets
