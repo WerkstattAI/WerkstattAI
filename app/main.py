@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+import logging
+
 from fastapi import FastAPI, HTTPException, Query, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse, PlainTextResponse, RedirectResponse
@@ -36,6 +38,8 @@ from app.whatsapp import (
 )
 from app.web import router as web_router
 from app.workshops import find_workshop_id_by_whatsapp_phone_number_id
+
+logger = logging.getLogger(__name__)
 
 
 class UTF8JSONResponse(JSONResponse):
@@ -188,28 +192,41 @@ def process_chat_message(
 
 @app.get("/webhooks/whatsapp", response_class=PlainTextResponse)
 def whatsapp_webhook_verify(
+    request: Request,
     mode: str | None = Query(None, alias="hub.mode"),
     verify_token: str | None = Query(None, alias="hub.verify_token"),
     challenge: str | None = Query(None, alias="hub.challenge"),
 ):
-    return _verify_whatsapp_webhook_challenge(mode, verify_token, challenge)
+    return _verify_whatsapp_webhook_challenge(request, mode, verify_token, challenge)
 
 
 @app.get("/meta/whatsapp", response_class=PlainTextResponse)
 def whatsapp_webhook_verify_alt(
+    request: Request,
     mode: str | None = Query(None, alias="hub.mode"),
     verify_token: str | None = Query(None, alias="hub.verify_token"),
     challenge: str | None = Query(None, alias="hub.challenge"),
 ):
-    return _verify_whatsapp_webhook_challenge(mode, verify_token, challenge)
+    return _verify_whatsapp_webhook_challenge(request, mode, verify_token, challenge)
 
 
 def _verify_whatsapp_webhook_challenge(
+    request: Request,
     mode: str | None,
     verify_token: str | None,
     challenge: str | None,
 ) -> PlainTextResponse:
     expected = str(settings.whatsapp_verify_token or "").strip()
+    provided = str(verify_token or "")
+    logger.info(
+        "WhatsApp webhook verify path=%s mode=%s challenge=%s token_len=%s expected_len=%s token_match=%s",
+        request.url.path,
+        mode,
+        bool(challenge),
+        len(provided),
+        len(expected),
+        bool(expected and provided == expected),
+    )
     if mode == "subscribe" and expected and verify_token == expected and challenge:
         return PlainTextResponse(challenge)
 

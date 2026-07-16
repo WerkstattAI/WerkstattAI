@@ -124,6 +124,24 @@ def _dashboard_request(workshop_id: str = "demo-werkstatt", role: str = "owner")
     return request
 
 
+def _get_request(path: str = "/webhooks/whatsapp") -> Request:
+    scope = {
+        "type": "http",
+        "method": "GET",
+        "path": path,
+        "headers": [],
+        "query_string": b"",
+        "server": ("testserver", 80),
+        "scheme": "http",
+        "client": ("testclient", 50000),
+    }
+
+    async def receive():
+        return {"type": "http.request", "body": b"", "more_body": False}
+
+    return Request(scope, receive)
+
+
 def _anonymous_dashboard_request() -> Request:
     scope = {
         "type": "http",
@@ -433,6 +451,7 @@ class WhatsAppWebhookTests(unittest.TestCase):
         object.__setattr__(settings, "whatsapp_verify_token", "verify-test-token")
         try:
             response = whatsapp_webhook_verify(
+                _get_request(),
                 mode="subscribe",
                 verify_token="verify-test-token",
                 challenge="challenge-123",
@@ -448,6 +467,7 @@ class WhatsAppWebhookTests(unittest.TestCase):
         object.__setattr__(settings, "whatsapp_verify_token", "verify-test-token")
         try:
             response = whatsapp_webhook_verify_alt(
+                _get_request("/meta/whatsapp"),
                 mode="subscribe",
                 verify_token="verify-test-token",
                 challenge="challenge-123",
@@ -464,6 +484,7 @@ class WhatsAppWebhookTests(unittest.TestCase):
         try:
             with self.assertRaises(HTTPException) as ctx:
                 whatsapp_webhook_verify(
+                    _get_request(),
                     mode="subscribe",
                     verify_token="wrong",
                     challenge="challenge-123",
