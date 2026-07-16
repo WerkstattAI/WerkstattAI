@@ -192,6 +192,23 @@ def whatsapp_webhook_verify(
     verify_token: str | None = Query(None, alias="hub.verify_token"),
     challenge: str | None = Query(None, alias="hub.challenge"),
 ):
+    return _verify_whatsapp_webhook_challenge(mode, verify_token, challenge)
+
+
+@app.get("/meta/whatsapp", response_class=PlainTextResponse)
+def whatsapp_webhook_verify_alt(
+    mode: str | None = Query(None, alias="hub.mode"),
+    verify_token: str | None = Query(None, alias="hub.verify_token"),
+    challenge: str | None = Query(None, alias="hub.challenge"),
+):
+    return _verify_whatsapp_webhook_challenge(mode, verify_token, challenge)
+
+
+def _verify_whatsapp_webhook_challenge(
+    mode: str | None,
+    verify_token: str | None,
+    challenge: str | None,
+) -> PlainTextResponse:
     expected = str(settings.whatsapp_verify_token or "").strip()
     if mode == "subscribe" and expected and verify_token == expected and challenge:
         return PlainTextResponse(challenge)
@@ -433,6 +450,11 @@ async def whatsapp_webhook(request: Request):
         "status_updates": status_updates,
         "replies": replies,
     }
+
+
+@app.post("/meta/whatsapp")
+async def whatsapp_webhook_alt(request: Request):
+    return await whatsapp_webhook(request)
 
 
 class StatusUpdate(BaseModel):

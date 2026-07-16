@@ -44,6 +44,7 @@ from app.main import (
     subscription,
     whatsapp_session_id,
     whatsapp_webhook,
+    whatsapp_webhook_verify_alt,
     whatsapp_webhook_verify,
 )
 from app.subscriptions import get_subscription, is_subscription_active
@@ -432,6 +433,21 @@ class WhatsAppWebhookTests(unittest.TestCase):
         object.__setattr__(settings, "whatsapp_verify_token", "verify-test-token")
         try:
             response = whatsapp_webhook_verify(
+                mode="subscribe",
+                verify_token="verify-test-token",
+                challenge="challenge-123",
+            )
+
+            self.assertEqual(response.status_code, 200)
+            self.assertEqual(response.body.decode("utf-8"), "challenge-123")
+        finally:
+            object.__setattr__(settings, "whatsapp_verify_token", old_token)
+
+    def test_alt_meta_webhook_verification_accepts_valid_token(self) -> None:
+        old_token = settings.whatsapp_verify_token
+        object.__setattr__(settings, "whatsapp_verify_token", "verify-test-token")
+        try:
+            response = whatsapp_webhook_verify_alt(
                 mode="subscribe",
                 verify_token="verify-test-token",
                 challenge="challenge-123",
