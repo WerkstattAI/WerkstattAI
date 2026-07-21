@@ -1,0 +1,7 @@
+name = "werkstattai-whatsapp-webhook"
+main = "worker.js"
+compatibility_date = "2026-07-21"
+
+[vars]
+UPSTREAM_URL = "https://werkstattai-whatsapp.up.railway.app/meta/whatsapp"
+WHATSAPP_VERIFY_TOKEN = "werkstattai-whatsapp-verify-2026"
