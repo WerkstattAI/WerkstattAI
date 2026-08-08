@@ -291,7 +291,8 @@ def _whatsapp_readiness(request: Request, workshop: dict[str, Any]) -> dict[str,
     app_secret_ready = bool(str(settings.whatsapp_app_secret or "").strip())
     phone_number_id = str(workshop.get("whatsapp_phone_number_id") or "").strip()
     display_phone_number = str(workshop.get("whatsapp_display_phone_number") or "").strip()
-    webhook_url = f"{str(request.base_url).rstrip('/')}/webhooks/whatsapp"
+    configured_webhook_url = str(settings.whatsapp_webhook_public_url or "").strip()
+    webhook_url = configured_webhook_url or f"{str(request.base_url).rstrip('/')}/webhooks/whatsapp"
 
     checks = [
         {
@@ -321,6 +322,7 @@ def _whatsapp_readiness(request: Request, workshop: dict[str, Any]) -> dict[str,
         "can_send": access_token_ready and bool(phone_number_id),
         "reply_mode": "meta" if access_token_ready and phone_number_id else "local",
         "webhook_url": webhook_url,
+        "webhook_url_source": "configured" if configured_webhook_url else "request",
         "phone_number_id": phone_number_id,
         "display_phone_number": display_phone_number,
         "checks": checks,
@@ -690,6 +692,16 @@ def _render_dashboard(
 # -------------------------
 # Routes
 # -------------------------
+@router.get("/datenschutz", response_class=HTMLResponse)
+def datenschutz_page(request: Request):
+    return templates.TemplateResponse(
+        "datenschutz.html",
+        {
+            "request": request,
+        },
+    )
+
+
 @router.get("/assistant", response_class=HTMLResponse)
 def assistant_page(request: Request):
     return templates.TemplateResponse(

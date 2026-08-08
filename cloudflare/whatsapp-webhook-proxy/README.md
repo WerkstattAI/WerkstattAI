@@ -10,6 +10,9 @@ Cloudflare Worker proxy for Meta WhatsApp webhooks.
 
 Use this Worker URL as the Meta callback URL instead of the Railway URL.
 
+Set the same Worker URL in the app environment as `WHATSAPP_WEBHOOK_PUBLIC_URL`
+so the dashboard shows the public callback URL.
+
 ## Deploy With Cloudflare Dashboard
 
 1. Open Cloudflare Workers.
@@ -23,6 +26,12 @@ UPSTREAM_URL=https://werkstattai-whatsapp.up.railway.app/meta/whatsapp
 ```
 
 5. Deploy.
+
+6. In the WerkstattAI app/Railway environment, set:
+
+```text
+WHATSAPP_WEBHOOK_PUBLIC_URL=https://<your-worker-url>
+```
 
 ## Deploy With Wrangler
 

@@ -27,6 +27,7 @@ class Settings:
     whatsapp_default_phone_number_id: str | None = _env("WHATSAPP_DEFAULT_PHONE_NUMBER_ID", None)
     whatsapp_access_token: str | None = _env("WHATSAPP_ACCESS_TOKEN", None)
     whatsapp_graph_api_version: str = _env("WHATSAPP_GRAPH_API_VERSION", "v23.0") or "v23.0"
+    whatsapp_webhook_public_url: str | None = _env("WHATSAPP_WEBHOOK_PUBLIC_URL", None)
 
     # Optional for later AI features.
     openai_api_key: str | None = _env("OPENAI_API_KEY", None)

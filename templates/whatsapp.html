@@ -637,6 +637,9 @@
         <div class="panel-head">
           <div class="panel-title">Webhook & Test</div>
           <div class="panel-sub">Diese URL in Meta als Callback URL verwenden.</div>
+          {% if readiness.webhook_url_source == "configured" %}
+            <div class="panel-sub">Oeffentliche Proxy-URL aus WHATSAPP_WEBHOOK_PUBLIC_URL.</div>
+          {% endif %}
         </div>
 
         <div class="webhook-box">

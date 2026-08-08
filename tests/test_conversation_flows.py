@@ -65,6 +65,7 @@ from app.whatsapp import (
     WhatsAppSendResult,
 )
 from app.web import (
+    datenschutz_page,
     dashboard_admin_workshops,
     dashboard_admin_workshops_create,
     dashboard_admin_workshop_reset_password,
@@ -72,6 +73,7 @@ from app.web import (
     dashboard_settings_save,
     dashboard_whatsapp_reply,
     dashboard_whatsapp_test,
+    _whatsapp_readiness,
     _workshop_id_for_request,
 )
 from app.workshops import get_workshop, update_workshop
@@ -374,6 +376,12 @@ class MessyCustomerIntentTests(unittest.TestCase):
 
 
 class WhatsAppWebhookTests(unittest.TestCase):
+    def test_datenschutz_page_is_publicly_renderable(self) -> None:
+        response = datenschutz_page(_get_request("/datenschutz"))
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.template.name, "datenschutz.html")
+
     META_PAYLOAD = {
         "object": "whatsapp_business_account",
         "entry": [
@@ -928,6 +936,35 @@ class WhatsAppWebhookTests(unittest.TestCase):
         self.assertEqual(selected[0]["message_count"], 2)
         self.assertEqual(selected[0]["last_direction"], "outbound")
         self.assertEqual(selected[0]["last_text"], "Antwort vom Bot")
+
+    def test_whatsapp_readiness_uses_request_webhook_url_by_default(self) -> None:
+        old_public_url = settings.whatsapp_webhook_public_url
+        object.__setattr__(settings, "whatsapp_webhook_public_url", "")
+        try:
+            readiness = _whatsapp_readiness(_get_request(), {"whatsapp_phone_number_id": ""})
+
+            self.assertEqual(readiness["webhook_url"], "http://testserver/webhooks/whatsapp")
+            self.assertEqual(readiness["webhook_url_source"], "request")
+        finally:
+            object.__setattr__(settings, "whatsapp_webhook_public_url", old_public_url)
+
+    def test_whatsapp_readiness_prefers_configured_public_webhook_url(self) -> None:
+        old_public_url = settings.whatsapp_webhook_public_url
+        object.__setattr__(
+            settings,
+            "whatsapp_webhook_public_url",
+            "https://werkstattai-whatsapp.example.workers.dev",
+        )
+        try:
+            readiness = _whatsapp_readiness(_get_request(), {"whatsapp_phone_number_id": ""})
+
+            self.assertEqual(
+                readiness["webhook_url"],
+                "https://werkstattai-whatsapp.example.workers.dev",
+            )
+            self.assertEqual(readiness["webhook_url_source"], "configured")
+        finally:
+            object.__setattr__(settings, "whatsapp_webhook_public_url", old_public_url)
 
     def test_dashboard_whatsapp_reply_is_saved_as_local_outbound_message(self) -> None:
         init_db()
