@@ -1355,7 +1355,13 @@ def dashboard_intake_save(
 
 
 @router.get("/dashboard/ticket/{ticket_id}", response_class=HTMLResponse)
-def ticket_detail(request: Request, ticket_id: str, workshop_id: str | None = None):
+def ticket_detail(
+    request: Request,
+    ticket_id: str,
+    workshop_id: str | None = None,
+    reply_status: str | None = None,
+    reply_detail: str | None = None,
+):
     wid = _workshop_id_for_request(request, workshop_id)
     ticket = find_ticket_by_id(ticket_id, workshop_id=wid)
     if not ticket:
@@ -1403,6 +1409,8 @@ def ticket_detail(request: Request, ticket_id: str, workshop_id: str | None = No
             request,
             ticket=t,
             workshop_id=wid,
+            reply_status=(reply_status or "").strip(),
+            reply_detail=(reply_detail or "").strip(),
         ),
     )
 
@@ -1450,6 +1458,20 @@ def ticket_add_note(
     workshop_id: str | None = Form(None),
 ):
     wid = _workshop_id_for_request(request, workshop_id)
+
+    def redirect_reply(status: str = "", detail: str = "") -> RedirectResponse:
+        query = urlencode(
+            {
+                "workshop_id": wid,
+                "reply_status": status,
+                "reply_detail": detail,
+            }
+        )
+        return RedirectResponse(
+            url=f"/dashboard/ticket/{ticket_id}?{query}",
+            status_code=303,
+        )
+
     try:
         text = (note_text or "").strip()
         if not text:
@@ -1458,11 +1480,87 @@ def ticket_add_note(
         if note_type not in {"internal_note", "customer_reply"}:
             return HTMLResponse("Ungültiger Notiztyp", status_code=400)
 
+        if note_type == "customer_reply":
+            ticket = find_ticket_by_id(ticket_id, workshop_id=wid)
+            if not ticket:
+                return HTMLResponse("Ticket nicht gefunden", status_code=404)
+
+            if str(ticket.get("source") or "").strip().lower() == "whatsapp":
+                linked_messages = list_whatsapp_messages(
+                    workshop_id=wid,
+                    ticket_id=ticket_id,
+                    limit=250,
+                )
+                customer_phone = next(
+                    (
+                        str(message.get("customer_phone") or "").strip()
+                        for message in reversed(linked_messages)
+                        if str(message.get("customer_phone") or "").strip()
+                    ),
+                    "",
+                )
+                workshop = get_workshop(wid)
+                phone_number_id = str(workshop.get("whatsapp_phone_number_id") or "").strip()
+                access_token = str(settings.whatsapp_access_token or "").strip()
+
+                if not customer_phone:
+                    return redirect_reply(
+                        "failed",
+                        "Für dieses Ticket wurde kein WhatsApp-Kontakt gefunden.",
+                    )
+                if not phone_number_id or not access_token:
+                    return redirect_reply(
+                        "failed",
+                        "Die WhatsApp-Verbindung der Werkstatt ist nicht vollständig konfiguriert.",
+                    )
+
+                send_result = send_whatsapp_text_message(
+                    phone_number_id=phone_number_id,
+                    customer_phone=customer_phone,
+                    text=text,
+                    access_token=access_token,
+                    graph_api_version=settings.whatsapp_graph_api_version,
+                )
+                send_status = "sent" if send_result.ok else "failed"
+                save_whatsapp_message(
+                    workshop_id=wid,
+                    phone_number_id=phone_number_id,
+                    customer_phone=customer_phone,
+                    direction="outbound",
+                    message_type="text",
+                    text=text,
+                    wa_message_id=send_result.wa_message_id,
+                    ticket_id=ticket_id,
+                    status=send_status,
+                    payload={
+                        "source": "dashboard_ticket",
+                        "local_only": False,
+                        "user": (get_current_user(request) or {}).get("email"),
+                        "meta_status_code": send_result.status_code,
+                        "meta_response": send_result.payload,
+                        "meta_error": send_result.error,
+                    },
+                )
+
+                if not send_result.ok:
+                    return redirect_reply(
+                        "failed",
+                        send_result.error or "Meta hat die WhatsApp-Nachricht abgelehnt.",
+                    )
+
         add_ticket_note(ticket_id, text, note_type=note_type, workshop_id=wid)
     except KeyError:
         return HTMLResponse("Ticket nicht gefunden", status_code=404)
     except Exception:
         return HTMLResponse("Notiz konnte nicht gespeichert werden", status_code=400)
+
+    if note_type == "customer_reply":
+        detail = (
+            "WhatsApp-Nachricht wurde an den Kunden gesendet."
+            if str((ticket or {}).get("source") or "").strip().lower() == "whatsapp"
+            else "Antwort wurde im Ticket gespeichert."
+        )
+        return redirect_reply("sent", detail)
 
     return RedirectResponse(url=f"/dashboard/ticket/{ticket_id}?workshop_id={wid}", status_code=303)
 
