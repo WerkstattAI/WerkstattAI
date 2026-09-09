@@ -21,6 +21,7 @@ class Settings:
     dashboard_admin_email: str = _env("DASHBOARD_ADMIN_EMAIL", "admin@werkstatt.local") or "admin@werkstatt.local"
     dashboard_admin_password: str = _env("DASHBOARD_ADMIN_PASSWORD", "werkstatt123") or "werkstatt123"
     dashboard_admin_role: str = _env("DASHBOARD_ADMIN_ROLE", "admin") or "admin"
+    session_cookie_secure: str = _env("SESSION_COOKIE_SECURE", "auto") or "auto"
     trial_days: int = int(_env("TRIAL_DAYS", "14") or "14")
     whatsapp_verify_token: str | None = _env("WHATSAPP_VERIFY_TOKEN", None)
     whatsapp_app_secret: str | None = _env("WHATSAPP_APP_SECRET", None)

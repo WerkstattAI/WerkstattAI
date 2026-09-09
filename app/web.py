@@ -668,6 +668,7 @@ def _render_dashboard(
         tickets.sort(key=lambda t: t["created_dt"], reverse=True)
 
     return templates.TemplateResponse(
+        request,
         "dashboard.html",
         _template_context(
             request,
@@ -695,6 +696,7 @@ def _render_dashboard(
 @router.get("/datenschutz", response_class=HTMLResponse)
 def datenschutz_page(request: Request):
     return templates.TemplateResponse(
+        request,
         "datenschutz.html",
         {
             "request": request,
@@ -705,6 +707,7 @@ def datenschutz_page(request: Request):
 @router.get("/assistant", response_class=HTMLResponse)
 def assistant_page(request: Request):
     return templates.TemplateResponse(
+        request,
         "chat.html",
         {
             "request": request,
@@ -719,6 +722,7 @@ def login_page(
     error: str | None = None,
 ):
     return templates.TemplateResponse(
+        request,
         "login.html",
         _template_context(
             request,
@@ -738,6 +742,7 @@ def login_submit(
     user = authenticate_user(email, password)
     if not user:
         return templates.TemplateResponse(
+            request,
             "login.html",
             _template_context(
                 request,
@@ -749,7 +754,7 @@ def login_submit(
 
     target = next if next.startswith("/") and not next.startswith("//") else "/dashboard"
     response = RedirectResponse(url=target, status_code=303)
-    set_session_cookie(response, user)
+    set_session_cookie(response, user, request=request)
     return response
 
 
@@ -820,6 +825,7 @@ def dashboard_settings(
     workshop = get_workshop(wid)
 
     return templates.TemplateResponse(
+        request,
         "settings.html",
         _template_context(
             request,
@@ -838,6 +844,7 @@ def dashboard_billing(
     wid = _workshop_id_for_request(request, workshop_id)
 
     return templates.TemplateResponse(
+        request,
         "billing.html",
         _template_context(
             request,
@@ -859,6 +866,7 @@ def dashboard_admin_workshops(
         return HTMLResponse("Nur Admins duerfen Werkstattkonten verwalten.", status_code=403)
 
     return templates.TemplateResponse(
+        request,
         "admin_workshops.html",
         _template_context(
             request,
@@ -945,6 +953,7 @@ def dashboard_admin_workshop_edit(
         return HTMLResponse("Werkstattkonto wurde nicht gefunden.", status_code=404)
 
     return templates.TemplateResponse(
+        request,
         "admin_workshop_edit.html",
         _template_context(
             request,
@@ -1086,6 +1095,7 @@ def dashboard_whatsapp(
         )
 
     return templates.TemplateResponse(
+        request,
         "whatsapp.html",
         _template_context(
             request,
@@ -1285,6 +1295,7 @@ def dashboard_intake(
 ):
     wid = _workshop_id_for_request(request, workshop_id)
     return templates.TemplateResponse(
+        request,
         "intake.html",
         _template_context(
             request,
@@ -1404,6 +1415,7 @@ def ticket_detail(
     t["raw_json"] = json.dumps(t, ensure_ascii=False, default=str, indent=2)
 
     return templates.TemplateResponse(
+        request,
         "ticket.html",
         _template_context(
             request,

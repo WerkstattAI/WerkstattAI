@@ -116,14 +116,36 @@ def get_current_user(request: Request) -> dict[str, Any] | None:
     return decode_session_token(request.cookies.get(SESSION_COOKIE))
 
 
-def set_session_cookie(response: Response, user: dict[str, Any]) -> None:
+def _request_uses_https(request: Request | None) -> bool:
+    if request is None:
+        return False
+
+    forwarded_proto = str(request.headers.get("x-forwarded-proto") or "")
+    if forwarded_proto:
+        return forwarded_proto.split(",", 1)[0].strip().lower() == "https"
+
+    return request.url.scheme == "https"
+
+
+def should_secure_session_cookie(request: Request | None = None) -> bool:
+    mode = str(settings.session_cookie_secure or "auto").strip().lower()
+
+    if mode in {"1", "true", "yes", "on"}:
+        return True
+    if mode in {"0", "false", "no", "off"}:
+        return False
+
+    return _request_uses_https(request)
+
+
+def set_session_cookie(response: Response, user: dict[str, Any], request: Request | None = None) -> None:
     response.set_cookie(
         SESSION_COOKIE,
         create_session_token(user),
         max_age=SESSION_MAX_AGE_SECONDS,
         httponly=True,
         samesite="lax",
-        secure=False,
+        secure=should_secure_session_cookie(request),
     )
 
 

@@ -7,9 +7,16 @@ from datetime import datetime, timedelta, timezone
 from unittest.mock import patch
 
 from fastapi import HTTPException
+from fastapi.responses import RedirectResponse
 from starlette.requests import Request
 
-from app.auth import authenticate_user, create_session_token, decode_session_token
+from app.auth import (
+    authenticate_user,
+    create_session_token,
+    decode_session_token,
+    set_session_cookie,
+    should_secure_session_cookie,
+)
 from app.admin import (
     create_workshop_account,
     get_workshop_account,
@@ -136,6 +143,28 @@ def _get_request(path: str = "/webhooks/whatsapp") -> Request:
         "query_string": b"",
         "server": ("testserver", 80),
         "scheme": "http",
+        "client": ("testclient", 50000),
+    }
+
+    async def receive():
+        return {"type": "http.request", "body": b"", "more_body": False}
+
+    return Request(scope, receive)
+
+
+def _request_with_scheme(scheme: str, headers: dict[str, str] | None = None) -> Request:
+    raw_headers = [
+        (key.lower().encode("latin-1"), value.encode("latin-1"))
+        for key, value in (headers or {}).items()
+    ]
+    scope = {
+        "type": "http",
+        "method": "GET",
+        "path": "/login",
+        "headers": raw_headers,
+        "query_string": b"",
+        "server": ("testserver", 443 if scheme == "https" else 80),
+        "scheme": scheme,
         "client": ("testclient", 50000),
     }
 
@@ -1379,6 +1408,41 @@ class AuthTests(unittest.TestCase):
         tampered = token[:-1] + ("A" if token[-1] != "A" else "B")
 
         self.assertIsNone(decode_session_token(tampered))
+
+    def test_session_cookie_is_secure_for_https_requests(self) -> None:
+        response = RedirectResponse(url="/dashboard", status_code=303)
+        set_session_cookie(
+            response,
+            {
+                "email": "admin@werkstatt.local",
+                "workshop_id": "demo-werkstatt",
+                "role": "owner",
+            },
+            request=_request_with_scheme("https"),
+        )
+
+        self.assertIn("Secure", response.headers["set-cookie"])
+
+    def test_session_cookie_auto_mode_uses_forwarded_https(self) -> None:
+        self.assertTrue(
+            should_secure_session_cookie(
+                _request_with_scheme("http", {"x-forwarded-proto": "https"})
+            )
+        )
+
+    def test_session_cookie_stays_local_http_compatible(self) -> None:
+        response = RedirectResponse(url="/dashboard", status_code=303)
+        set_session_cookie(
+            response,
+            {
+                "email": "admin@werkstatt.local",
+                "workshop_id": "demo-werkstatt",
+                "role": "owner",
+            },
+            request=_request_with_scheme("http"),
+        )
+
+        self.assertNotIn("Secure", response.headers["set-cookie"])
 
 
 class AdminWorkshopTests(unittest.TestCase):
