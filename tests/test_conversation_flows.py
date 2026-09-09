@@ -78,6 +78,7 @@ from app.web import (
     dashboard_admin_workshop_reset_password,
     dashboard_admin_workshop_update,
     dashboard_settings_save,
+    home_page,
     ticket_add_note,
     dashboard_whatsapp_reply,
     dashboard_whatsapp_test,
@@ -406,6 +407,12 @@ class MessyCustomerIntentTests(unittest.TestCase):
 
 
 class WhatsAppWebhookTests(unittest.TestCase):
+    def test_home_page_is_publicly_renderable(self) -> None:
+        response = home_page(_get_request("/"))
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.template.name, "home.html")
+
     def test_datenschutz_page_is_publicly_renderable(self) -> None:
         response = datenschutz_page(_get_request("/datenschutz"))
 

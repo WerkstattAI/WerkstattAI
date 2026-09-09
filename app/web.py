@@ -693,6 +693,17 @@ def _render_dashboard(
 # -------------------------
 # Routes
 # -------------------------
+@router.get("/", response_class=HTMLResponse)
+def home_page(request: Request):
+    return templates.TemplateResponse(
+        request,
+        "home.html",
+        {
+            "request": request,
+        },
+    )
+
+
 @router.get("/datenschutz", response_class=HTMLResponse)
 def datenschutz_page(request: Request):
     return templates.TemplateResponse(

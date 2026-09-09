@@ -3,7 +3,7 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width,initial-scale=1" />
-  <title>WerkstattAI – Kundenchat</title>
+  <title>WerkstattAI - Demo</title>
   <style>
     :root{
       --bg:#0b1220;
@@ -127,6 +127,7 @@
     }
 
     .session-box{
+      display:none;
       margin-top:14px;
       padding:12px;
       border-radius:16px;
@@ -428,51 +429,50 @@
   <div class="wrap">
     <div class="top">
       <div class="brand">
-        <h1>WerkstattAI – Kundenchat</h1>
-        <div class="sub">Testumgebung für den Werkstatt-Assistenten</div>
+        <h1>WerkstattAI - Demo</h1>
+        <div class="sub">Digitale Annahme fuer Werkstattkunden</div>
       </div>
 
       <div class="top-actions">
-        <a class="link-btn" href="/dashboard">Zum Dashboard</a>
-        <a class="link-btn" href="/docs">Swagger</a>
+        <a class="link-btn" href="/">Startseite</a>
+        <a class="link-btn" href="/login">Werkstatt Login</a>
       </div>
     </div>
 
     <div class="shell">
       <div class="card side">
-        <h2>Hinweise</h2>
+        <h2>Demo fuer Kundenanfragen</h2>
 
         <div class="hint-box">
-          <div class="hint-title">Was diese Seite macht</div>
+          <div class="hint-title">Kundenanfrage</div>
           <div class="hint-text">
-            Hier kannst du den Kundenchat so testen, wie ihn später ein echter Kunde nutzen würde.
-            Jede Nachricht geht an dein bestehendes <code>/chat</code>-Backend.
+            Probieren Sie eine typische Werkstatt-Anfrage aus. Der Assistent fragt die wichtigsten Informationen ab.
           </div>
         </div>
 
         <div class="hint-box">
-          <div class="hint-title">Neue Möglichkeiten</div>
+          <div class="hint-title">Geeignet fuer</div>
           <div class="hint-text">
-            Der Assistent kann jetzt:
+            Der Assistent hilft bei:
             <br><br>
-            • Probleme aufnehmen
+            - Problemen am Fahrzeug
             <br>
-            • Anfragen zu bestehenden Tickets bearbeiten
+            - Rueckrufwuenschen
             <br>
-            • allgemeine Fragen beantworten
+            - allgemeinen Fragen
             <br>
-            • Kostenvoranschläge anfragen
+            - Kostenvoranschlaegen
           </div>
         </div>
 
         <div class="hint-box">
           <div class="hint-title">Beispiele</div>
           <div class="hint-text">
-            „Mein Auto springt nicht an“
+            "Mein Auto springt nicht an"
             <br>
-            „Status von Ticket WS-20260419-0001“
+            "Ich brauche einen Rueckruf"
             <br>
-            „Was sind eure Öffnungszeiten?“
+            "Was sind eure Oeffnungszeiten?"
           </div>
         </div>
 
@@ -486,7 +486,7 @@
         <div class="chat-header">
           <div>
             <h2>Kundenchat</h2>
-            <div class="muted">WerkstattAI unterstützt Problemmeldungen, Kostenvoranschläge, Anfragen zu bestehenden Tickets und allgemeine Fragen.</div>
+            <div class="muted">WerkstattAI nimmt die Anfrage auf und erstellt daraus ein uebersichtliches Ticket.</div>
           </div>
 
           <div class="chat-status">
@@ -514,12 +514,12 @@
               ></textarea>
 
               <div class="helper">
-                <span>Enter = senden • Shift+Enter = neue Zeile</span>
+                <span>Enter = senden / Shift+Enter = neue Zeile</span>
                 <span id="charCount">0 Zeichen</span>
               </div>
             </div>
 
-            <button class="ghost-btn" type="button" id="resetBtn">Neue Session</button>
+            <button class="ghost-btn" type="button" id="resetBtn">Neu starten</button>
             <button class="send-btn" type="submit" id="sendBtn">Senden</button>
           </form>
 
@@ -540,20 +540,20 @@
     const charCountEl = document.getElementById("charCount");
     const sessionIdBox = document.getElementById("sessionIdBox");
 
-    const WELCOME_MESSAGE = `Willkommen bei WerkstattAI 🚗
+    const WELCOME_MESSAGE = `Willkommen bei WerkstattAI.
 
 Wie kann ich Ihnen helfen?
 
-Wählen Sie einfach den passenden Bereich aus oder schreiben Sie direkt Ihr Anliegen.`;
+Waehlen Sie einen Bereich aus oder schreiben Sie direkt Ihr Anliegen.`;
 
     const QUICK_ACTIONS = [
       {
         label: "Problem melden",
-        message: "Ich möchte ein Problem melden."
+        message: "Ich moechte ein Problem melden."
       },
       {
         label: "Kostenvoranschlag anfragen",
-        message: "Ich möchte einen Kostenvoranschlag anfragen."
+        message: "Ich moechte einen Kostenvoranschlag anfragen."
       },
       {
         label: "Anfrage zu einem bestehenden Ticket",
@@ -671,11 +671,11 @@ Wählen Sie einfach den passenden Bereich aus oder schreiben Sie direkt Ihr Anli
 
       doneBoxEl.style.display = "block";
       doneBoxEl.textContent =
-        "Der Vorgang wurde abgeschlossen.\n" +
+        "Die Anfrage wurde aufgenommen.\n" +
         `Ticket-ID: ${ticketId}\n` +
         `Typ: ${requestType}\n` +
-        `Priorität: ${priority}\n\n` +
-        "Das Ticket sollte jetzt im Dashboard sichtbar sein.";
+        `Prioritaet: ${priority}\n\n` +
+        "Das Ticket ist im Werkstatt-Dashboard gespeichert.";
     }
 
     function renderWelcome() {
