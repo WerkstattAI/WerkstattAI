@@ -1578,36 +1578,498 @@
         width:230px;
       }
     }
+
+    /* Calm workshop workspace theme */
+    :root{
+      --bg:#f3f6f5;
+      --bg-2:#eaf0ee;
+      --card:#ffffff;
+      --card-2:#f8faf9;
+      --panel:#ffffff;
+      --line:#dfe6e3;
+      --line-2:#cfdad6;
+      --text:#182522;
+      --muted:#65736f;
+      --soft:#45544f;
+      --petrol:#0f6f66;
+      --petrol-dark:#17413c;
+      --graphite:#172723;
+      --ok:#23815d;
+      --warn:#c47a16;
+      --info:#2d6f96;
+      --danger:#c44743;
+      --shadow:0 8px 24px rgba(28,52,45,.08);
+      --shadow-2:0 18px 42px rgba(28,52,45,.12);
+    }
+
+    body{
+      color:var(--text);
+      background:
+        radial-gradient(900px 440px at 72% -10%, rgba(15,111,102,.11), transparent 64%),
+        linear-gradient(180deg, #edf3f1 0, #f7f9f8 420px, #f3f6f5 100%);
+      font-family:"Segoe UI Variable", "Segoe UI", Inter, system-ui, -apple-system, sans-serif;
+    }
+
+    .wrap{
+      width:100%;
+      max-width:none;
+      min-height:100vh;
+      display:grid;
+      grid-template-columns:244px minmax(0, 1fr);
+      align-items:start;
+      margin:0;
+      padding:0;
+    }
+
+    .topbar{
+      position:sticky;
+      top:0;
+      z-index:20;
+      min-height:100vh;
+      height:100vh;
+      display:flex;
+      flex-direction:column;
+      align-items:stretch;
+      justify-content:flex-start;
+      gap:26px;
+      margin:0;
+      padding:26px 18px 20px;
+      border:0;
+      border-radius:0;
+      color:#f5fbf9;
+      background:
+        radial-gradient(360px 220px at 10% 0%, rgba(34,143,131,.24), transparent 70%),
+        linear-gradient(180deg, #172a26 0%, #13231f 100%);
+      box-shadow:8px 0 28px rgba(22,42,36,.10);
+      backdrop-filter:none;
+    }
+
+    .brand{
+      gap:7px;
+      padding:0 8px;
+    }
+
+    .eyebrow{
+      width:max-content;
+      padding:0;
+      border:0;
+      border-radius:0;
+      background:transparent;
+      color:#78c9bd;
+      font-size:12px;
+      font-weight:750;
+      letter-spacing:.09em;
+    }
+
+    .brand h1{
+      margin:0;
+      color:#ffffff;
+      font-size:22px;
+      line-height:1.22;
+      font-weight:720;
+      letter-spacing:-.02em;
+    }
+
+    .brand .sub{
+      max-width:none;
+      color:#aebeb9;
+      font-size:12px;
+      line-height:1.5;
+    }
+
+    .top-actions{
+      min-height:0;
+      flex:1;
+      width:100%;
+      display:flex;
+      flex-direction:column;
+      flex-wrap:nowrap;
+      align-items:stretch;
+      gap:5px;
+    }
+
+    .nav-section-label{
+      margin:15px 10px 5px;
+      color:#7f948e;
+      font-size:10px;
+      font-weight:700;
+      letter-spacing:.11em;
+      text-transform:uppercase;
+    }
+
+    .nav-section-label:first-child{
+      margin-top:0;
+    }
+
+    .nav-btn{
+      width:100%;
+      min-height:42px;
+      justify-content:flex-start;
+      padding:10px 12px;
+      border:1px solid transparent;
+      border-radius:9px;
+      background:transparent;
+      color:#d5e0dc;
+      font-size:13px;
+      font-weight:600;
+      box-shadow:none;
+    }
+
+    .nav-btn:hover{
+      transform:none;
+      border-color:rgba(255,255,255,.06);
+      background:rgba(255,255,255,.07);
+      color:#ffffff;
+    }
+
+    .nav-btn.active{
+      border-color:rgba(86,194,177,.16);
+      background:rgba(64,166,151,.17);
+      color:#ffffff;
+      box-shadow:inset 3px 0 0 #58b8a9;
+    }
+
+    .top-actions .nav-btn[href^="/dashboard/intake"]{
+      margin-bottom:4px;
+      border-color:rgba(127,211,198,.24);
+      background:rgba(101,194,180,.12);
+      color:#e7f8f4;
+    }
+
+    .top-actions form{
+      width:100%;
+      margin-top:auto !important;
+    }
+
+    .top-actions form .nav-btn{
+      color:#b9c9c4;
+    }
+
+    .chip{
+      width:100%;
+      min-height:auto;
+      justify-content:flex-start;
+      margin-top:5px;
+      padding:10px 12px;
+      border:1px solid rgba(255,255,255,.07);
+      border-radius:9px;
+      background:rgba(255,255,255,.04);
+      color:#93a7a1;
+      font-size:11px;
+      font-weight:600;
+    }
+
+    .grid{
+      min-width:0;
+      gap:18px;
+      padding:30px clamp(20px, 3vw, 46px) 46px;
+    }
+
+    .workspace-head{
+      display:flex;
+      align-items:flex-end;
+      justify-content:space-between;
+      gap:24px;
+      padding:2px 2px 4px;
+    }
+
+    .workspace-overline{
+      margin-bottom:6px;
+      color:var(--petrol);
+      font-size:12px;
+      font-weight:700;
+      letter-spacing:.08em;
+      text-transform:uppercase;
+    }
+
+    .workspace-head h2{
+      margin:0;
+      color:#17231f;
+      font-size:30px;
+      line-height:1.15;
+      font-weight:720;
+      letter-spacing:-.025em;
+    }
+
+    .workspace-head p{
+      max-width:670px;
+      margin:8px 0 0;
+      color:var(--muted);
+      font-size:14px;
+      line-height:1.55;
+    }
+
+    .primary-action{
+      display:inline-flex;
+      align-items:center;
+      justify-content:center;
+      flex:0 0 auto;
+      min-height:44px;
+      padding:11px 16px;
+      border:1px solid #0c625a;
+      border-radius:10px;
+      background:var(--petrol);
+      color:#ffffff;
+      text-decoration:none;
+      font-size:13px;
+      font-weight:700;
+      box-shadow:0 8px 18px rgba(15,111,102,.18);
+      transition:.16s ease;
+    }
+
+    .primary-action:hover{
+      transform:translateY(-1px);
+      background:#0c625a;
+      box-shadow:0 10px 22px rgba(15,111,102,.22);
+    }
+
+    .cards{
+      display:grid;
+      grid-template-columns:repeat(12, minmax(0, 1fr));
+      gap:11px;
+    }
+
+    .card{
+      border:1px solid var(--line);
+      border-radius:12px;
+      background:#ffffff;
+      box-shadow:var(--shadow);
+    }
+
+    .kpi{
+      min-height:128px;
+      padding:17px 18px;
+      border-color:var(--line);
+      background:#ffffff;
+      box-shadow:0 5px 16px rgba(28,52,45,.055);
+    }
+
+    .kpi-primary{grid-column:span 3}
+    .kpi-compact{grid-column:span 2;min-height:98px;padding:14px 15px}
+    .kpi-wide{grid-column:span 4}
+    .kpi-order-1{order:1}.kpi-order-2{order:2}.kpi-order-3{order:3}
+    .kpi-order-4{order:4}.kpi-order-5{order:5}.kpi-order-6{order:6}
+    .kpi-order-7{order:7}.kpi-order-8{order:8}.kpi-order-9{order:9}
+
+    .kpi:hover{
+      transform:translateY(-2px);
+      border-color:#b8cec8;
+      background:#ffffff;
+      box-shadow:0 12px 28px rgba(28,52,45,.10);
+    }
+
+    .kpi .label{
+      color:#5f6f6a;
+      font-size:11px;
+      font-weight:650;
+      letter-spacing:.055em;
+    }
+
+    .kpi .value{
+      margin-top:9px;
+      color:#173b36;
+      font-size:36px;
+      font-weight:720;
+      letter-spacing:-.03em;
+      font-variant-numeric:tabular-nums;
+    }
+
+    .kpi-compact .value{display:inline-block;margin-top:7px;font-size:28px}
+
+    .kpi .hint{
+      margin-top:7px;
+      color:#7b8985;
+      font-size:11px;
+      line-height:1.4;
+    }
+
+    .kpi-hot{border-top:3px solid #c44743;background:linear-gradient(180deg,#fffafa,#fff 58%)}
+    .kpi-warn{border-top:3px solid #d08a2d;background:linear-gradient(180deg,#fffcf7,#fff 58%)}
+    .kpi-customer{border-top:3px solid #397f78;background:linear-gradient(180deg,#f8fcfb,#fff 58%)}
+    .kpi-quote{border-top:3px solid #7b6b9e;background:linear-gradient(180deg,#fbfafe,#fff 58%)}
+
+    .toolbar{
+      padding:13px;
+      border:1px solid var(--line);
+      border-radius:12px;
+      background:#ffffff;
+      box-shadow:0 5px 16px rgba(28,52,45,.055);
+      backdrop-filter:none;
+    }
+
+    input,select,button{
+      border:1px solid #d8e1de;
+      border-radius:9px;
+      background:#f8faf9;
+      color:var(--text);
+    }
+
+    input::placeholder{color:#8b9894}
+    input:focus,select:focus,button:focus{border-color:#5b9e94;box-shadow:0 0 0 3px rgba(15,111,102,.11)}
+    button{background:#e8f2ef;color:#195149;font-weight:700}
+    button:hover{transform:none;background:#dcebe7}
+
+    .btn-secondary{
+      border-color:#d8e1de;
+      border-radius:9px;
+      background:#ffffff;
+      color:#56645f;
+      font-weight:650;
+    }
+
+    .btn-secondary:hover{transform:none;background:#f3f6f5}
+
+    .attention{
+      border:1px solid #e8dcc5;
+      border-radius:12px;
+      background:#fffcf6;
+      box-shadow:0 5px 18px rgba(89,66,29,.055);
+    }
+
+    .attention-head{padding:15px 17px;border-bottom:1px solid #eee3cf;background:transparent}
+    .attention-title{color:#493a22;font-size:12px;font-weight:750;letter-spacing:.055em}
+    .attention-sub,.attention-empty{color:#7a6c55}
+
+    .attention-card{
+      min-height:122px;
+      border-color:#eadfcf;
+      border-radius:10px;
+      background:#ffffff;
+      color:var(--text);
+    }
+
+    .attention-card:hover{transform:translateY(-1px);border-color:#c9dcd7;background:#f9fcfb}
+    .attention-reason{border-color:#d7c49e;background:#fff4dc;color:#855716}
+    .attention-car{color:#1c2925;font-weight:700}
+    .attention-problem{color:#5c6965}
+    .attention-meta{color:#788580}
+    .attention-source{border-color:#d8e1de;background:#f4f7f6;color:#53615c}
+    .attention-source.web_chat{border-color:#c7dce8;background:#eff7fb;color:#285f7c}
+    .attention-source.whatsapp{border-color:#bfe1d3;background:#ecf8f2;color:#267454}
+    .attention-source.direktannahme{border-color:#ead4a6;background:#fff6e4;color:#8a5b18}
+
+    .table-shell{
+      overflow:hidden;
+      border:1px solid var(--line);
+      border-radius:13px;
+      background:#ffffff;
+      box-shadow:var(--shadow-2);
+    }
+
+    .table-head{padding:17px 19px;border-bottom:1px solid var(--line);background:#ffffff}
+    .table-title{color:#1b2925;font-weight:720}
+    .table-sub,.muted{color:var(--muted)}
+    table.ticket-table{border-spacing:0 5px;background:#ffffff}
+    .ticket-table th{color:#7a8883;font-weight:650}
+    .ticket-table tbody td{border-top-color:#e8edeb;border-bottom-color:#e8edeb;background:#f9fbfa}
+    .ticket-table tbody tr:hover td{background:#f0f7f5}
+    tbody tr.row-high td:first-child{box-shadow:inset 4px 0 0 #c44743}
+    tbody tr.row-notfall td:first-child{box-shadow:inset 4px 0 0 #d08a2d}
+    tbody tr.row-customer-question td:first-child{box-shadow:inset 4px 0 0 #397f78}
+    .vehicle .title,.problem-text{color:#1c2925}
+    .problem-text{font-weight:600}
+    .id{color:#7c8985}
+    .tel,.tel a{color:#12685f}
+    .date-cell{color:#75827e}
+
+    .status{border-color:#d9e1de;background:#f1f4f3;color:#46534f;font-weight:650}
+    .s-offen{border-color:#ead2a4;background:#fff6e5;color:#8a5b14}
+    .s-in_bearbeitung{border-color:#bfd7e6;background:#edf7fc;color:#285f7d}
+    .s-erledigt{border-color:#bcdccb;background:#edf8f2;color:#267153}
+    .s-archiviert{border-color:#d6dcda;background:#f1f3f2;color:#5f6b67}
+    .new{border-color:#e9cf9e;background:#fff4dc;color:#8a5b14}
+    .customer-question-badge{border-color:#b8d8d1;background:#eaf6f3;color:#17675d}
+    .priority,.request-type,.tiny-badge{border-color:#d8e1de;background:#f1f5f3;color:#4c5a55}
+    .p-niedrig,.rt-service{border-color:#bfdfd0;background:#edf8f2;color:#267153}
+    .p-normal{border-color:#d6dedb;background:#f2f5f4;color:#53615c}
+    .p-hoch{border-color:#efc5c3;background:#fff0ef;color:#a2322e}
+    .rt-diagnose{border-color:#c6dce8;background:#eff7fb;color:#2b6481}
+    .rt-notfall,.tiny-badge.warn{border-color:#ead1a0;background:#fff5df;color:#8a5911}
+    .rt-kostenvoranschlag{border-color:#d9cfeb;background:#f7f3fc;color:#665181}
+    .tiny-badge.danger{border-color:#edc4c2;background:#fff0ef;color:#a3312e}
+
+    .last-note-block{border-color:#dfe6e3;background:#f3f7f5}
+    .row-customer-question .last-note-block{border-color:#bcd9d2;background:#ebf6f3}
+    .last-note-label{color:#287268}
+    .last-note-text{color:#35433e}
+    .last-note-date{color:#75827e}
+
+    .open{border-color:#0e675f;background:var(--petrol);color:#ffffff}
+    .open:hover{background:#0c625a}
+    .details-btn,.mini-action{border-color:#d5dfdc;background:#ffffff;color:#41504b}
+    .details-btn:hover,.mini-action:hover{transform:none;background:#edf4f2}
+    .quick{border-color:#dce4e1;background:#f3f6f5}
+    .archive-btn{border-color:#edc4c2;background:#fff0ef;color:#a3312e}
+    .archive-btn:hover{transform:none;background:#fce4e2}
+    .empty{color:var(--muted)}
+
+    .modal-backdrop{background:rgba(12,24,20,.48)}
+    .modal,.modal-body{border-color:#dce4e1;background:#f5f8f7;color:var(--text)}
+    .modal{box-shadow:0 30px 80px rgba(13,31,25,.24)}
+    .modal-header{border-bottom-color:#dce4e1;background:#ffffff}
+    .modal-title,.mini-card h3,summary{color:#1c2925}
+    .modal-close,.copy-btn{border-color:#d5dfdc;background:#f4f7f6;color:#41504b}
+    .mini-card,.debug-item,details{border-color:#dce4e1;background:#ffffff}
+    .mini-card .muted,.debug-value,.debug-list{color:#4f5d58}
+    .debug-label{color:#75827e}
+    summary{background:#ffffff}
+    .raw{border-top-color:#dce4e1;background:#ffffff}
+    pre{border-color:#d8e1de;background:#eff3f1;color:#33423d}
+    .toast{border-color:#31534a;background:#18332c;color:#ffffff;box-shadow:var(--shadow-2)}
+
+    @media (max-width:1260px){
+      .cards{grid-template-columns:repeat(6,minmax(0,1fr))}
+      .kpi-primary{grid-column:span 3}
+      .kpi-compact{grid-column:span 2}
+      .kpi-wide{grid-column:span 4}
+    }
+
+    @media (max-width:980px){
+      .wrap{display:block}
+      .topbar{position:relative;width:auto;height:auto;min-height:0;gap:18px;padding:20px;border-radius:0}
+      .top-actions{display:flex;flex-direction:row;flex-wrap:wrap;align-items:center}
+      .nav-section-label{display:none}
+      .nav-btn,.top-actions form,.chip{width:auto}
+      .top-actions form{margin-top:0 !important}
+      .grid{padding:24px 20px 38px}
+      .workspace-head{align-items:flex-start}
+      .kpi-wide{grid-column:span 2}
+    }
+
+    @media (max-width:680px){
+      .grid{padding:20px 14px 30px}
+      .workspace-head{flex-direction:column;gap:14px}
+      .workspace-head h2{font-size:26px}
+      .primary-action{width:100%}
+      .cards{grid-template-columns:repeat(2,minmax(0,1fr))}
+      .kpi-primary,.kpi-compact,.kpi-wide{grid-column:span 1}
+      .kpi{min-height:110px}
+      .toolbar-left,.toolbar-right{display:grid;grid-template-columns:1fr}
+      .toolbar input,.toolbar select,.toolbar button,.toolbar .btn-secondary{width:100%;min-width:0 !important}
+    }
+
+    @media (max-width:430px){
+      .cards{grid-template-columns:1fr}
+    }
   </style>
 </head>
 <body>
   <div class="wrap">
     <div class="topbar">
       <div class="brand">
-        <div class="eyebrow">WerkstattAI • internes System</div>
-
-        <h1>
-          {% if archive_mode %}
-            WerkstattAI – Archiv
-          {% else %}
-            WerkstattAI – Dashboard
-          {% endif %}
-        </h1>
-
-        <div class="sub">
-          {% if archive_mode %}
-            Archivierte Aufträge, abgeschlossene Fälle und historische Vorgänge auf einen Blick.
-          {% else %}
-            Alle aktiven Werkstatt-Anfragen zentral an einem Ort – klar priorisiert, schnell bearbeitbar und sofort verständlich.
-          {% endif %}
-        </div>
+        <div class="eyebrow">WerkstattAI</div>
+        <h1>{{ workshop.name or "Werkstattbereich" }}</h1>
+        <div class="sub">Digitaler Werkstattbereich</div>
       </div>
 
       <div class="top-actions">
+        <div class="nav-section-label">Anfragen</div>
         <a class="nav-btn {% if not archive_mode %}active{% endif %}" href="/dashboard?workshop_id={{ workshop_id }}">Aktive Tickets</a>
-        <a class="nav-btn {% if archive_mode %}active{% endif %}" href="/dashboard/archive?workshop_id={{ workshop_id }}">Archiv</a>
         <a class="nav-btn" href="/dashboard/whatsapp?workshop_id={{ workshop_id }}">WhatsApp</a>
         <a class="nav-btn" href="/dashboard/intake?workshop_id={{ workshop_id }}">+ Direktannahme</a>
+
+        <div class="nav-section-label">Verwaltung</div>
+        <a class="nav-btn {% if archive_mode %}active{% endif %}" href="/dashboard/archive?workshop_id={{ workshop_id }}">Archiv</a>
         <a class="nav-btn" href="/dashboard/settings?workshop_id={{ workshop_id }}">Einstellungen</a>
         <a class="nav-btn" href="/dashboard/billing?workshop_id={{ workshop_id }}">Abo</a>
         {% if current_user and current_user.role == "admin" %}
@@ -1616,61 +2078,80 @@
         <form method="post" action="/logout" style="margin:0;">
           <button class="nav-btn" type="submit">Abmelden</button>
         </form>
-        <div class="chip">🔒 MVP v1 • intern</div>
+        <div class="chip">Sicher angemeldet</div>
       </div>
     </div>
 
     <div class="grid">
+      <header class="workspace-head">
+        <div>
+          <div class="workspace-overline">
+            {% if archive_mode %}Historie{% else %}Tagesübersicht{% endif %}
+          </div>
+          <h2>{% if archive_mode %}Archiv{% else %}Auftragsübersicht{% endif %}</h2>
+          <p>
+            {% if archive_mode %}
+              Abgeschlossene und archivierte Vorgänge übersichtlich durchsuchen.
+            {% else %}
+              Neue Anfragen erkennen, Wichtiges zuerst bearbeiten und den Werkstattalltag im Blick behalten.
+            {% endif %}
+          </p>
+        </div>
+        {% if not archive_mode %}
+          <a class="primary-action" href="/dashboard/intake?workshop_id={{ workshop_id }}">+ Neue Direktannahme</a>
+        {% endif %}
+      </header>
+
       <div class="cards">
-        <a class="card kpi" href="{% if archive_mode %}/dashboard/archive?workshop_id={{ workshop_id }}&status=offen&source={{ filters.source }}&question_state={{ filters.question_state }}&sort={{ filters.sort }}{% else %}/dashboard?workshop_id={{ workshop_id }}&status=offen&source={{ filters.source }}&question_state={{ filters.question_state }}&sort={{ filters.sort }}{% endif %}">
+        <a class="card kpi kpi-primary kpi-order-1" href="{% if archive_mode %}/dashboard/archive?workshop_id={{ workshop_id }}&status=offen&source={{ filters.source }}&question_state={{ filters.question_state }}&sort={{ filters.sort }}{% else %}/dashboard?workshop_id={{ workshop_id }}&status=offen&source={{ filters.source }}&question_state={{ filters.question_state }}&sort={{ filters.sort }}{% endif %}">
           <div class="label">Offen</div>
           <div class="value">{{ stats.offen or 0 }}</div>
           <div class="hint">Neue oder noch unbehandelte Anfragen</div>
         </a>
 
-        <a class="card kpi" href="{% if archive_mode %}/dashboard/archive?workshop_id={{ workshop_id }}&status=in_bearbeitung&source={{ filters.source }}&question_state={{ filters.question_state }}&sort={{ filters.sort }}{% else %}/dashboard?workshop_id={{ workshop_id }}&status=in_bearbeitung&source={{ filters.source }}&question_state={{ filters.question_state }}&sort={{ filters.sort }}{% endif %}">
+        <a class="card kpi kpi-primary kpi-order-2" href="{% if archive_mode %}/dashboard/archive?workshop_id={{ workshop_id }}&status=in_bearbeitung&source={{ filters.source }}&question_state={{ filters.question_state }}&sort={{ filters.sort }}{% else %}/dashboard?workshop_id={{ workshop_id }}&status=in_bearbeitung&source={{ filters.source }}&question_state={{ filters.question_state }}&sort={{ filters.sort }}{% endif %}">
           <div class="label">In Bearbeitung</div>
           <div class="value">{{ stats.in_bearbeitung or 0 }}</div>
           <div class="hint">Mechaniker oder Team arbeitet bereits daran</div>
         </a>
 
-        <a class="card kpi" href="{% if archive_mode %}/dashboard/archive?workshop_id={{ workshop_id }}&status=erledigt&source={{ filters.source }}&question_state={{ filters.question_state }}&sort={{ filters.sort }}{% else %}/dashboard?workshop_id={{ workshop_id }}&status=erledigt&source={{ filters.source }}&question_state={{ filters.question_state }}&sort={{ filters.sort }}{% endif %}">
+        <a class="card kpi kpi-compact kpi-order-5" href="{% if archive_mode %}/dashboard/archive?workshop_id={{ workshop_id }}&status=erledigt&source={{ filters.source }}&question_state={{ filters.question_state }}&sort={{ filters.sort }}{% else %}/dashboard?workshop_id={{ workshop_id }}&status=erledigt&source={{ filters.source }}&question_state={{ filters.question_state }}&sort={{ filters.sort }}{% endif %}">
           <div class="label">Erledigt</div>
           <div class="value">{{ stats.erledigt or 0 }}</div>
           <div class="hint">Abgeschlossene oder fertige Fälle</div>
         </a>
 
-        <a class="card kpi kpi-hot" href="{% if archive_mode %}/dashboard/archive?workshop_id={{ workshop_id }}&status={{ filters.status }}&source={{ filters.source }}&question_state={{ filters.question_state }}&q=hoch&sort=priority{% else %}/dashboard?workshop_id={{ workshop_id }}&status={{ filters.status }}&source={{ filters.source }}&question_state={{ filters.question_state }}&q=hoch&sort=priority{% endif %}">
+        <a class="card kpi kpi-hot kpi-primary kpi-order-4" href="{% if archive_mode %}/dashboard/archive?workshop_id={{ workshop_id }}&status={{ filters.status }}&source={{ filters.source }}&question_state={{ filters.question_state }}&q=hoch&sort=priority{% else %}/dashboard?workshop_id={{ workshop_id }}&status={{ filters.status }}&source={{ filters.source }}&question_state={{ filters.question_state }}&q=hoch&sort=priority{% endif %}">
           <div class="label">Hohe Priorität</div>
           <div class="value">{{ stats.hoch or 0 }}</div>
           <div class="hint">Sofort prüfen oder zuerst bearbeiten</div>
         </a>
 
-        <a class="card kpi kpi-warn" href="{% if archive_mode %}/dashboard/archive?workshop_id={{ workshop_id }}&status={{ filters.status }}&source={{ filters.source }}&question_state={{ filters.question_state }}&q=notfall&sort=priority{% else %}/dashboard?workshop_id={{ workshop_id }}&status={{ filters.status }}&source={{ filters.source }}&question_state={{ filters.question_state }}&q=notfall&sort=priority{% endif %}">
+        <a class="card kpi kpi-warn kpi-compact kpi-order-6" href="{% if archive_mode %}/dashboard/archive?workshop_id={{ workshop_id }}&status={{ filters.status }}&source={{ filters.source }}&question_state={{ filters.question_state }}&q=notfall&sort=priority{% else %}/dashboard?workshop_id={{ workshop_id }}&status={{ filters.status }}&source={{ filters.source }}&question_state={{ filters.question_state }}&q=notfall&sort=priority{% endif %}">
           <div class="label">Notfall-Typ</div>
           <div class="value">{{ stats.notfall or 0 }}</div>
           <div class="hint">Kritische Anfragen mit erhöhter Dringlichkeit</div>
         </a>
 
-        <a class="card kpi kpi-customer" href="{% if archive_mode %}/dashboard/archive?workshop_id={{ workshop_id }}&status={{ filters.status }}&source={{ filters.source }}&question_state={{ filters.question_state }}&q=kundenfrage&sort=updated{% else %}/dashboard?workshop_id={{ workshop_id }}&status={{ filters.status }}&source={{ filters.source }}&question_state={{ filters.question_state }}&q=kundenfrage&sort=updated{% endif %}">
+        <a class="card kpi kpi-customer kpi-compact kpi-order-7" href="{% if archive_mode %}/dashboard/archive?workshop_id={{ workshop_id }}&status={{ filters.status }}&source={{ filters.source }}&question_state={{ filters.question_state }}&q=kundenfrage&sort=updated{% else %}/dashboard?workshop_id={{ workshop_id }}&status={{ filters.status }}&source={{ filters.source }}&question_state={{ filters.question_state }}&q=kundenfrage&sort=updated{% endif %}">
           <div class="label">Kundenfragen</div>
           <div class="value">{{ stats.kundenfragen or 0 }}</div>
           <div class="hint">Neue Rückfragen aus dem Chat</div>
         </a>
 
-        <a class="card kpi kpi-customer" href="{% if archive_mode %}/dashboard/archive?workshop_id={{ workshop_id }}&status={{ filters.status }}&source={{ filters.source }}&question_state=open&sort=updated{% else %}/dashboard?workshop_id={{ workshop_id }}&status={{ filters.status }}&source={{ filters.source }}&question_state=open&sort=updated{% endif %}">
+        <a class="card kpi kpi-customer kpi-primary kpi-order-3" href="{% if archive_mode %}/dashboard/archive?workshop_id={{ workshop_id }}&status={{ filters.status }}&source={{ filters.source }}&question_state=open&sort=updated{% else %}/dashboard?workshop_id={{ workshop_id }}&status={{ filters.status }}&source={{ filters.source }}&question_state=open&sort=updated{% endif %}">
           <div class="label">Offene Fragen</div>
           <div class="value">{{ stats.kundenfragen_offen or 0 }}</div>
           <div class="hint">Kundenfragen ohne Antwort vom Team</div>
         </a>
 
-        <a class="card kpi kpi-quote" href="{% if archive_mode %}/dashboard/archive?workshop_id={{ workshop_id }}&status={{ filters.status }}&source={{ filters.source }}&question_state={{ filters.question_state }}&q=kostenvoranschlag&sort=updated{% else %}/dashboard?workshop_id={{ workshop_id }}&status={{ filters.status }}&source={{ filters.source }}&question_state={{ filters.question_state }}&q=kostenvoranschlag&sort=updated{% endif %}">
+        <a class="card kpi kpi-quote kpi-compact kpi-order-8" href="{% if archive_mode %}/dashboard/archive?workshop_id={{ workshop_id }}&status={{ filters.status }}&source={{ filters.source }}&question_state={{ filters.question_state }}&q=kostenvoranschlag&sort=updated{% else %}/dashboard?workshop_id={{ workshop_id }}&status={{ filters.status }}&source={{ filters.source }}&question_state={{ filters.question_state }}&q=kostenvoranschlag&sort=updated{% endif %}">
           <div class="label">Kostenvoranschläge</div>
           <div class="value">{{ stats.kostenvoranschlag or 0 }}</div>
           <div class="hint">Preis- und Angebotsanfragen</div>
         </a>
 
-        <a class="card kpi" href="{% if archive_mode %}/dashboard/archive?workshop_id={{ workshop_id }}{% else %}/dashboard?workshop_id={{ workshop_id }}{% endif %}">
+        <a class="card kpi kpi-compact kpi-wide kpi-order-9" href="{% if archive_mode %}/dashboard/archive?workshop_id={{ workshop_id }}{% else %}/dashboard?workshop_id={{ workshop_id }}{% endif %}">
           <div class="label">Alle</div>
           <div class="value">{{ stats.all or 0 }}</div>
           <div class="hint">Gesamtanzahl in der aktuellen Ansicht</div>

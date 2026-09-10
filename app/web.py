@@ -672,6 +672,7 @@ def _render_dashboard(
         "dashboard.html",
         _template_context(
             request,
+            workshop=get_workshop(wid),
             tickets=tickets,
             attention_tickets=attention_tickets,
             stats=stats,
