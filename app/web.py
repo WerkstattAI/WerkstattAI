@@ -854,6 +854,7 @@ def dashboard_billing(
     workshop_id: str | None = None,
 ):
     wid = _workshop_id_for_request(request, workshop_id)
+    workshop = get_workshop(wid)
 
     return templates.TemplateResponse(
         request,
@@ -861,6 +862,7 @@ def dashboard_billing(
         _template_context(
             request,
             workshop_id=wid,
+            workshop=workshop,
             subscription=get_subscription(wid),
         ),
     )
@@ -1306,12 +1308,14 @@ def dashboard_intake(
     workshop_id: str | None = None,
 ):
     wid = _workshop_id_for_request(request, workshop_id)
+    workshop = get_workshop(wid)
     return templates.TemplateResponse(
         request,
         "intake.html",
         _template_context(
             request,
             workshop_id=wid,
+            workshop=workshop,
         ),
     )
 
@@ -1386,6 +1390,7 @@ def ticket_detail(
     reply_detail: str | None = None,
 ):
     wid = _workshop_id_for_request(request, workshop_id)
+    workshop = get_workshop(wid)
     ticket = find_ticket_by_id(ticket_id, workshop_id=wid)
     if not ticket:
         return HTMLResponse("Ticket nicht gefunden", status_code=404)
@@ -1433,6 +1438,7 @@ def ticket_detail(
             request,
             ticket=t,
             workshop_id=wid,
+            workshop=workshop,
             reply_status=(reply_status or "").strip(),
             reply_detail=(reply_detail or "").strip(),
         ),

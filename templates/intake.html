@@ -3,214 +3,622 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width,initial-scale=1" />
-  <title>WerkstattAI - Direktannahme</title>
+  <title>WerkstattAI – Direktannahme</title>
   <style>
     :root{
-      --bg:#0b1324;
-      --card:#121c33;
-      --line:rgba(255,255,255,.12);
-      --text:#e7edf7;
-      --muted:#9cadc5;
-      --accent:#60a5fa;
-      --accent-2:#22c55e;
+      --page:#f3f6f5;
+      --surface:#ffffff;
+      --surface-soft:#f8faf9;
+      --sidebar:#172a26;
+      --sidebar-deep:#13231f;
+      --petrol:#0f6f66;
+      --petrol-dark:#0c625a;
+      --text:#182522;
+      --muted:#65736f;
+      --border:#dfe6e3;
+      --shadow:0 8px 24px rgba(28,52,45,.08);
     }
+
     *{box-sizing:border-box}
+
     body{
       margin:0;
-      font-family:system-ui,-apple-system,Segoe UI,Roboto,Arial,sans-serif;
+      min-height:100vh;
       color:var(--text);
       background:
-        radial-gradient(900px 420px at 10% -10%, rgba(37,99,235,.40), transparent 60%),
-        radial-gradient(700px 360px at 90% 0%, rgba(34,197,94,.18), transparent 60%),
-        linear-gradient(140deg,#08111f,#121d35 45%,#0a1223);
+        radial-gradient(900px 440px at 72% -10%, rgba(15,111,102,.11), transparent 64%),
+        linear-gradient(180deg, #edf3f1 0, #f7f9f8 420px, var(--page) 100%);
+      font-family:"Segoe UI Variable", "Segoe UI", Inter, system-ui, -apple-system, sans-serif;
+      -webkit-font-smoothing:antialiased;
+    }
+
+    button,
+    input,
+    select,
+    textarea{
+      font:inherit;
+    }
+
+    button,
+    a{
+      -webkit-tap-highlight-color:transparent;
+    }
+
+    .app-shell{
+      width:100%;
       min-height:100vh;
-    }
-    .wrap{
-      max-width:980px;
-      margin:0 auto;
-      padding:24px;
-    }
-    .top{
-      display:flex;
-      justify-content:space-between;
-      align-items:center;
-      gap:12px;
-      margin-bottom:18px;
-      flex-wrap:wrap;
-    }
-    .back{
-      color:var(--text);
-      text-decoration:none;
-      border:1px solid var(--line);
-      border-radius:12px;
-      padding:10px 12px;
-      background:rgba(255,255,255,.06);
-      font-weight:700;
-    }
-    .card{
-      border:1px solid var(--line);
-      border-radius:18px;
-      background:linear-gradient(180deg, rgba(255,255,255,.11), rgba(255,255,255,.05));
-      box-shadow:0 20px 50px rgba(0,0,0,.35);
-      padding:18px;
-    }
-    h1{
-      margin:0;
-      font-size:30px;
-      letter-spacing:.2px;
-    }
-    .sub{
-      margin-top:6px;
-      color:var(--muted);
-      font-size:14px;
-    }
-    form{
-      margin-top:18px;
       display:grid;
-      grid-template-columns:repeat(2,minmax(0,1fr));
-      gap:12px;
+      grid-template-columns:244px minmax(0, 1fr);
+      align-items:start;
     }
-    .full{grid-column:1/-1}
-    label{
-      display:block;
+
+    .sidebar{
+      position:sticky;
+      top:0;
+      z-index:20;
+      min-height:100vh;
+      height:100vh;
+      overflow-y:auto;
+      display:flex;
+      flex-direction:column;
+      gap:26px;
+      padding:26px 18px 20px;
+      color:#f5fbf9;
+      background:
+        radial-gradient(360px 220px at 10% 0%, rgba(34,143,131,.24), transparent 70%),
+        linear-gradient(180deg, var(--sidebar) 0%, var(--sidebar-deep) 100%);
+      box-shadow:8px 0 28px rgba(22,42,36,.10);
+    }
+
+    .brand{
+      display:grid;
+      gap:7px;
+      padding:0 8px;
+    }
+
+    .brand-kicker{
+      color:#78c9bd;
       font-size:12px;
-      color:#c6d3e6;
-      font-weight:800;
-      letter-spacing:.04em;
-      margin-bottom:6px;
+      font-weight:750;
+      letter-spacing:.09em;
       text-transform:uppercase;
     }
-    input,select,textarea,button{
+
+    .brand-name{
+      color:#ffffff;
+      font-size:22px;
+      line-height:1.22;
+      font-weight:720;
+      letter-spacing:-.02em;
+    }
+
+    .brand-subtitle{
+      color:#aebeb9;
+      font-size:12px;
+      line-height:1.5;
+    }
+
+    .side-nav{
+      flex:1;
+      display:flex;
+      flex-direction:column;
+      align-items:stretch;
+      gap:5px;
+      min-height:0;
+    }
+
+    .nav-label{
+      margin:15px 10px 5px;
+      color:#7f948e;
+      font-size:11px;
+      font-weight:700;
+      letter-spacing:.11em;
+      text-transform:uppercase;
+    }
+
+    .nav-label:first-child{margin-top:0}
+
+    .side-link{
+      width:100%;
+      min-height:42px;
+      display:flex;
+      align-items:center;
+      justify-content:flex-start;
+      padding:10px 12px;
+      border:1px solid transparent;
+      border-radius:9px;
+      background:transparent;
+      color:#d5e0dc;
+      text-align:left;
+      text-decoration:none;
+      font-size:13px;
+      font-weight:600;
+      line-height:1.25;
+      cursor:pointer;
+      transition:background .16s ease, border-color .16s ease, color .16s ease;
+    }
+
+    .side-link:hover{
+      border-color:rgba(255,255,255,.06);
+      background:rgba(255,255,255,.07);
+      color:#ffffff;
+    }
+
+    .side-link.active{
+      border-color:rgba(86,194,177,.16);
+      background:rgba(64,166,151,.17);
+      color:#ffffff;
+      box-shadow:inset 3px 0 0 #58b8a9;
+    }
+
+    .side-link.intake-link{
+      margin-bottom:4px;
+      border-color:rgba(127,211,198,.24);
+      background:rgba(101,194,180,.12);
+      color:#e7f8f4;
+    }
+
+    .sidebar-foot{
+      display:grid;
+      gap:8px;
+    }
+
+    .sidebar-foot form{margin:0}
+
+    .session-status{
+      display:flex;
+      align-items:center;
+      gap:8px;
+      padding:10px 12px;
+      border:1px solid rgba(255,255,255,.07);
+      border-radius:9px;
+      background:rgba(255,255,255,.04);
+      color:#93a7a1;
+      font-size:12px;
+      font-weight:600;
+    }
+
+    .session-dot{
+      width:7px;
+      height:7px;
+      flex:0 0 auto;
+      border-radius:50%;
+      background:#65c5a0;
+      box-shadow:0 0 0 3px rgba(101,197,160,.12);
+    }
+
+    .workspace{
+      min-width:0;
+      padding:30px clamp(20px, 3vw, 46px) 46px;
+    }
+
+    .page-header{
+      display:flex;
+      align-items:flex-end;
+      justify-content:space-between;
+      gap:24px;
+      margin-bottom:20px;
+      padding:2px 2px 4px;
+    }
+
+    .overline{
+      margin-bottom:6px;
+      color:var(--petrol);
+      font-size:12px;
+      font-weight:700;
+      letter-spacing:.08em;
+      text-transform:uppercase;
+    }
+
+    h1{
+      margin:0;
+      color:#17231f;
+      font-size:30px;
+      line-height:1.15;
+      font-weight:720;
+      letter-spacing:-.025em;
+    }
+
+    .page-header p{
+      max-width:720px;
+      margin:8px 0 0;
+      color:var(--muted);
+      font-size:14px;
+      line-height:1.55;
+    }
+
+    .required-note{
+      flex:0 0 auto;
+      color:#75827e;
+      font-size:12px;
+    }
+
+    .required-mark{color:#a4443f}
+
+    .form-card{
+      max-width:1060px;
+      overflow:hidden;
+      border:1px solid var(--border);
+      border-radius:13px;
+      background:var(--surface);
+      box-shadow:var(--shadow);
+    }
+
+    .intake-form{display:grid}
+
+    .form-section{
+      display:grid;
+      gap:15px;
+      padding:20px;
+    }
+
+    .form-section + .form-section{
+      border-top:1px solid var(--border);
+    }
+
+    .section-heading{
+      display:flex;
+      align-items:flex-start;
+      gap:12px;
+    }
+
+    .section-number{
+      width:28px;
+      height:28px;
+      flex:0 0 auto;
+      display:grid;
+      place-items:center;
+      border-radius:8px;
+      background:#e8f2ef;
+      color:#195149;
+      font-size:12px;
+      font-weight:750;
+    }
+
+    .section-heading h2{
+      margin:1px 0 0;
+      color:#263530;
+      font-size:14px;
+      font-weight:720;
+    }
+
+    .section-heading p{
+      margin:3px 0 0;
+      color:#75827e;
+      font-size:12px;
+      line-height:1.45;
+    }
+
+    .form-grid{
+      display:grid;
+      grid-template-columns:repeat(2, minmax(0, 1fr));
+      gap:14px;
+    }
+
+    .vehicle-grid{
+      grid-template-columns:minmax(220px, 2fr) minmax(130px, 1fr) minmax(160px, 1fr);
+    }
+
+    .field{
+      display:grid;
+      align-content:start;
+      gap:7px;
+    }
+
+    .field.full{grid-column:1 / -1}
+
+    label{
+      color:#34433e;
+      font-size:13px;
+      font-weight:650;
+    }
+
+    input,
+    select,
+    textarea{
       width:100%;
       min-height:44px;
-      border-radius:12px;
-      border:1px solid var(--line);
-      background:rgba(7,14,27,.72);
-      color:var(--text);
       padding:10px 12px;
+      border:1px solid #d8e1de;
+      border-radius:9px;
       outline:none;
+      background:var(--surface-soft);
+      color:var(--text);
+      transition:border-color .16s ease, box-shadow .16s ease, background .16s ease;
     }
-    textarea{min-height:110px;resize:vertical}
-    input:focus,select:focus,textarea:focus{
-      border-color:rgba(96,165,250,.45);
-      box-shadow:0 0 0 3px rgba(96,165,250,.12);
+
+    textarea{
+      min-height:132px;
+      resize:vertical;
+      line-height:1.5;
     }
-    .actions{
-      grid-column:1/-1;
+
+    input::placeholder,
+    textarea::placeholder{color:#8b9894}
+
+    input:hover,
+    select:hover,
+    textarea:hover{
+      border-color:#c2d0cc;
+      background:#ffffff;
+    }
+
+    input:focus,
+    select:focus,
+    textarea:focus{
+      border-color:#5b9e94;
+      background:#ffffff;
+      box-shadow:0 0 0 3px rgba(15,111,102,.11);
+    }
+
+    .hint{
+      color:#75827e;
+      font-size:12px;
+      line-height:1.45;
+    }
+
+    .form-actions{
       display:flex;
-      gap:10px;
       justify-content:flex-end;
-      margin-top:8px;
+      gap:10px;
+      padding:16px 20px 20px;
+      border-top:1px solid var(--border);
+      background:#fbfcfc;
     }
-    .btn{
-      min-width:180px;
-      font-weight:800;
-      cursor:pointer;
-    }
-    .btn.save{
-      background:linear-gradient(180deg, rgba(96,165,250,.28), rgba(96,165,250,.12));
-      border-color:rgba(96,165,250,.38);
-    }
-    .btn.cancel{
-      text-decoration:none;
+
+    .button{
+      min-height:44px;
+      min-width:150px;
       display:inline-flex;
       align-items:center;
       justify-content:center;
-      border:1px solid var(--line);
-      background:rgba(255,255,255,.05);
-      color:var(--text);
+      padding:10px 15px;
+      border:1px solid #d4dedb;
+      border-radius:9px;
+      background:#ffffff;
+      color:#485752;
+      text-decoration:none;
+      font-size:13px;
+      font-weight:700;
+      line-height:1.2;
+      cursor:pointer;
+      transition:background .16s ease, border-color .16s ease, transform .16s ease, box-shadow .16s ease;
     }
-    @media (max-width: 860px){
-      form{grid-template-columns:1fr}
+
+    .button:hover{
+      border-color:#c4d0cc;
+      background:#f3f6f5;
+    }
+
+    .button.primary{
+      border-color:var(--petrol-dark);
+      background:var(--petrol);
+      color:#ffffff;
+      box-shadow:0 8px 18px rgba(15,111,102,.18);
+    }
+
+    .button.primary:hover{
+      transform:translateY(-1px);
+      background:var(--petrol-dark);
+      box-shadow:0 10px 22px rgba(15,111,102,.22);
+    }
+
+    .button:focus-visible,
+    .side-link:focus-visible{
+      outline:3px solid rgba(88,184,169,.28);
+      outline-offset:2px;
+    }
+
+    @media (max-width:1100px){
+      .vehicle-grid{grid-template-columns:repeat(2, minmax(0, 1fr))}
+      .vehicle-grid .field:first-child{grid-column:1 / -1}
+    }
+
+    @media (max-width:980px){
+      .app-shell{display:block}
+
+      .sidebar{
+        position:relative;
+        width:auto;
+        height:auto;
+        min-height:0;
+        gap:18px;
+        padding:20px;
+      }
+
+      .side-nav{
+        display:flex;
+        flex-direction:row;
+        flex-wrap:wrap;
+        align-items:center;
+      }
+
+      .nav-label{display:none}
+      .side-link{width:auto}
+      .sidebar-foot{display:flex;align-items:center;flex-wrap:wrap}
+      .sidebar-foot form{width:auto}
+      .session-status{width:auto}
+      .workspace{padding:24px 20px 38px}
+    }
+
+    @media (max-width:680px){
+      .workspace{padding:20px 14px 30px}
+      .page-header{align-items:flex-start;flex-direction:column;gap:8px}
+      h1{font-size:26px}
+      .form-grid,.vehicle-grid{grid-template-columns:1fr}
+      .vehicle-grid .field:first-child{grid-column:auto}
+      .field.full{grid-column:auto}
+      .form-section{padding:16px}
+      .form-actions{display:grid;grid-template-columns:1fr;padding:16px}
+      .button{width:100%;min-width:0}
+    }
+
+    @media (max-width:520px){
+      .sidebar{padding:18px 14px}
+      .side-nav{display:grid;grid-template-columns:repeat(2, minmax(0, 1fr));width:100%}
+      .side-link{width:100%}
+      .sidebar-foot{display:grid;grid-template-columns:1fr 1fr}
+      .sidebar-foot .side-link,.session-status{width:100%}
     }
   </style>
 </head>
 <body>
-  <div class="wrap">
-    <div class="top">
-      <a class="back" href="/dashboard?workshop_id={{ workshop_id }}">Zurück zum Dashboard</a>
-    </div>
+  <div class="app-shell">
+    <aside class="sidebar">
+      <div class="brand">
+        <div class="brand-kicker">WerkstattAI</div>
+        <div class="brand-name">{{ workshop.name or "Werkstattbereich" }}</div>
+        <div class="brand-subtitle">Digitaler Werkstattbereich</div>
+      </div>
 
-    <section class="card">
-      <h1>Direktannahme</h1>
-      <div class="sub">Ticket manuell erfassen, wenn der Kunde direkt in der Werkstatt ist.</div>
+      <nav class="side-nav" aria-label="Hauptnavigation">
+        <div class="nav-label">Anfragen</div>
+        <a class="side-link" href="/dashboard?workshop_id={{ workshop_id }}">Aktive Tickets</a>
+        <a class="side-link" href="/dashboard/whatsapp?workshop_id={{ workshop_id }}">WhatsApp</a>
+        <a class="side-link intake-link active" aria-current="page" href="/dashboard/intake?workshop_id={{ workshop_id }}">+ Direktannahme</a>
 
-      <form method="post" action="/dashboard/intake">
-        <input type="hidden" name="workshop_id" value="{{ workshop_id }}" />
+        <div class="nav-label">Verwaltung</div>
+        <a class="side-link" href="/dashboard/archive?workshop_id={{ workshop_id }}">Archiv</a>
+        <a class="side-link" href="/dashboard/settings?workshop_id={{ workshop_id }}">Einstellungen</a>
+        <a class="side-link" href="/dashboard/billing?workshop_id={{ workshop_id }}">Abo</a>
+        {% if current_user and current_user.role == "admin" %}
+          <a class="side-link" href="/dashboard/admin/workshops">Admin</a>
+        {% endif %}
+      </nav>
 
+      <div class="sidebar-foot">
+        <form method="post" action="/logout">
+          <button class="side-link" type="submit">Abmelden</button>
+        </form>
+        <div class="session-status"><span class="session-dot"></span>Sicher angemeldet</div>
+      </div>
+    </aside>
+
+    <main class="workspace">
+      <header class="page-header">
         <div>
-          <label for="fahrzeug">Fahrzeug</label>
-          <input id="fahrzeug" name="fahrzeug" placeholder="z.B. VW Golf" required />
+          <div class="overline">Manuelle Erfassung</div>
+          <h1>Neue Direktannahme</h1>
+          <p>Erstellen Sie ein Ticket für einen Kunden, der sein Anliegen direkt in der Werkstatt schildert.</p>
         </div>
+        <div class="required-note"><span class="required-mark">*</span> Pflichtfeld</div>
+      </header>
 
-        <div>
-          <label for="baujahr">Baujahr</label>
-          <input id="baujahr" name="baujahr" placeholder="z.B. 2018" />
-        </div>
+      <section class="form-card">
+        <form class="intake-form" method="post" action="/dashboard/intake">
+          <input type="hidden" name="workshop_id" value="{{ workshop_id }}" />
 
-        <div>
-          <label for="kilometerstand">Kilometerstand</label>
-          <input id="kilometerstand" name="kilometerstand" placeholder="z.B. 95000" />
-        </div>
+          <div class="form-section">
+            <div class="section-heading">
+              <div class="section-number">1</div>
+              <div>
+                <h2>Fahrzeug</h2>
+                <p>Grunddaten für die schnelle Zuordnung des Auftrags.</p>
+              </div>
+            </div>
 
-        <div>
-          <label for="telefon">Telefon</label>
-          <input id="telefon" name="telefon" placeholder="z.B. 0176 12345678" />
-        </div>
+            <div class="form-grid vehicle-grid">
+              <div class="field">
+                <label for="fahrzeug">Fahrzeug <span class="required-mark" aria-hidden="true">*</span></label>
+                <input id="fahrzeug" name="fahrzeug" placeholder="z. B. VW Golf" required />
+              </div>
 
-        <div>
-          <label for="name">Name</label>
-          <input id="name" name="name" placeholder="z.B. Max Mustermann" />
-        </div>
+              <div class="field">
+                <label for="baujahr">Baujahr</label>
+                <input id="baujahr" name="baujahr" placeholder="z. B. 2018" inputmode="numeric" />
+              </div>
 
-        <div>
-          <label for="request_type">Typ</label>
-          <select id="request_type" name="request_type">
-            <option value="diagnose">Diagnose</option>
-            <option value="service">Service</option>
-            <option value="notfall">Notfall</option>
-            <option value="kostenvoranschlag">Kostenvoranschlag</option>
-          </select>
-        </div>
+              <div class="field">
+                <label for="kilometerstand">Kilometerstand</label>
+                <input id="kilometerstand" name="kilometerstand" placeholder="z. B. 95.000 km" inputmode="numeric" />
+              </div>
+            </div>
+          </div>
 
-        <div>
-          <label for="priority">Priorität</label>
-          <select id="priority" name="priority">
-            <option value="normal">Normal</option>
-            <option value="hoch">Hoch</option>
-            <option value="niedrig">Niedrig</option>
-          </select>
-        </div>
+          <div class="form-section">
+            <div class="section-heading">
+              <div class="section-number">2</div>
+              <div>
+                <h2>Kundendaten</h2>
+                <p>Kontaktangaben für Rückfragen und Statusmeldungen.</p>
+              </div>
+            </div>
 
-        <div>
-          <label for="fahrbereit">Fahrbereit</label>
-          <select id="fahrbereit" name="fahrbereit">
-            <option value="">Nicht angegeben</option>
-            <option value="ja">Ja</option>
-            <option value="nein">Nein</option>
-          </select>
-        </div>
+            <div class="form-grid">
+              <div class="field">
+                <label for="name">Kundenname</label>
+                <input id="name" name="name" placeholder="z. B. Max Mustermann" autocomplete="name" />
+              </div>
 
-        <div>
-          <label for="abschleppdienst">Abschleppdienst</label>
-          <select id="abschleppdienst" name="abschleppdienst">
-            <option value="">Nicht angegeben</option>
-            <option value="ja">Ja</option>
-            <option value="nein">Nein</option>
-          </select>
-        </div>
+              <div class="field">
+                <label for="telefon">Telefon</label>
+                <input id="telefon" name="telefon" placeholder="z. B. 0176 12345678" autocomplete="tel" inputmode="tel" />
+              </div>
+            </div>
+          </div>
 
-        <div class="full">
-          <label for="problem">Anliegen</label>
-          <textarea id="problem" name="problem" placeholder="Kurz das Problem oder den Auftrag beschreiben..." required></textarea>
-        </div>
+          <div class="form-section">
+            <div class="section-heading">
+              <div class="section-number">3</div>
+              <div>
+                <h2>Auftrag</h2>
+                <p>Art, Dringlichkeit und kurze Beschreibung des Kundenanliegens.</p>
+              </div>
+            </div>
 
-        <div class="actions">
-          <a class="btn cancel" href="/dashboard?workshop_id={{ workshop_id }}">Abbrechen</a>
-          <button class="btn save" type="submit">Ticket speichern</button>
-        </div>
-      </form>
-    </section>
+            <div class="form-grid">
+              <div class="field">
+                <label for="request_type">Anfrageart</label>
+                <select id="request_type" name="request_type">
+                  <option value="diagnose">Diagnose</option>
+                  <option value="service">Service</option>
+                  <option value="notfall">Notfall</option>
+                  <option value="kostenvoranschlag">Kostenvoranschlag</option>
+                </select>
+              </div>
+
+              <div class="field">
+                <label for="priority">Priorität</label>
+                <select id="priority" name="priority">
+                  <option value="normal">Normal</option>
+                  <option value="hoch">Hoch</option>
+                  <option value="niedrig">Niedrig</option>
+                </select>
+              </div>
+
+              <div class="field">
+                <label for="fahrbereit">Fahrbereit</label>
+                <select id="fahrbereit" name="fahrbereit">
+                  <option value="">Nicht angegeben</option>
+                  <option value="ja">Ja</option>
+                  <option value="nein">Nein</option>
+                </select>
+              </div>
+
+              <div class="field">
+                <label for="abschleppdienst">Abschleppdienst</label>
+                <select id="abschleppdienst" name="abschleppdienst">
+                  <option value="">Nicht angegeben</option>
+                  <option value="ja">Ja</option>
+                  <option value="nein">Nein</option>
+                </select>
+              </div>
+
+              <div class="field full">
+                <label for="problem">Anliegen oder Auftrag <span class="required-mark" aria-hidden="true">*</span></label>
+                <textarea id="problem" name="problem" placeholder="Beschreiben Sie kurz das Problem oder den gewünschten Auftrag." required></textarea>
+                <span class="hint">Die Beschreibung erscheint später direkt im Ticket.</span>
+              </div>
+            </div>
+          </div>
+
+          <div class="form-actions">
+            <a class="button" href="/dashboard?workshop_id={{ workshop_id }}">Abbrechen</a>
+            <button class="button primary" type="submit">Ticket speichern</button>
+          </div>
+        </form>
+      </section>
+    </main>
   </div>
 </body>
 </html>

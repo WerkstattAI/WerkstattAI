@@ -3,210 +3,358 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width,initial-scale=1" />
-  <title>WerkstattAI - Einstellungen</title>
+  <title>WerkstattAI – Einstellungen</title>
   <style>
     :root{
-      --bg:#09111f;
-      --card:#0f1b33;
-      --panel:#101a31;
-      --line:rgba(255,255,255,.12);
-      --text:#e8eef8;
-      --muted:#97a3b6;
-      --soft:#c8d4e4;
-      --ok:#22c55e;
-      --info:#60a5fa;
-      --warn:#f59e0b;
-      --shadow:0 24px 64px rgba(0,0,0,.42);
+      --page:#f3f6f5;
+      --surface:#ffffff;
+      --surface-soft:#f8faf9;
+      --sidebar:#172a26;
+      --sidebar-deep:#13231f;
+      --petrol:#0f6f66;
+      --petrol-dark:#0c625a;
+      --text:#182522;
+      --muted:#65736f;
+      --border:#dfe6e3;
+      --border-strong:#cfdad6;
+      --success:#23815d;
+      --shadow:0 8px 24px rgba(28,52,45,.08);
+      --shadow-raised:0 18px 42px rgba(28,52,45,.12);
     }
 
     *{box-sizing:border-box}
 
+    html{scroll-behavior:smooth}
+
     body{
       margin:0;
       min-height:100vh;
-      font-family:system-ui, -apple-system, Segoe UI, Roboto, Arial, sans-serif;
       color:var(--text);
       background:
-        linear-gradient(90deg, rgba(255,255,255,.055) 1px, transparent 1px),
-        linear-gradient(180deg, rgba(255,255,255,.045) 1px, transparent 1px),
-        radial-gradient(900px 420px at 10% -8%, rgba(37,99,235,.48), transparent 64%),
-        radial-gradient(760px 360px at 86% 4%, rgba(245,158,11,.24), transparent 62%),
-        linear-gradient(135deg, #08111f 0%, #101b31 42%, #0a1020 100%);
-      background-size:44px 44px, 44px 44px, auto, auto, auto;
+        radial-gradient(900px 440px at 72% -10%, rgba(15,111,102,.11), transparent 64%),
+        linear-gradient(180deg, #edf3f1 0, #f7f9f8 420px, var(--page) 100%);
+      font-family:"Segoe UI Variable", "Segoe UI", Inter, system-ui, -apple-system, sans-serif;
+      -webkit-font-smoothing:antialiased;
     }
 
-    .wrap{
-      width:min(1180px, 100%);
-      margin:0 auto;
-      padding:22px;
+    button,
+    input,
+    textarea{
+      font:inherit;
     }
 
-    .topbar{
+    button,
+    a{
+      -webkit-tap-highlight-color:transparent;
+    }
+
+    .app-shell{
+      width:100%;
+      min-height:100vh;
+      display:grid;
+      grid-template-columns:244px minmax(0, 1fr);
+      align-items:start;
+    }
+
+    .sidebar{
+      position:sticky;
+      top:0;
+      z-index:20;
+      min-height:100vh;
+      height:100vh;
+      overflow-y:auto;
       display:flex;
-      justify-content:space-between;
-      align-items:flex-start;
-      gap:16px;
-      flex-wrap:wrap;
-      margin-bottom:22px;
-      padding:24px;
-      border:1px solid rgba(255,255,255,.18);
-      border-radius:28px;
+      flex-direction:column;
+      gap:26px;
+      padding:26px 18px 20px;
+      color:#f5fbf9;
       background:
-        linear-gradient(135deg, rgba(59,130,246,.38), rgba(255,255,255,.09) 45%, rgba(245,158,11,.16)),
-        rgba(8,15,28,.86);
-      box-shadow:0 30px 90px rgba(0,0,0,.48), inset 0 1px 0 rgba(255,255,255,.16);
-      backdrop-filter:blur(18px);
+        radial-gradient(360px 220px at 10% 0%, rgba(34,143,131,.24), transparent 70%),
+        linear-gradient(180deg, var(--sidebar) 0%, var(--sidebar-deep) 100%);
+      box-shadow:8px 0 28px rgba(22,42,36,.10);
     }
 
-    .eyebrow{
-      display:inline-flex;
-      width:max-content;
-      padding:7px 11px;
-      border-radius:999px;
-      border:1px solid rgba(255,255,255,.22);
-      background:rgba(255,255,255,.13);
-      color:#eaf2ff;
+    .brand{
+      display:grid;
+      gap:7px;
+      padding:0 8px;
+    }
+
+    .brand-kicker{
+      color:#78c9bd;
       font-size:12px;
-      font-weight:850;
-      letter-spacing:.04em;
+      font-weight:750;
+      letter-spacing:.09em;
+      text-transform:uppercase;
+    }
+
+    .brand-name{
+      color:#ffffff;
+      font-size:22px;
+      line-height:1.22;
+      font-weight:720;
+      letter-spacing:-.02em;
+      overflow-wrap:anywhere;
+    }
+
+    .brand-subtitle{
+      color:#aebeb9;
+      font-size:12px;
+      line-height:1.5;
+    }
+
+    .side-nav{
+      flex:1;
+      display:flex;
+      flex-direction:column;
+      align-items:stretch;
+      gap:5px;
+      min-height:0;
+    }
+
+    .nav-label{
+      margin:15px 10px 5px;
+      color:#7f948e;
+      font-size:11px;
+      font-weight:700;
+      letter-spacing:.11em;
+      text-transform:uppercase;
+    }
+
+    .nav-label:first-child{margin-top:0}
+
+    .side-link{
+      width:100%;
+      min-height:42px;
+      display:flex;
+      align-items:center;
+      justify-content:flex-start;
+      padding:10px 12px;
+      border:1px solid transparent;
+      border-radius:9px;
+      background:transparent;
+      color:#d5e0dc;
+      text-align:left;
+      text-decoration:none;
+      font-size:13px;
+      font-weight:600;
+      line-height:1.25;
+      cursor:pointer;
+      transition:background .16s ease, border-color .16s ease, color .16s ease;
+    }
+
+    .side-link:hover{
+      border-color:rgba(255,255,255,.06);
+      background:rgba(255,255,255,.07);
+      color:#ffffff;
+    }
+
+    .side-link.active{
+      border-color:rgba(86,194,177,.16);
+      background:rgba(64,166,151,.17);
+      color:#ffffff;
+      box-shadow:inset 3px 0 0 #58b8a9;
+    }
+
+    .side-link.intake-link{
+      margin-bottom:4px;
+      border-color:rgba(127,211,198,.24);
+      background:rgba(101,194,180,.12);
+      color:#e7f8f4;
+    }
+
+    .sidebar-foot{
+      display:grid;
+      gap:8px;
+    }
+
+    .sidebar-foot form{margin:0}
+
+    .session-status{
+      display:flex;
+      align-items:center;
+      gap:8px;
+      padding:10px 12px;
+      border:1px solid rgba(255,255,255,.07);
+      border-radius:9px;
+      background:rgba(255,255,255,.04);
+      color:#93a7a1;
+      font-size:12px;
+      font-weight:600;
+    }
+
+    .session-dot{
+      width:7px;
+      height:7px;
+      flex:0 0 auto;
+      border-radius:50%;
+      background:#65c5a0;
+      box-shadow:0 0 0 3px rgba(101,197,160,.12);
+    }
+
+    .workspace{
+      min-width:0;
+      padding:30px clamp(20px, 3vw, 46px) 46px;
+    }
+
+    .page-header{
+      display:flex;
+      align-items:flex-end;
+      justify-content:space-between;
+      gap:24px;
+      margin-bottom:20px;
+      padding:2px 2px 4px;
+    }
+
+    .overline{
+      margin-bottom:6px;
+      color:var(--petrol);
+      font-size:12px;
+      font-weight:700;
+      letter-spacing:.08em;
       text-transform:uppercase;
     }
 
     h1{
+      margin:0;
+      color:#17231f;
+      font-size:30px;
+      line-height:1.15;
+      font-weight:720;
+      letter-spacing:-.025em;
+    }
+
+    .page-header p{
+      max-width:760px;
       margin:8px 0 0;
-      font-size:42px;
-      line-height:1.1;
-    }
-
-    .sub{
-      max-width:720px;
-      margin-top:8px;
-      color:#b9c6d8;
+      color:var(--muted);
       font-size:14px;
-      line-height:1.5;
+      line-height:1.55;
     }
 
-    .top-actions{
-      display:flex;
-      gap:10px;
-      flex-wrap:wrap;
-      align-items:center;
-    }
-
-    .nav-btn,
-    button{
-      display:inline-flex;
-      align-items:center;
-      justify-content:center;
-      min-height:44px;
-      padding:10px 14px;
-      border-radius:14px;
-      border:1px solid var(--line);
-      background:rgba(255,255,255,.06);
-      color:var(--text);
-      text-decoration:none;
-      font-weight:850;
-      cursor:pointer;
-      transition:.18s ease;
-    }
-
-    .nav-btn:hover,
-    button:hover{
-      background:rgba(96,165,250,.15);
-      transform:translateY(-1px);
-    }
-
-    .nav-btn.active{
-      border-color:rgba(96,165,250,.42);
-      background:rgba(96,165,250,.18);
-    }
-
-    .grid{
+    .content-grid{
       display:grid;
-      grid-template-columns:minmax(0, 1.2fr) minmax(320px, .8fr);
+      grid-template-columns:minmax(0, 1.35fr) minmax(290px, .65fr);
       gap:18px;
       align-items:start;
     }
 
     .card{
-      border:1px solid rgba(255,255,255,.16);
-      border-radius:24px;
-      background:linear-gradient(180deg, rgba(255,255,255,.12), rgba(255,255,255,.055));
-      box-shadow:var(--shadow);
       overflow:hidden;
+      border:1px solid var(--border);
+      border-radius:13px;
+      background:var(--surface);
+      box-shadow:var(--shadow);
     }
 
     .card-head{
       padding:18px 20px;
-      border-bottom:1px solid rgba(255,255,255,.11);
-      background:linear-gradient(135deg, rgba(96,165,250,.18), rgba(255,255,255,.055));
+      border-bottom:1px solid var(--border);
+      background:var(--surface);
     }
 
     .card-title{
       margin:0;
+      color:#1b2925;
       font-size:16px;
-      font-weight:900;
-      letter-spacing:.02em;
+      font-weight:720;
+      letter-spacing:-.01em;
     }
 
     .card-sub{
       margin-top:6px;
       color:var(--muted);
       font-size:13px;
-      line-height:1.45;
+      line-height:1.5;
     }
 
     .form{
-      padding:20px;
       display:grid;
-      gap:16px;
+      gap:18px;
+      padding:20px;
     }
 
-    .row{
+    .form-section{
       display:grid;
-      grid-template-columns:1fr 1fr;
+      gap:14px;
+    }
+
+    .form-section + .form-section{
+      padding-top:19px;
+      border-top:1px solid var(--border);
+    }
+
+    .section-heading{
+      display:grid;
+      gap:3px;
+    }
+
+    .section-heading h3{
+      margin:0;
+      color:#263530;
+      font-size:14px;
+      font-weight:720;
+    }
+
+    .section-heading p{
+      margin:0;
+      color:#75827e;
+      font-size:12px;
+      line-height:1.45;
+    }
+
+    .field-row{
+      display:grid;
+      grid-template-columns:repeat(2, minmax(0, 1fr));
       gap:14px;
     }
 
     label{
       display:grid;
-      gap:8px;
-      color:#dbe6f5;
+      align-content:start;
+      gap:7px;
+      color:#34433e;
       font-size:13px;
-      font-weight:850;
+      font-weight:650;
     }
 
     input,
     textarea{
       width:100%;
       min-height:44px;
-      padding:11px 12px;
-      border-radius:14px;
-      border:1px solid var(--line);
-      background:rgba(10,18,34,.76);
-      color:var(--text);
+      padding:10px 12px;
+      border:1px solid #d8e1de;
+      border-radius:9px;
       outline:none;
-      font:inherit;
-      transition:.18s ease;
+      background:var(--surface-soft);
+      color:var(--text);
+      transition:border-color .16s ease, box-shadow .16s ease, background .16s ease;
     }
 
     textarea{
-      min-height:92px;
+      min-height:96px;
       resize:vertical;
-      line-height:1.45;
+      line-height:1.5;
+    }
+
+    input:hover,
+    textarea:hover{
+      border-color:#c2d0cc;
+      background:#ffffff;
     }
 
     input:focus,
     textarea:focus{
-      border-color:rgba(96,165,250,.46);
-      box-shadow:0 0 0 3px rgba(96,165,250,.12);
+      border-color:#5b9e94;
+      background:#ffffff;
+      box-shadow:0 0 0 3px rgba(15,111,102,.11);
     }
 
     .hint{
-      color:var(--muted);
+      color:#75827e;
       font-size:12px;
       line-height:1.45;
-      font-weight:650;
+      font-weight:400;
     }
 
     .actions{
@@ -214,218 +362,360 @@
       justify-content:flex-end;
       gap:10px;
       flex-wrap:wrap;
-      padding-top:4px;
+      padding-top:2px;
     }
 
-    .primary{
-      border-color:rgba(96,165,250,.42);
-      background:linear-gradient(180deg, rgba(96,165,250,.28), rgba(96,165,250,.14));
+    .button{
+      min-height:44px;
+      display:inline-flex;
+      align-items:center;
+      justify-content:center;
+      padding:10px 15px;
+      border:1px solid #d4dedb;
+      border-radius:9px;
+      background:#ffffff;
+      color:#485752;
+      text-decoration:none;
+      font-size:13px;
+      font-weight:700;
+      line-height:1.2;
+      cursor:pointer;
+      transition:background .16s ease, border-color .16s ease, transform .16s ease, box-shadow .16s ease;
+    }
+
+    .button:hover{
+      border-color:#c4d0cc;
+      background:#f3f6f5;
+    }
+
+    .button:focus-visible,
+    .side-link:focus-visible{
+      outline:3px solid rgba(88,184,169,.28);
+      outline-offset:2px;
+    }
+
+    .button.primary{
+      border-color:var(--petrol-dark);
+      background:var(--petrol);
+      color:#ffffff;
+      box-shadow:0 8px 18px rgba(15,111,102,.18);
+    }
+
+    .button.primary:hover{
+      transform:translateY(-1px);
+      background:var(--petrol-dark);
+      box-shadow:0 10px 22px rgba(15,111,102,.22);
     }
 
     .success{
-      margin:0 20px 18px;
+      display:flex;
+      align-items:center;
+      gap:9px;
+      margin:0 20px 20px;
       padding:12px 14px;
-      border-radius:16px;
-      border:1px solid rgba(34,197,94,.32);
-      background:rgba(34,197,94,.13);
-      color:#bbf7d0;
+      border:1px solid #bcdccb;
+      border-radius:9px;
+      background:#edf8f2;
+      color:#246d51;
       font-size:13px;
-      font-weight:850;
+      font-weight:650;
+    }
+
+    .success::before{
+      content:"";
+      width:8px;
+      height:8px;
+      flex:0 0 auto;
+      border-radius:50%;
+      background:var(--success);
+    }
+
+    .preview-card{
+      position:sticky;
+      top:30px;
     }
 
     .preview{
-      padding:18px 20px 20px;
       display:grid;
-      gap:12px;
+      gap:10px;
+      padding:16px 18px 18px;
     }
 
-    .item{
-      padding:14px;
-      border-radius:16px;
-      border:1px solid rgba(255,255,255,.10);
-      background:rgba(0,0,0,.16);
+    .preview-item{
+      padding:13px 14px;
+      border:1px solid #e4eae8;
+      border-radius:10px;
+      background:var(--surface-soft);
     }
 
-    .item b{
+    .preview-item b{
       display:block;
-      margin-bottom:6px;
-      font-size:12px;
-      color:#c7d2fe;
+      margin-bottom:5px;
+      color:#65736f;
+      font-size:11px;
+      font-weight:700;
+      letter-spacing:.08em;
       text-transform:uppercase;
-      letter-spacing:.06em;
     }
 
-    .item div{
-      color:#edf4ff;
-      font-size:14px;
-      line-height:1.45;
+    .preview-item div{
+      color:#35433e;
+      font-size:13px;
+      line-height:1.5;
       white-space:pre-wrap;
-      word-break:break-word;
+      overflow-wrap:anywhere;
     }
 
-    @media (max-width: 900px){
-      .grid,
-      .row{
-        grid-template-columns:1fr;
+    @media (max-width:1080px){
+      .content-grid{grid-template-columns:minmax(0, 1fr) 320px}
+    }
+
+    @media (max-width:980px){
+      .app-shell{display:block}
+
+      .sidebar{
+        position:relative;
+        width:auto;
+        height:auto;
+        min-height:0;
+        gap:18px;
+        padding:20px;
       }
 
-      h1{
-        font-size:32px;
+      .side-nav{
+        display:flex;
+        flex-direction:row;
+        flex-wrap:wrap;
+        align-items:center;
       }
+
+      .nav-label{display:none}
+      .side-link{width:auto}
+      .sidebar-foot{display:flex;align-items:center;flex-wrap:wrap}
+      .sidebar-foot form{width:auto}
+      .session-status{width:auto}
+      .workspace{padding:24px 20px 38px}
+      .content-grid{grid-template-columns:1fr}
+      .preview-card{position:static}
+    }
+
+    @media (max-width:680px){
+      .workspace{padding:20px 14px 30px}
+      h1{font-size:26px}
+      .page-header{align-items:flex-start}
+      .field-row{grid-template-columns:1fr}
+      .card-head,.form{padding:16px}
+      .preview{padding:14px}
+      .success{margin:0 16px 16px}
+      .actions{display:grid;grid-template-columns:1fr}
+      .button{width:100%}
+    }
+
+    @media (max-width:520px){
+      .sidebar{padding:18px 14px}
+      .side-nav{display:grid;grid-template-columns:repeat(2, minmax(0, 1fr));width:100%}
+      .side-link{width:100%}
+      .sidebar-foot{display:grid;grid-template-columns:1fr 1fr}
+      .sidebar-foot .side-link,.session-status{width:100%}
     }
   </style>
 </head>
 <body>
-  <div class="wrap">
-    <div class="topbar">
-      <div>
-        <div class="eyebrow">WerkstattAI - Konfiguration</div>
-        <h1>Werkstatt-Einstellungen</h1>
-        <div class="sub">
-          Diese Daten nutzt der Assistent fuer allgemeine Fragen zu Kontakt, Adresse, Oeffnungszeiten, Leistungen, Preisen und Abschleppdienst.
-        </div>
+  <div class="app-shell">
+    <aside class="sidebar">
+      <div class="brand">
+        <div class="brand-kicker">WerkstattAI</div>
+        <div class="brand-name">{{ workshop.name or "Werkstattbereich" }}</div>
+        <div class="brand-subtitle">Digitaler Werkstattbereich</div>
       </div>
 
-      <div class="top-actions">
-        <a class="nav-btn" href="/dashboard?workshop_id={{ workshop_id }}">Dashboard</a>
-        <a class="nav-btn" href="/dashboard/archive?workshop_id={{ workshop_id }}">Archiv</a>
-        <a class="nav-btn" href="/dashboard/whatsapp?workshop_id={{ workshop_id }}">WhatsApp</a>
-        <a class="nav-btn active" href="/dashboard/settings?workshop_id={{ workshop_id }}">Einstellungen</a>
-        <a class="nav-btn" href="/dashboard/billing?workshop_id={{ workshop_id }}">Abo</a>
+      <nav class="side-nav" aria-label="Hauptnavigation">
+        <div class="nav-label">Anfragen</div>
+        <a class="side-link" href="/dashboard?workshop_id={{ workshop_id }}">Aktive Tickets</a>
+        <a class="side-link" href="/dashboard/whatsapp?workshop_id={{ workshop_id }}">WhatsApp</a>
+        <a class="side-link intake-link" href="/dashboard/intake?workshop_id={{ workshop_id }}">+ Direktannahme</a>
+
+        <div class="nav-label">Verwaltung</div>
+        <a class="side-link" href="/dashboard/archive?workshop_id={{ workshop_id }}">Archiv</a>
+        <a class="side-link active" aria-current="page" href="/dashboard/settings?workshop_id={{ workshop_id }}">Einstellungen</a>
+        <a class="side-link" href="/dashboard/billing?workshop_id={{ workshop_id }}">Abo</a>
         {% if current_user and current_user.role == "admin" %}
-          <a class="nav-btn" href="/dashboard/admin/workshops">Admin</a>
+          <a class="side-link" href="/dashboard/admin/workshops">Admin</a>
         {% endif %}
-      </div>
-    </div>
+      </nav>
 
-    <div class="grid">
-      <section class="card">
-        <div class="card-head">
-          <h2 class="card-title">Betriebsdaten</h2>
-          <div class="card-sub">Aenderungen werden sofort gespeichert und vom Chat-Assistenten sowie vom WhatsApp-Posteingang verwendet.</div>
-        </div>
-
-        <form class="form" method="post" action="/dashboard/settings">
-          <input type="hidden" name="workshop_id" value="{{ workshop_id }}" />
-
-          <div class="row">
-            <label>
-              Werkstattname
-              <input name="name" value="{{ workshop.name or '' }}" required />
-            </label>
-
-            <label>
-              Telefon
-              <input name="phone" value="{{ workshop.phone or '' }}" />
-            </label>
-          </div>
-
-          <div class="row">
-            <label>
-              Adresse
-              <input name="address" value="{{ workshop.address or '' }}" />
-            </label>
-
-            <label>
-              E-Mail
-              <input name="email" type="email" value="{{ workshop.email or '' }}" />
-            </label>
-          </div>
-
-          <label>
-            Oeffnungszeiten
-            <textarea name="opening_hours">{{ workshop.opening_hours or '' }}</textarea>
-            <span class="hint">Empfohlenes Format: Montag bis Freitag: 09:00-17:00; Samstag: 09:00-14:00; Sonntag: geschlossen</span>
-          </label>
-
-          <label>
-            Leistungen
-            <textarea name="services">{{ workshop.services or '' }}</textarea>
-            <span class="hint">Mehrere Leistungen mit Komma trennen, z.B. Autoreparaturen, Reifenwechsel, Polieren.</span>
-          </label>
-
-          <label>
-            Preisinfo
-            <textarea name="pricing_info">{{ workshop.pricing_info or '' }}</textarea>
-          </label>
-
-          <label>
-            Abschleppdienst / Pannenhilfe
-            <textarea name="towing_info">{{ workshop.towing_info or '' }}</textarea>
-          </label>
-
-          <div class="row">
-            <label>
-              WhatsApp Phone Number ID
-              <input name="whatsapp_phone_number_id" value="{{ workshop.whatsapp_phone_number_id or '' }}" autocomplete="off" />
-              <span class="hint">Aus Meta Cloud API. Damit wird der WhatsApp-Absender diesem Werkstattkonto zugeordnet.</span>
-            </label>
-
-            <label>
-              WhatsApp Anzeigenummer
-              <input name="whatsapp_display_phone_number" value="{{ workshop.whatsapp_display_phone_number or '' }}" autocomplete="off" />
-              <span class="hint">Nur zur Anzeige im Panel, z.B. +49 176 12345678.</span>
-            </label>
-          </div>
-
-          <div class="actions">
-            <a class="nav-btn" href="/dashboard?workshop_id={{ workshop_id }}">Abbrechen</a>
-            <button class="primary" type="submit">Einstellungen speichern</button>
-          </div>
+      <div class="sidebar-foot">
+        <form method="post" action="/logout">
+          <button class="side-link" type="submit">Abmelden</button>
         </form>
+        <div class="session-status"><span class="session-dot"></span>Sicher angemeldet</div>
+      </div>
+    </aside>
 
-        {% if saved %}
-          <div class="success">Einstellungen wurden gespeichert.</div>
-        {% endif %}
-      </section>
-
-      <aside class="card">
-        <div class="card-head">
-          <h2 class="card-title">Assistenten-Vorschau</h2>
-          <div class="card-sub">Diese Informationen erscheinen in Antworten auf allgemeine Kundenfragen.</div>
+    <main class="workspace">
+      <header class="page-header">
+        <div>
+          <div class="overline">Verwaltung</div>
+          <h1>Einstellungen</h1>
+          <p>
+            Pflegen Sie die Informationen, mit denen der Assistent Fragen zu Kontakt,
+            Öffnungszeiten, Leistungen und Pannenhilfe beantwortet.
+          </p>
         </div>
+      </header>
 
-        <div class="preview">
-          <div class="item">
-            <b>Kontakt</b>
-            <div>{{ workshop.name }}
+      <div class="content-grid">
+        <section class="card">
+          <div class="card-head">
+            <h2 class="card-title">Betriebsdaten</h2>
+            <div class="card-sub">
+              Änderungen werden nach dem Speichern im Chat-Assistenten und im WhatsApp-Posteingang verwendet.
+            </div>
+          </div>
+
+          <form class="form" method="post" action="/dashboard/settings">
+            <input type="hidden" name="workshop_id" value="{{ workshop_id }}" />
+
+            <div class="form-section">
+              <div class="section-heading">
+                <h3>Kontakt</h3>
+                <p>Die wichtigsten Angaben, unter denen Kunden Ihre Werkstatt erreichen.</p>
+              </div>
+
+              <div class="field-row">
+                <label>
+                  Werkstattname
+                  <input name="name" value="{{ workshop.name or '' }}" required />
+                </label>
+
+                <label>
+                  Telefon
+                  <input name="phone" value="{{ workshop.phone or '' }}" />
+                </label>
+              </div>
+
+              <div class="field-row">
+                <label>
+                  Adresse
+                  <input name="address" value="{{ workshop.address or '' }}" />
+                </label>
+
+                <label>
+                  E-Mail
+                  <input name="email" type="email" value="{{ workshop.email or '' }}" />
+                </label>
+              </div>
+            </div>
+
+            <div class="form-section">
+              <div class="section-heading">
+                <h3>Öffnungszeiten und Angebot</h3>
+                <p>Diese Inhalte verwendet der Assistent für allgemeine Kundenfragen.</p>
+              </div>
+
+              <label>
+                Öffnungszeiten
+                <textarea name="opening_hours">{{ workshop.opening_hours or '' }}</textarea>
+                <span class="hint">Empfohlenes Format: Montag bis Freitag: 09:00–17:00; Samstag: 09:00–14:00; Sonntag: geschlossen.</span>
+              </label>
+
+              <label>
+                Leistungen
+                <textarea name="services">{{ workshop.services or '' }}</textarea>
+                <span class="hint">Mehrere Leistungen mit Komma trennen, zum Beispiel Autoreparaturen, Reifenwechsel und Fahrzeugpflege.</span>
+              </label>
+
+              <label>
+                Preisangaben
+                <textarea name="pricing_info">{{ workshop.pricing_info or '' }}</textarea>
+              </label>
+
+              <label>
+                Abschleppdienst und Pannenhilfe
+                <textarea name="towing_info">{{ workshop.towing_info or '' }}</textarea>
+              </label>
+            </div>
+
+            <div class="form-section">
+              <div class="section-heading">
+                <h3>WhatsApp-Verbindung</h3>
+                <p>Ordnen Sie die geschäftliche WhatsApp-Nummer diesem Werkstattkonto zu.</p>
+              </div>
+
+              <div class="field-row">
+                <label>
+                  WhatsApp Phone Number ID
+                  <input name="whatsapp_phone_number_id" value="{{ workshop.whatsapp_phone_number_id or '' }}" autocomplete="off" />
+                  <span class="hint">Die Phone Number ID finden Sie in der Meta Cloud API.</span>
+                </label>
+
+                <label>
+                  WhatsApp-Anzeigenummer
+                  <input name="whatsapp_display_phone_number" value="{{ workshop.whatsapp_display_phone_number or '' }}" autocomplete="off" />
+                  <span class="hint">Nummer zur Anzeige im Werkstattbereich, zum Beispiel +49 176 12345678.</span>
+                </label>
+              </div>
+            </div>
+
+            <div class="actions">
+              <a class="button" href="/dashboard?workshop_id={{ workshop_id }}">Abbrechen</a>
+              <button class="button primary" type="submit">Einstellungen speichern</button>
+            </div>
+          </form>
+
+          {% if saved %}
+            <div class="success" role="status">Einstellungen wurden gespeichert.</div>
+          {% endif %}
+        </section>
+
+        <aside class="card preview-card">
+          <div class="card-head">
+            <h2 class="card-title">Assistenten-Vorschau</h2>
+            <div class="card-sub">So stehen die hinterlegten Angaben für Kundenantworten bereit.</div>
+          </div>
+
+          <div class="preview">
+            <div class="preview-item">
+              <b>Kontakt</b>
+              <div>{{ workshop.name }}
 Telefon: {{ workshop.phone or '-' }}
 E-Mail: {{ workshop.email or '-' }}</div>
-          </div>
+            </div>
 
-          <div class="item">
-            <b>Adresse</b>
-            <div>{{ workshop.address or '-' }}</div>
-          </div>
+            <div class="preview-item">
+              <b>Adresse</b>
+              <div>{{ workshop.address or '-' }}</div>
+            </div>
 
-          <div class="item">
-            <b>Oeffnungszeiten</b>
-            <div>{{ workshop.opening_hours or '-' }}</div>
-          </div>
+            <div class="preview-item">
+              <b>Öffnungszeiten</b>
+              <div>{{ workshop.opening_hours or '-' }}</div>
+            </div>
 
-          <div class="item">
-            <b>Leistungen</b>
-            <div>{{ workshop.services or '-' }}</div>
-          </div>
+            <div class="preview-item">
+              <b>Leistungen</b>
+              <div>{{ workshop.services or '-' }}</div>
+            </div>
 
-          <div class="item">
-            <b>Preisinfo</b>
-            <div>{{ workshop.pricing_info or '-' }}</div>
-          </div>
+            <div class="preview-item">
+              <b>Preisangaben</b>
+              <div>{{ workshop.pricing_info or '-' }}</div>
+            </div>
 
-          <div class="item">
-            <b>Abschleppdienst</b>
-            <div>{{ workshop.towing_info or '-' }}</div>
-          </div>
+            <div class="preview-item">
+              <b>Abschleppdienst</b>
+              <div>{{ workshop.towing_info or '-' }}</div>
+            </div>
 
-          <div class="item">
-            <b>WhatsApp</b>
-            <div>Phone Number ID: {{ workshop.whatsapp_phone_number_id or '-' }}
+            <div class="preview-item">
+              <b>WhatsApp</b>
+              <div>Phone Number ID: {{ workshop.whatsapp_phone_number_id or '-' }}
 Anzeigenummer: {{ workshop.whatsapp_display_phone_number or '-' }}</div>
+            </div>
           </div>
-        </div>
-      </aside>
-    </div>
+        </aside>
+      </div>
+    </main>
   </div>
 </body>
 </html>

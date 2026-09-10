@@ -292,6 +292,456 @@
 
       h1{font-size:32px}
     }
+
+    /* Calm workshop workspace theme */
+    :root{
+      --bg:#f3f6f5;
+      --panel:#ffffff;
+      --line:#dfe6e3;
+      --text:#182522;
+      --muted:#65736f;
+      --petrol:#0f6f66;
+      --petrol-dark:#17413c;
+      --graphite:#172723;
+      --ok:#23815d;
+      --danger:#c44743;
+      --info:#2d6f96;
+      --warn:#c47a16;
+      --shadow:0 8px 24px rgba(28,52,45,.08);
+      --shadow-2:0 18px 42px rgba(28,52,45,.12);
+    }
+
+    body{
+      color:var(--text);
+      background:
+        radial-gradient(900px 440px at 72% -10%, rgba(15,111,102,.11), transparent 64%),
+        linear-gradient(180deg, #edf3f1 0, #f7f9f8 420px, #f3f6f5 100%);
+      font-family:"Segoe UI Variable", "Segoe UI", Inter, system-ui, -apple-system, sans-serif;
+    }
+
+    .sr-only{
+      position:absolute;
+      width:1px;
+      height:1px;
+      padding:0;
+      margin:-1px;
+      overflow:hidden;
+      clip:rect(0,0,0,0);
+      white-space:nowrap;
+      border:0;
+    }
+
+    .wrap{
+      width:100%;
+      max-width:none;
+      min-height:100vh;
+      display:grid;
+      grid-template-columns:244px minmax(0, 1fr);
+      align-items:start;
+      margin:0;
+      padding:0;
+    }
+
+    .topbar{
+      position:sticky;
+      top:0;
+      z-index:20;
+      min-height:100vh;
+      height:100vh;
+      overflow-y:auto;
+      display:flex;
+      flex-direction:column;
+      align-items:stretch;
+      justify-content:flex-start;
+      gap:26px;
+      margin:0;
+      padding:26px 18px 20px;
+      border:0;
+      border-radius:0;
+      color:#f5fbf9;
+      background:
+        radial-gradient(360px 220px at 10% 0%, rgba(34,143,131,.24), transparent 70%),
+        linear-gradient(180deg, #172a26 0%, #13231f 100%);
+      box-shadow:8px 0 28px rgba(22,42,36,.10);
+    }
+
+    .topbar > div:first-child{
+      padding:0 8px;
+    }
+
+    .eyebrow{
+      padding:0;
+      border:0;
+      border-radius:0;
+      background:transparent;
+      color:#78c9bd;
+      font-size:11px;
+      font-weight:750;
+      letter-spacing:.09em;
+    }
+
+    h1{
+      margin:7px 0 0;
+      color:#ffffff;
+      font-size:23px;
+      line-height:1.22;
+      font-weight:720;
+      letter-spacing:-.025em;
+    }
+
+    .sub{
+      margin-top:8px;
+      color:#aebeb9;
+      font-size:12px;
+      line-height:1.55;
+    }
+
+    .top-actions{
+      min-height:0;
+      flex:1;
+      width:100%;
+      display:flex;
+      flex-direction:column;
+      flex-wrap:nowrap;
+      align-items:stretch;
+      gap:5px;
+    }
+
+    .nav-section-label{
+      margin:15px 10px 5px;
+      color:#7f948e;
+      font-size:11px;
+      font-weight:700;
+      letter-spacing:.11em;
+      text-transform:uppercase;
+    }
+
+    .nav-section-label:first-child{margin-top:0}
+
+    .top-actions form{
+      width:100%;
+      margin-top:auto !important;
+    }
+
+    .nav-btn,
+    .top-actions .nav-btn{
+      width:100%;
+      min-height:42px;
+      justify-content:flex-start;
+      padding:10px 12px;
+      border:1px solid transparent;
+      border-radius:9px;
+      background:transparent;
+      color:#d5e0dc;
+      font-size:13px;
+      font-weight:600;
+      box-shadow:none;
+      transition:.16s ease;
+    }
+
+    .nav-btn:hover{
+      border-color:rgba(255,255,255,.06);
+      background:rgba(255,255,255,.07);
+      color:#ffffff;
+    }
+
+    .nav-btn.active{
+      border-color:rgba(86,194,177,.16);
+      background:rgba(64,166,151,.17);
+      color:#ffffff;
+      box-shadow:inset 3px 0 0 #58b8a9;
+    }
+
+    .grid{
+      min-width:0;
+      display:grid;
+      grid-template-columns:minmax(0, 1fr);
+      gap:18px;
+      padding:30px clamp(20px, 3vw, 46px) 46px;
+    }
+
+    .panel{
+      overflow:hidden;
+      border:1px solid var(--line);
+      border-radius:13px;
+      background:#ffffff;
+      box-shadow:var(--shadow);
+    }
+
+    .panel-head{
+      padding:17px 19px;
+      border-bottom:1px solid var(--line);
+      background:#ffffff;
+    }
+
+    .panel-title{
+      color:#1b2925;
+      font-size:15px;
+      font-weight:720;
+      letter-spacing:-.005em;
+    }
+
+    .panel-sub{
+      margin-top:5px;
+      color:var(--muted);
+      font-size:12px;
+      line-height:1.5;
+    }
+
+    .form{
+      padding:20px;
+      gap:16px;
+    }
+
+    .row{
+      gap:14px;
+    }
+
+    label{
+      gap:7px;
+      color:#34433e;
+      font-size:12px;
+      font-weight:700;
+    }
+
+    input,
+    textarea,
+    select{
+      min-height:44px;
+      padding:10px 12px;
+      border:1px solid #d5dfdc;
+      border-radius:9px;
+      background:#ffffff;
+      color:var(--text);
+      font:inherit;
+      box-shadow:none;
+    }
+
+    textarea{
+      min-height:92px;
+    }
+
+    input::placeholder,
+    textarea::placeholder{
+      color:#8a9893;
+      opacity:1;
+    }
+
+    input:focus,
+    textarea:focus,
+    select:focus{
+      border-color:#5b9e94;
+      box-shadow:0 0 0 3px rgba(15,111,102,.11);
+    }
+
+    input:focus-visible,
+    textarea:focus-visible,
+    select:focus-visible,
+    button:focus-visible,
+    a:focus-visible,
+    .table-wrap:focus-visible{
+      outline:3px solid rgba(15,111,102,.20);
+      outline-offset:2px;
+    }
+
+    .hint{
+      color:#74827e;
+      font-size:11px;
+      font-weight:500;
+    }
+
+    .actions{
+      padding-top:3px;
+    }
+
+    button.primary{
+      min-height:44px;
+      padding:10px 16px;
+      border:1px solid #0c625a;
+      border-radius:9px;
+      background:var(--petrol);
+      color:#ffffff;
+      font-weight:700;
+      box-shadow:0 8px 18px rgba(15,111,102,.16);
+      transition:.16s ease;
+    }
+
+    button.primary:hover{
+      transform:translateY(-1px);
+      background:#0c625a;
+    }
+
+    .alert{
+      margin:15px 19px 0;
+      border-radius:9px;
+      font-size:12px;
+      font-weight:650;
+    }
+
+    .alert.ok{
+      border-color:#b9dcc9;
+      background:#edf8f2;
+      color:#24694e;
+    }
+
+    .alert.error{
+      border-color:#ebc0bd;
+      background:#fff0ef;
+      color:#a3312e;
+    }
+
+    .table-wrap{
+      overflow:auto;
+      scrollbar-color:#bdcbc6 #f3f6f5;
+    }
+
+    table{
+      min-width:930px;
+      background:#ffffff;
+    }
+
+    th,
+    td{
+      padding:14px 15px;
+      border-bottom:1px solid #e8edeb;
+      color:#2c3a35;
+      font-size:12px;
+      line-height:1.45;
+    }
+
+    th{
+      position:sticky;
+      top:0;
+      z-index:1;
+      background:#f7f9f8;
+      color:#65736f;
+      font-size:11px;
+      font-weight:700;
+      letter-spacing:.07em;
+    }
+
+    tbody tr:hover td{
+      background:#f3f8f6;
+    }
+
+    td strong{
+      color:#1d2d28;
+      font-weight:700;
+    }
+
+    .muted{
+      color:var(--muted);
+      font-weight:500;
+    }
+
+    .pill{
+      border-color:#c5ddd6;
+      background:#edf7f4;
+      color:#22685d;
+      font-size:11px;
+      font-weight:700;
+    }
+
+    .table-link{
+      display:inline-flex;
+      align-items:center;
+      min-height:30px;
+      margin:0 5px 5px 0;
+      padding:5px 8px;
+      border:1px solid #d7e0dd;
+      border-radius:7px;
+      background:#ffffff;
+      color:#35534c;
+      font-size:12px;
+      font-weight:650;
+      text-decoration:none;
+    }
+
+    .table-link:hover{
+      border-color:#b8d0c9;
+      background:#edf5f3;
+      color:#164f47;
+    }
+
+    @media (max-width: 980px){
+      .wrap{
+        display:block;
+      }
+
+      .topbar{
+        position:relative;
+        width:auto;
+        height:auto;
+        min-height:0;
+        gap:18px;
+        padding:20px;
+      }
+
+      .top-actions{
+        display:flex;
+        flex-direction:row;
+        flex-wrap:wrap;
+        align-items:center;
+      }
+
+      .nav-section-label{display:none}
+
+      .top-actions form,
+      .nav-btn,
+      .top-actions .nav-btn{
+        width:auto;
+      }
+
+      .top-actions form{
+        margin-top:0 !important;
+      }
+
+      .grid{
+        padding:24px 20px 38px;
+      }
+    }
+
+    @media (max-width: 680px){
+      h1{
+        font-size:22px;
+      }
+
+      .topbar{
+        padding:18px 14px;
+      }
+
+      .topbar > div:first-child{
+        padding:0;
+      }
+
+      .top-actions{
+        display:grid;
+        grid-template-columns:1fr 1fr;
+      }
+
+      .top-actions form,
+      .top-actions .nav-btn,
+      .nav-btn{
+        width:100%;
+      }
+
+      .grid{
+        padding:18px 14px 30px;
+      }
+
+      .row{
+        grid-template-columns:1fr;
+      }
+
+      .form{
+        padding:16px;
+      }
+
+      .actions,
+      .actions button{
+        width:100%;
+      }
+    }
   </style>
 </head>
 <body>
@@ -299,26 +749,34 @@
     <div class="topbar">
       <div>
         <div class="eyebrow">WerkstattAI - Admin</div>
-        <h1>Werkstaetten verwalten</h1>
+        <h1>Werkstätten verwalten</h1>
         <div class="sub">
           Neue Werkstattkonten mit eigenem Login, eigener Datenbasis, Trial-Status und optionaler WhatsApp-Konfiguration anlegen.
         </div>
       </div>
 
-      <div class="top-actions">
-        <a class="nav-btn" href="/dashboard?workshop_id={{ workshop_id }}">Dashboard</a>
-        <a class="nav-btn active" href="/dashboard/admin/workshops">Admin</a>
+      <nav class="top-actions" aria-label="Hauptnavigation">
+        <div class="nav-section-label">Anfragen</div>
+        <a class="nav-btn" href="/dashboard?workshop_id={{ workshop_id }}">Aktive Tickets</a>
+        <a class="nav-btn" href="/dashboard/whatsapp?workshop_id={{ workshop_id }}">WhatsApp</a>
+        <a class="nav-btn" href="/dashboard/intake?workshop_id={{ workshop_id }}">+ Direktannahme</a>
+
+        <div class="nav-section-label">Verwaltung</div>
+        <a class="nav-btn" href="/dashboard/archive?workshop_id={{ workshop_id }}">Archiv</a>
+        <a class="nav-btn" href="/dashboard/settings?workshop_id={{ workshop_id }}">Einstellungen</a>
+        <a class="nav-btn" href="/dashboard/billing?workshop_id={{ workshop_id }}">Abo</a>
+        <a class="nav-btn active" href="/dashboard/admin/workshops" aria-current="page">Admin</a>
         <form method="post" action="/logout" style="margin:0;">
           <button class="nav-btn" type="submit">Abmelden</button>
         </form>
-      </div>
+      </nav>
     </div>
 
     <div class="grid">
       <section class="panel">
         <div class="panel-head">
           <div class="panel-title">Neues Werkstattkonto</div>
-          <div class="panel-sub">Erstellt einen Workshop und einen Owner-Login fuer den Kunden.</div>
+          <div class="panel-sub">Erstellt einen Workspace und einen Owner-Login für den Kunden.</div>
         </div>
 
         {% if created %}
@@ -328,7 +786,7 @@
           <div class="alert ok">Werkstattkonto {{ updated }} wurde aktualisiert.</div>
         {% endif %}
         {% if reset %}
-          <div class="alert ok">Passwort fuer {{ reset }} wurde aktualisiert.</div>
+          <div class="alert ok">Passwort für {{ reset }} wurde aktualisiert.</div>
         {% endif %}
         {% if error %}
           <div class="alert error">{{ error }}</div>
@@ -343,21 +801,21 @@
 
             <label>
               Workshop-ID
-              <input name="workshop_id" placeholder="z.B. autohaus-mueller" />
+              <input name="workshop_id" placeholder="z. B. autohaus-mueller" />
               <span class="hint">Leer lassen, um sie aus dem Namen zu erzeugen.</span>
             </label>
           </div>
 
           <div class="row">
             <label>
-              Owner Login E-Mail
+              Login-E-Mail des Inhabers
               <input name="admin_email" type="email" required />
             </label>
 
             <label>
               Startpasswort
               <input name="admin_password" type="password" minlength="8" required />
-              <span class="hint">Mindestens 8 Zeichen. Spaeter durch Passwort-Reset ersetzen.</span>
+              <span class="hint">Mindestens 8 Zeichen. Später durch Passwort-Reset ersetzen.</span>
             </label>
           </div>
 
@@ -375,7 +833,7 @@
 
           <div class="row">
             <label>
-              Kontakt E-Mail
+              Kontakt-E-Mail
               <input name="email" type="email" />
             </label>
 
@@ -386,7 +844,7 @@
           </div>
 
           <label>
-            Oeffnungszeiten
+            Öffnungszeiten
             <textarea name="opening_hours" placeholder="Montag bis Freitag: 08:00-17:00"></textarea>
           </label>
 
@@ -403,10 +861,10 @@
             <label>
               Status
               <select name="subscription_status">
-                <option value="trialing">Trialing</option>
-                <option value="active">Active</option>
-                <option value="inactive">Inactive</option>
-                <option value="past_due">Past due</option>
+                <option value="trialing">Testphase</option>
+                <option value="active">Aktiv</option>
+                <option value="inactive">Inaktiv</option>
+                <option value="past_due">Zahlung offen</option>
               </select>
             </label>
           </div>
@@ -424,7 +882,7 @@
           </div>
 
           <label>
-            Preisinfo
+            Preisangaben
             <textarea name="pricing_info" placeholder="Aktuell keine festen Preisangaben..."></textarea>
           </label>
 
@@ -441,12 +899,13 @@
 
       <aside class="panel">
         <div class="panel-head">
-          <div class="panel-title">Bestehende Werkstaetten</div>
+          <div class="panel-title">Bestehende Werkstätten</div>
           <div class="panel-sub">{{ workshops|length }} Konten im System.</div>
         </div>
 
-        <div class="table-wrap">
+        <div class="table-wrap" tabindex="0" aria-label="Bestehende Werkstätten">
           <table>
+            <caption class="sr-only">Werkstattkonten mit Login, Abonnement, WhatsApp-Status und Aktionen</caption>
             <thead>
               <tr>
                 <th>Werkstatt</th>
@@ -484,7 +943,7 @@
                     <a class="table-link" href="/dashboard/settings?workshop_id={{ w.id }}">Einstellungen</a>
                     <a class="table-link" href="/dashboard/whatsapp?workshop_id={{ w.id }}">WhatsApp</a>
                     <a class="table-link" href="/dashboard/billing?workshop_id={{ w.id }}">Abo</a>
-                    <a class="table-link" href="/dashboard/admin/workshops/{{ w.id }}">Edytuj</a>
+                    <a class="table-link" href="/dashboard/admin/workshops/{{ w.id }}">Bearbeiten</a>
                   </td>
                 </tr>
               {% endfor %}

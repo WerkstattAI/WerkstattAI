@@ -1608,6 +1608,20 @@
         radial-gradient(900px 440px at 72% -10%, rgba(15,111,102,.11), transparent 64%),
         linear-gradient(180deg, #edf3f1 0, #f7f9f8 420px, #f3f6f5 100%);
       font-family:"Segoe UI Variable", "Segoe UI", Inter, system-ui, -apple-system, sans-serif;
+      font-size:14px;
+      line-height:1.5;
+    }
+
+    .sr-only{
+      position:absolute;
+      width:1px;
+      height:1px;
+      padding:0;
+      margin:-1px;
+      overflow:hidden;
+      clip:rect(0,0,0,0);
+      white-space:nowrap;
+      border:0;
     }
 
     .wrap{
@@ -1642,6 +1656,7 @@
         linear-gradient(180deg, #172a26 0%, #13231f 100%);
       box-shadow:8px 0 28px rgba(22,42,36,.10);
       backdrop-filter:none;
+      overflow-y:auto;
     }
 
     .brand{
@@ -1691,7 +1706,7 @@
     .nav-section-label{
       margin:15px 10px 5px;
       color:#7f948e;
-      font-size:10px;
+      font-size:11px;
       font-weight:700;
       letter-spacing:.11em;
       text-transform:uppercase;
@@ -1755,7 +1770,7 @@
       border-radius:9px;
       background:rgba(255,255,255,.04);
       color:#93a7a1;
-      font-size:11px;
+      font-size:12px;
       font-weight:600;
     }
 
@@ -1836,6 +1851,8 @@
       box-shadow:var(--shadow);
     }
 
+    .card::after{display:none}
+
     .kpi{
       min-height:128px;
       padding:17px 18px;
@@ -1860,7 +1877,7 @@
 
     .kpi .label{
       color:#5f6f6a;
-      font-size:11px;
+      font-size:12px;
       font-weight:650;
       letter-spacing:.055em;
     }
@@ -1879,7 +1896,7 @@
     .kpi .hint{
       margin-top:7px;
       color:#7b8985;
-      font-size:11px;
+      font-size:12px;
       line-height:1.4;
     }
 
@@ -1902,6 +1919,7 @@
       border-radius:9px;
       background:#f8faf9;
       color:var(--text);
+      font-size:13px;
     }
 
     input::placeholder{color:#8b9894}
@@ -1947,6 +1965,10 @@
     .attention-source.web_chat{border-color:#c7dce8;background:#eff7fb;color:#285f7c}
     .attention-source.whatsapp{border-color:#bfe1d3;background:#ecf8f2;color:#267454}
     .attention-source.direktannahme{border-color:#ead4a6;background:#fff6e4;color:#8a5b18}
+    .attention-reason{font-size:11px}
+    .attention-problem{font-size:13px}
+    .attention-meta{font-size:12px}
+    .attention-source{font-size:11px}
 
     .table-shell{
       overflow:hidden;
@@ -1957,10 +1979,12 @@
     }
 
     .table-head{padding:17px 19px;border-bottom:1px solid var(--line);background:#ffffff}
-    .table-title{color:#1b2925;font-weight:720}
+    .table-title{color:#1b2925;font-size:16px;font-weight:720}
+    .table-sub{margin-top:4px;font-size:13px;line-height:1.45}
     .table-sub,.muted{color:var(--muted)}
     table.ticket-table{border-spacing:0 5px;background:#ffffff}
-    .ticket-table th{color:#7a8883;font-weight:650}
+    .ticket-table th{color:#687671;font-size:12px;font-weight:700;letter-spacing:.055em}
+    .ticket-table td{font-size:13px}
     .ticket-table tbody td{border-top-color:#e8edeb;border-bottom-color:#e8edeb;background:#f9fbfa}
     .ticket-table tbody tr:hover td{background:#f0f7f5}
     tbody tr.row-high td:first-child{box-shadow:inset 4px 0 0 #c44743}
@@ -1972,14 +1996,17 @@
     .tel,.tel a{color:#12685f}
     .date-cell{color:#75827e}
 
-    .status{border-color:#d9e1de;background:#f1f4f3;color:#46534f;font-weight:650}
+    .status{border-color:#d9e1de;background:#f1f4f3;color:#46534f;font-size:12px;font-weight:650}
     .s-offen{border-color:#ead2a4;background:#fff6e5;color:#8a5b14}
     .s-in_bearbeitung{border-color:#bfd7e6;background:#edf7fc;color:#285f7d}
     .s-erledigt{border-color:#bcdccb;background:#edf8f2;color:#267153}
     .s-archiviert{border-color:#d6dcda;background:#f1f3f2;color:#5f6b67}
     .new{border-color:#e9cf9e;background:#fff4dc;color:#8a5b14}
     .customer-question-badge{border-color:#b8d8d1;background:#eaf6f3;color:#17675d}
-    .priority,.request-type,.tiny-badge{border-color:#d8e1de;background:#f1f5f3;color:#4c5a55}
+    .priority,.request-type,.tiny-badge{border-color:#d8e1de;background:#f1f5f3;color:#4c5a55;font-size:11px;line-height:1.3}
+    .request-type{max-width:none;white-space:normal;text-align:center}
+    .new,.customer-question-badge{font-size:11px;line-height:1.3}
+    .customer-question-badge{white-space:normal}
     .p-niedrig,.rt-service{border-color:#bfdfd0;background:#edf8f2;color:#267153}
     .p-normal{border-color:#d6dedb;background:#f2f5f4;color:#53615c}
     .p-hoch{border-color:#efc5c3;background:#fff0ef;color:#a2322e}
@@ -1990,13 +2017,17 @@
 
     .last-note-block{border-color:#dfe6e3;background:#f3f7f5}
     .row-customer-question .last-note-block{border-color:#bcd9d2;background:#ebf6f3}
-    .last-note-label{color:#287268}
-    .last-note-text{color:#35433e}
-    .last-note-date{color:#75827e}
+    .last-note-label{color:#287268;font-size:11px}
+    .last-note-text{color:#35433e;font-size:13px}
+    .last-note-date{color:#75827e;font-size:11px}
+
+    .vehicle .muted,.id{font-size:12px}
+    .tel,.tel a,.date-cell{font-size:12px}
 
     .open{border-color:#0e675f;background:var(--petrol);color:#ffffff}
     .open:hover{background:#0c625a}
     .details-btn,.mini-action{border-color:#d5dfdc;background:#ffffff;color:#41504b}
+    .open,.details-btn,.mini-action,.archive-btn{min-height:38px;font-size:12px}
     .details-btn:hover,.mini-action:hover{transform:none;background:#edf4f2}
     .quick{border-color:#dce4e1;background:#f3f6f5}
     .archive-btn{border-color:#edc4c2;background:#fff0ef;color:#a3312e}
@@ -2011,11 +2042,27 @@
     .modal-close,.copy-btn{border-color:#d5dfdc;background:#f4f7f6;color:#41504b}
     .mini-card,.debug-item,details{border-color:#dce4e1;background:#ffffff}
     .mini-card .muted,.debug-value,.debug-list{color:#4f5d58}
-    .debug-label{color:#75827e}
+    .debug-label{color:#75827e;font-size:11px}
+    .debug-value,.debug-list,pre{font-size:13px}
     summary{background:#ffffff}
     .raw{border-top-color:#dce4e1;background:#ffffff}
     pre{border-color:#d8e1de;background:#eff3f1;color:#33423d}
     .toast{border-color:#31534a;background:#18332c;color:#ffffff;box-shadow:var(--shadow-2)}
+
+    a:focus-visible,
+    button:focus-visible,
+    input:focus-visible,
+    select:focus-visible,
+    summary:focus-visible,
+    .table-wrap:focus-visible{
+      outline:3px solid rgba(15,111,102,.32);
+      outline-offset:2px;
+    }
+
+    @media (prefers-reduced-motion:reduce){
+      html{scroll-behavior:auto}
+      *,*::before,*::after{transition-duration:.01ms !important;animation-duration:.01ms !important}
+    }
 
     @media (max-width:1260px){
       .cards{grid-template-columns:repeat(6,minmax(0,1fr))}
@@ -2046,6 +2093,7 @@
       .kpi{min-height:110px}
       .toolbar-left,.toolbar-right{display:grid;grid-template-columns:1fr}
       .toolbar input,.toolbar select,.toolbar button,.toolbar .btn-secondary{width:100%;min-width:0 !important}
+      .toolbar input,.toolbar select{font-size:16px}
     }
 
     @media (max-width:430px){
@@ -2055,21 +2103,21 @@
 </head>
 <body>
   <div class="wrap">
-    <div class="topbar">
+    <aside class="topbar">
       <div class="brand">
         <div class="eyebrow">WerkstattAI</div>
         <h1>{{ workshop.name or "Werkstattbereich" }}</h1>
         <div class="sub">Digitaler Werkstattbereich</div>
       </div>
 
-      <div class="top-actions">
+      <nav class="top-actions" aria-label="Hauptnavigation">
         <div class="nav-section-label">Anfragen</div>
-        <a class="nav-btn {% if not archive_mode %}active{% endif %}" href="/dashboard?workshop_id={{ workshop_id }}">Aktive Tickets</a>
+        <a class="nav-btn {% if not archive_mode %}active{% endif %}" href="/dashboard?workshop_id={{ workshop_id }}" {% if not archive_mode %}aria-current="page"{% endif %}>Aktive Tickets</a>
         <a class="nav-btn" href="/dashboard/whatsapp?workshop_id={{ workshop_id }}">WhatsApp</a>
         <a class="nav-btn" href="/dashboard/intake?workshop_id={{ workshop_id }}">+ Direktannahme</a>
 
         <div class="nav-section-label">Verwaltung</div>
-        <a class="nav-btn {% if archive_mode %}active{% endif %}" href="/dashboard/archive?workshop_id={{ workshop_id }}">Archiv</a>
+        <a class="nav-btn {% if archive_mode %}active{% endif %}" href="/dashboard/archive?workshop_id={{ workshop_id }}" {% if archive_mode %}aria-current="page"{% endif %}>Archiv</a>
         <a class="nav-btn" href="/dashboard/settings?workshop_id={{ workshop_id }}">Einstellungen</a>
         <a class="nav-btn" href="/dashboard/billing?workshop_id={{ workshop_id }}">Abo</a>
         {% if current_user and current_user.role == "admin" %}
@@ -2079,8 +2127,8 @@
           <button class="nav-btn" type="submit">Abmelden</button>
         </form>
         <div class="chip">Sicher angemeldet</div>
-      </div>
-    </div>
+      </nav>
+    </aside>
 
     <div class="grid">
       <header class="workspace-head">
@@ -2162,21 +2210,21 @@
         <form method="get" action="{% if archive_mode %}/dashboard/archive{% else %}/dashboard{% endif %}">
           <input type="hidden" name="workshop_id" value="{{ workshop_id }}" />
           <div class="toolbar-left">
-            <select name="status">
+            <select name="status" aria-label="Nach Status filtern">
               <option value="all" {% if filters.status=="all" %}selected{% endif %}>Status: alle</option>
               <option value="offen" {% if filters.status=="offen" %}selected{% endif %}>offen</option>
               <option value="in_bearbeitung" {% if filters.status=="in_bearbeitung" %}selected{% endif %}>in bearbeitung</option>
               <option value="erledigt" {% if filters.status=="erledigt" %}selected{% endif %}>erledigt</option>
             </select>
 
-            <select name="source">
+            <select name="source" aria-label="Nach Quelle filtern">
               <option value="all" {% if filters.source=="all" %}selected{% endif %}>Quelle: alle</option>
               <option value="web_chat" {% if filters.source=="web_chat" %}selected{% endif %}>Web-Chat</option>
               <option value="whatsapp" {% if filters.source=="whatsapp" %}selected{% endif %}>WhatsApp</option>
               <option value="direktannahme" {% if filters.source=="direktannahme" %}selected{% endif %}>Direktannahme</option>
             </select>
 
-            <select name="question_state">
+            <select name="question_state" aria-label="Nach Fragenstatus filtern">
               <option value="all" {% if filters.question_state=="all" %}selected{% endif %}>Fragen: alle</option>
               <option value="open" {% if filters.question_state=="open" %}selected{% endif %}>Fragen: offen</option>
               <option value="answered" {% if filters.question_state=="answered" %}selected{% endif %}>Fragen: beantwortet</option>
@@ -2185,6 +2233,7 @@
             <input
               type="text"
               name="q"
+              aria-label="Tickets durchsuchen"
               placeholder="Suche: Fahrzeug, Problem, Telefon, ID, Priorität, Typ…"
               value="{{ filters.q }}"
               style="min-width:300px; flex:1"
@@ -2192,15 +2241,15 @@
           </div>
 
           <div class="toolbar-right">
-            <select name="sort">
-              <option value="newest" {% if filters.sort=="newest" %}selected{% endif %}>Sort: neueste</option>
-              <option value="oldest" {% if filters.sort=="oldest" %}selected{% endif %}>Sort: älteste</option>
-              <option value="updated" {% if filters.sort=="updated" %}selected{% endif %}>Sort: zuletzt aktualisiert</option>
-              <option value="priority" {% if filters.sort=="priority" %}selected{% endif %}>Sort: Priorität</option>
+            <select name="sort" aria-label="Sortierung">
+              <option value="newest" {% if filters.sort=="newest" %}selected{% endif %}>Sortierung: neueste</option>
+              <option value="oldest" {% if filters.sort=="oldest" %}selected{% endif %}>Sortierung: älteste</option>
+              <option value="updated" {% if filters.sort=="updated" %}selected{% endif %}>Sortierung: zuletzt aktualisiert</option>
+              <option value="priority" {% if filters.sort=="priority" %}selected{% endif %}>Sortierung: Priorität</option>
             </select>
 
             <button type="submit">Anwenden</button>
-            <a class="btn-secondary" href="{% if archive_mode %}/dashboard/archive{% else %}/dashboard{% endif %}?workshop_id={{ workshop_id }}">Reset</a>
+            <a class="btn-secondary" href="{% if archive_mode %}/dashboard/archive{% else %}/dashboard{% endif %}?workshop_id={{ workshop_id }}">Zurücksetzen</a>
           </div>
         </form>
       </div>
@@ -2261,8 +2310,9 @@
           </div>
         </div>
 
-        <div class="table-wrap">
+        <div class="table-wrap" tabindex="0" aria-label="Ticketliste">
           <table class="ticket-table">
+            <caption class="sr-only">Werkstatt-Tickets mit Status, Fahrzeug, Anliegen, Kontakt und Aktionen</caption>
             <thead class="ticket-table-head">
               <tr>
                 <th>Status</th>
@@ -2290,7 +2340,7 @@
                   </span>
 
                   {% if t.is_new and not archive_mode %}
-                    <div><span class="new">NEW</span></div>
+                    <div><span class="new">Neu</span></div>
                   {% endif %}
 
                   {% if t.has_customer_question %}
@@ -2383,7 +2433,7 @@
                     <button
                       class="details-btn"
                       type="button"
-                      data-details='{{ t.details_json | safe }}'
+                      data-details='{{ t.details_json | forceescape }}'
                     >
                       Schnellansicht
                     </button>
@@ -2436,10 +2486,10 @@
     <div class="modal" role="dialog" aria-modal="true" aria-labelledby="modalTitle">
       <div class="modal-header">
         <div>
-          <div class="modal-title" id="modalTitle">Ticket Schnellansicht</div>
+          <div class="modal-title" id="modalTitle">Ticket-Schnellansicht</div>
           <div class="muted" id="modalSubtitle"></div>
         </div>
-        <button class="modal-close" type="button" id="modalClose">✕</button>
+        <button class="modal-close" type="button" id="modalClose" aria-label="Schnellansicht schließen">✕</button>
       </div>
 
       <div class="modal-body">
@@ -2707,9 +2757,9 @@
         setText("dPriority", data.priority_label || prettyPriority(data.priority || "-"));
         setText("dRequestType", data.request_type_label || prettyRequestType(data.request_type || "-"));
         setText("dSource", data.source_label || prettySource(data.source || "-"));
-        setText("dFahrbereit", prettyValue(data.fahrbereit || "-"));
-        setText("dAbschleppdienst", prettyValue(data.abschleppdienst || "-"));
-        setText("dKilometerstand", prettyValue(data.kilometerstand || "-"));
+        setText("dFahrbereit", prettyValue(data.fahrbereit));
+        setText("dAbschleppdienst", prettyValue(data.abschleppdienst));
+        setText("dKilometerstand", prettyValue(data.kilometerstand));
         setText("dInternalId", prettyValue(data.ticket_view_id || data._id || data.id || data.ticket_id || "-"));
         setText("dCreatedAt", prettyValue(data.created_at || "-"));
         setText("dUpdatedAt", prettyValue(data.updated_at || "-"));

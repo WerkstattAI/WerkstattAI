@@ -3,142 +3,319 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width,initial-scale=1" />
-  <title>WerkstattAI - WhatsApp</title>
+  <title>WerkstattAI – WhatsApp</title>
   <style>
     :root{
-      --bg:#09111f;
-      --panel:#101a31;
-      --card:#0f1b33;
-      --line:rgba(255,255,255,.14);
-      --text:#e8eef8;
-      --muted:#97a3b6;
-      --soft:#c8d4e4;
-      --info:#60a5fa;
-      --ok:#22c55e;
-      --warn:#f59e0b;
-      --danger:#ef4444;
+      --page:#f3f6f5;
+      --page-soft:#edf3f1;
+      --surface:#ffffff;
+      --surface-soft:#f7faf9;
+      --surface-tint:#edf7f4;
+      --sidebar:#172a26;
+      --sidebar-deep:#13231f;
+      --petrol:#0f6f66;
+      --petrol-dark:#0c5f57;
+      --petrol-soft:#e4f2ef;
+      --line:#dfe7e4;
+      --line-strong:#cad7d3;
+      --text:#182522;
+      --text-soft:#43534e;
+      --muted:#687772;
+      --ok:#23815d;
+      --ok-soft:#eaf7f0;
+      --warn:#a96810;
+      --warn-soft:#fff6e5;
+      --danger:#b83f3a;
+      --danger-soft:#fff0ef;
+      --shadow:0 7px 22px rgba(28,52,45,.07);
+      --shadow-strong:0 18px 44px rgba(28,52,45,.11);
     }
 
     *{box-sizing:border-box}
+    html{scroll-behavior:smooth}
 
     body{
       margin:0;
       min-height:100vh;
-      font-family:system-ui,-apple-system,Segoe UI,Roboto,Arial,sans-serif;
       color:var(--text);
       background:
-        linear-gradient(90deg, rgba(255,255,255,.055) 1px, transparent 1px),
-        linear-gradient(180deg, rgba(255,255,255,.045) 1px, transparent 1px),
-        radial-gradient(900px 420px at 10% -8%, rgba(37,99,235,.48), transparent 64%),
-        radial-gradient(760px 360px at 86% 4%, rgba(245,158,11,.24), transparent 62%),
-        linear-gradient(135deg, #08111f 0%, #101b31 42%, #0a1020 100%);
-      background-size:44px 44px,44px 44px,auto,auto,auto;
+        radial-gradient(900px 440px at 72% -10%, rgba(15,111,102,.11), transparent 64%),
+        linear-gradient(180deg, var(--page-soft) 0, #f8faf9 420px, var(--page) 100%);
+      font-family:"Segoe UI Variable", "Segoe UI", Inter, system-ui, -apple-system, sans-serif;
+      -webkit-font-smoothing:antialiased;
     }
 
-    .wrap{
-      width:min(1280px,100%);
-      margin:0 auto;
-      padding:22px;
+    button,
+    input,
+    textarea{font:inherit}
+
+    button,
+    a,
+    input,
+    textarea{transition:border-color .16s ease, background .16s ease, color .16s ease, box-shadow .16s ease, transform .16s ease}
+
+    a:focus-visible,
+    button:focus-visible,
+    input:focus-visible,
+    textarea:focus-visible{
+      outline:3px solid rgba(15,111,102,.18);
+      outline-offset:2px;
     }
 
-    .topbar{
+    .app-shell{
+      width:100%;
+      min-height:100vh;
+      display:grid;
+      grid-template-columns:244px minmax(0, 1fr);
+      align-items:start;
+    }
+
+    .sidebar{
+      position:sticky;
+      top:0;
+      z-index:20;
+      min-height:100vh;
+      height:100vh;
+      overflow-y:auto;
       display:flex;
-      justify-content:space-between;
-      align-items:flex-start;
-      gap:16px;
-      flex-wrap:wrap;
-      margin-bottom:18px;
-      padding:24px;
-      border:1px solid rgba(255,255,255,.18);
-      border-radius:24px;
-      background:rgba(8,15,28,.86);
-      box-shadow:0 30px 90px rgba(0,0,0,.42), inset 0 1px 0 rgba(255,255,255,.12);
+      flex-direction:column;
+      gap:26px;
+      padding:26px 18px 20px;
+      color:#f5fbf9;
+      background:
+        radial-gradient(360px 220px at 10% 0%, rgba(34,143,131,.24), transparent 70%),
+        linear-gradient(180deg, var(--sidebar) 0%, var(--sidebar-deep) 100%);
+      box-shadow:8px 0 28px rgba(22,42,36,.10);
     }
 
-    .eyebrow{
-      display:inline-flex;
-      padding:7px 11px;
-      border-radius:999px;
-      border:1px solid rgba(255,255,255,.18);
-      background:rgba(255,255,255,.08);
-      color:#dbeafe;
+    .brand{
+      display:flex;
+      flex-direction:column;
+      gap:7px;
+      padding:0 8px;
+    }
+
+    .brand-mark{
+      color:#78c9bd;
       font-size:12px;
-      font-weight:900;
-      letter-spacing:.04em;
+      font-weight:750;
+      letter-spacing:.09em;
+      text-transform:uppercase;
+    }
+
+    .brand-title{
+      margin:0;
+      color:#ffffff;
+      font-size:22px;
+      line-height:1.22;
+      font-weight:720;
+      letter-spacing:-.02em;
+    }
+
+    .brand-subtitle{
+      color:#aebeb9;
+      font-size:12px;
+      line-height:1.5;
+    }
+
+    .sidebar-nav{
+      min-height:0;
+      flex:1;
+      display:flex;
+      flex-direction:column;
+      gap:5px;
+    }
+
+    .nav-section-label{
+      margin:15px 10px 5px;
+      color:#7f948e;
+      font-size:11px;
+      font-weight:700;
+      letter-spacing:.11em;
+      text-transform:uppercase;
+    }
+
+    .nav-section-label:first-child{margin-top:0}
+
+    .nav-btn{
+      width:100%;
+      min-height:42px;
+      display:flex;
+      align-items:center;
+      justify-content:flex-start;
+      padding:10px 12px;
+      border:1px solid transparent;
+      border-radius:9px;
+      background:transparent;
+      color:#d5e0dc;
+      text-decoration:none;
+      font-size:13px;
+      font-weight:600;
+    }
+
+    .nav-btn:hover{
+      border-color:rgba(255,255,255,.06);
+      background:rgba(255,255,255,.07);
+      color:#ffffff;
+    }
+
+    .nav-btn.active{
+      border-color:rgba(86,194,177,.16);
+      background:rgba(64,166,151,.17);
+      color:#ffffff;
+      box-shadow:inset 3px 0 0 #58b8a9;
+    }
+
+    .nav-btn.intake-link{
+      margin-bottom:4px;
+      border-color:rgba(127,211,198,.24);
+      background:rgba(101,194,180,.12);
+      color:#e7f8f4;
+    }
+
+    .sidebar-status{
+      display:flex;
+      align-items:center;
+      gap:8px;
+      margin-top:auto;
+      padding:10px 12px;
+      border:1px solid rgba(255,255,255,.07);
+      border-radius:9px;
+      background:rgba(255,255,255,.04);
+      color:#a8bab4;
+      font-size:12px;
+      font-weight:600;
+    }
+
+    .logout-form{
+      width:100%;
+      margin:0;
+    }
+
+    .logout-form .nav-btn{
+      color:#b9c9c4;
+      cursor:pointer;
+    }
+
+    .sidebar-status-dot{
+      width:7px;
+      height:7px;
+      flex:0 0 auto;
+      border-radius:50%;
+      background:#62c3a0;
+      box-shadow:0 0 0 3px rgba(98,195,160,.13);
+    }
+
+    .workspace{
+      min-width:0;
+      display:grid;
+      gap:18px;
+      padding:30px clamp(20px, 3vw, 46px) 46px;
+    }
+
+    .workspace-head{
+      display:flex;
+      align-items:flex-end;
+      justify-content:space-between;
+      gap:24px;
+      padding:2px 2px 4px;
+    }
+
+    .workspace-overline{
+      margin-bottom:6px;
+      color:var(--petrol);
+      font-size:12px;
+      font-weight:700;
+      letter-spacing:.08em;
       text-transform:uppercase;
     }
 
     h1{
-      margin:8px 0 0;
-      font-size:38px;
-      line-height:1.1;
+      margin:0;
+      color:#17231f;
+      font-size:30px;
+      line-height:1.15;
+      font-weight:720;
+      letter-spacing:-.025em;
     }
 
-    .sub{
-      margin-top:8px;
+    .workspace-copy{
       max-width:720px;
-      color:#b9c6d8;
+      margin:8px 0 0;
+      color:var(--muted);
       font-size:14px;
-      line-height:1.5;
+      line-height:1.55;
     }
 
-    .top-actions{
-      display:flex;
-      gap:10px;
-      flex-wrap:wrap;
-    }
-
-    .nav-btn{
+    .readiness-pill{
       display:inline-flex;
       align-items:center;
-      justify-content:center;
-      min-height:44px;
-      padding:10px 14px;
-      border-radius:14px;
-      border:1px solid var(--line);
-      background:rgba(255,255,255,.06);
-      color:var(--text);
-      text-decoration:none;
-      font-weight:850;
+      gap:9px;
+      flex:0 0 auto;
+      min-height:38px;
+      padding:8px 12px;
+      border:1px solid #e7d4ae;
+      border-radius:999px;
+      background:var(--warn-soft);
+      color:#805614;
+      font-size:12px;
+      font-weight:700;
+      white-space:nowrap;
     }
 
-    .nav-btn.active{
-      border-color:rgba(96,165,250,.42);
-      background:rgba(96,165,250,.18);
+    .readiness-pill.ready{
+      border-color:#bfdfd0;
+      background:var(--ok-soft);
+      color:#246e52;
     }
 
-    .inbox{
-      display:grid;
-      grid-template-columns:minmax(280px, 360px) minmax(0, 1fr);
-      gap:16px;
-      min-height:620px;
+    .readiness-dot{
+      width:8px;
+      height:8px;
+      flex:0 0 auto;
+      border-radius:50%;
+      background:#c07a18;
+      box-shadow:0 0 0 3px rgba(192,122,24,.12);
+    }
+
+    .readiness-pill.ready .readiness-dot{
+      background:var(--ok);
+      box-shadow:0 0 0 3px rgba(35,129,93,.12);
     }
 
     .diagnostics{
       display:grid;
-      grid-template-columns:minmax(0, 1fr) minmax(320px, 420px);
-      gap:16px;
-      margin-bottom:16px;
+      grid-template-columns:minmax(0, 1.35fr) minmax(320px, .8fr);
+      gap:14px;
     }
 
     .panel{
-      border:1px solid rgba(255,255,255,.16);
-      border-radius:20px;
-      background:rgba(16,26,49,.86);
-      box-shadow:0 24px 70px rgba(0,0,0,.34);
+      min-width:0;
       overflow:hidden;
-    }
-
-    .messages.panel{
-      background:
-        linear-gradient(180deg, rgba(96,165,250,.08), rgba(255,255,255,.035)),
-        rgba(11,18,34,.92);
+      border:1px solid var(--line);
+      border-radius:13px;
+      background:var(--surface);
+      box-shadow:var(--shadow);
     }
 
     .panel-head{
       padding:16px 18px;
-      border-bottom:1px solid rgba(255,255,255,.10);
-      background:rgba(96,165,250,.10);
+      border-bottom:1px solid var(--line);
+      background:var(--surface);
+    }
+
+    .panel-title{
+      color:#1b2925;
+      font-size:14px;
+      font-weight:720;
+      letter-spacing:.01em;
+    }
+
+    .panel-sub{
+      margin-top:4px;
+      color:var(--muted);
+      font-size:12px;
+      line-height:1.45;
     }
 
     .status-grid{
@@ -149,10 +326,11 @@
     }
 
     .check{
+      min-width:0;
       padding:12px;
-      border-radius:14px;
-      border:1px solid rgba(255,255,255,.10);
-      background:rgba(255,255,255,.055);
+      border:1px solid var(--line);
+      border-radius:10px;
+      background:var(--surface-soft);
     }
 
     .check-top{
@@ -161,378 +339,444 @@
       align-items:center;
       gap:8px;
       margin-bottom:7px;
-      color:#e5eefc;
+      color:#25332f;
       font-size:12px;
-      font-weight:950;
+      font-weight:700;
     }
 
     .dot{
-      width:10px;
-      height:10px;
-      border-radius:50%;
+      width:9px;
+      height:9px;
       flex:0 0 auto;
+      border-radius:50%;
       background:var(--danger);
-      box-shadow:0 0 0 4px rgba(239,68,68,.12);
+      box-shadow:0 0 0 3px rgba(184,63,58,.11);
     }
 
     .dot.ok{
       background:var(--ok);
-      box-shadow:0 0 0 4px rgba(34,197,94,.12);
+      box-shadow:0 0 0 3px rgba(35,129,93,.11);
     }
 
     .check-detail{
       color:var(--muted);
       font-size:12px;
-      line-height:1.4;
-      word-break:break-word;
+      line-height:1.45;
+      overflow-wrap:anywhere;
     }
 
     .webhook-box{
       display:grid;
-      gap:10px;
+      gap:14px;
       padding:14px;
     }
 
+    .field{
+      min-width:0;
+      display:grid;
+      gap:6px;
+    }
+
+    .field-label{
+      color:#52615c;
+      font-size:12px;
+      font-weight:700;
+      letter-spacing:.025em;
+    }
+
     .webhook-row{
+      min-width:0;
       display:grid;
       grid-template-columns:minmax(0, 1fr) auto;
-      gap:10px;
+      gap:8px;
     }
 
     .readonly-input,
     .test-input,
-    .test-text{
+    .test-text,
+    .reply-input{
       width:100%;
-      min-height:42px;
+      min-width:0;
       padding:10px 12px;
-      border-radius:13px;
-      border:1px solid rgba(255,255,255,.14);
-      color:var(--text);
-      background:rgba(15,23,42,.82);
+      border:1px solid #d5dfdc;
+      border-radius:9px;
       outline:none;
-      font:inherit;
+      color:var(--text);
+      background:#f8faf9;
     }
 
-    .test-text{
-      min-height:78px;
-      resize:vertical;
-      line-height:1.45;
+    .readonly-input,
+    .test-input{min-height:42px}
+
+    .readonly-input{
+      color:#53625d;
+      background:#f2f5f4;
+      font-size:12px;
     }
+
+    .test-text,
+    .reply-input{
+      min-height:80px;
+      resize:vertical;
+      line-height:1.5;
+    }
+
+    .readonly-input:focus,
+    .test-input:focus,
+    .test-text:focus,
+    .reply-input:focus{
+      border-color:#5b9e94;
+      box-shadow:0 0 0 3px rgba(15,111,102,.11);
+      background:#ffffff;
+    }
+
+    .test-input::placeholder,
+    .test-text::placeholder,
+    .reply-input::placeholder{color:#87948f}
 
     .copy-btn,
-    .test-btn{
+    .test-btn,
+    .send-btn{
       min-height:42px;
-      padding:10px 13px;
-      border-radius:13px;
-      border:1px solid rgba(96,165,250,.40);
-      background:rgba(96,165,250,.16);
-      color:var(--text);
-      font-weight:950;
+      padding:10px 14px;
+      border:1px solid #0d655d;
+      border-radius:9px;
+      background:var(--petrol);
+      color:#ffffff;
+      font-weight:700;
       cursor:pointer;
       white-space:nowrap;
+    }
+
+    .copy-btn{
+      border-color:#d3dedb;
+      background:#ffffff;
+      color:#38514a;
+    }
+
+    .copy-btn:hover{background:#edf4f2}
+
+    .test-btn:hover,
+    .send-btn:hover{
+      transform:translateY(-1px);
+      background:var(--petrol-dark);
+      box-shadow:0 7px 16px rgba(15,111,102,.16);
     }
 
     .test-form{
       display:grid;
       gap:10px;
-      margin-top:2px;
     }
 
     .test-alert{
       margin:0 14px 14px;
       padding:11px 12px;
-      border-radius:14px;
-      border:1px solid rgba(255,255,255,.12);
-      color:#e5eefc;
+      border:1px solid var(--line);
+      border-radius:9px;
+      background:var(--surface-soft);
+      color:var(--text-soft);
       font-size:12px;
-      font-weight:850;
+      font-weight:650;
       line-height:1.45;
     }
 
     .test-alert.sent{
-      border-color:rgba(34,197,94,.34);
-      background:rgba(34,197,94,.13);
-      color:#bbf7d0;
+      border-color:#bfdfd0;
+      background:var(--ok-soft);
+      color:#246e52;
     }
 
     .test-alert.failed{
-      border-color:rgba(239,68,68,.34);
-      background:rgba(239,68,68,.13);
-      color:#fecaca;
+      border-color:#edc4c2;
+      background:var(--danger-soft);
+      color:#9f302c;
     }
 
-    .panel-title{
-      font-size:14px;
-      font-weight:950;
-      letter-spacing:.03em;
+    .inbox{
+      min-height:650px;
+      display:grid;
+      grid-template-columns:minmax(285px, 350px) minmax(0, 1fr);
+      gap:14px;
     }
 
-    .panel-sub{
-      margin-top:4px;
-      color:var(--muted);
-      font-size:12px;
-      line-height:1.4;
+    .conversation-panel,
+    .messages{box-shadow:var(--shadow-strong)}
+
+    .conversation-panel{
+      display:flex;
+      flex-direction:column;
+      min-height:0;
     }
 
     .conversation-list{
       display:grid;
-      gap:8px;
+      align-content:start;
+      gap:7px;
       padding:10px;
-      max-height:620px;
+      max-height:650px;
       overflow:auto;
+      scrollbar-color:#bdcbc7 transparent;
+      scrollbar-width:thin;
     }
 
     .conversation{
+      position:relative;
+      min-width:0;
       display:grid;
-      gap:6px;
-      padding:13px;
-      border-radius:14px;
-      border:1px solid rgba(255,255,255,.10);
-      background:rgba(255,255,255,.055);
+      gap:7px;
+      padding:13px 13px 13px 15px;
+      border:1px solid transparent;
+      border-radius:10px;
+      background:#f7f9f8;
       color:var(--text);
       text-decoration:none;
     }
 
-    .conversation:hover,
-    .conversation.active{
-      border-color:rgba(96,165,250,.38);
-      background:rgba(96,165,250,.14);
-      text-decoration:none;
+    .conversation::before{
+      content:"";
+      position:absolute;
+      top:11px;
+      bottom:11px;
+      left:0;
+      width:3px;
+      border-radius:0 3px 3px 0;
+      background:transparent;
     }
 
+    .conversation:hover{
+      border-color:#d5e2de;
+      background:#f0f6f4;
+    }
+
+    .conversation.active{
+      border-color:#b9d6d0;
+      background:var(--petrol-soft);
+    }
+
+    .conversation.active::before{background:var(--petrol)}
+
     .conversation-top{
+      min-width:0;
       display:flex;
       justify-content:space-between;
-      gap:10px;
       align-items:center;
+      gap:10px;
     }
 
     .phone{
-      font-weight:950;
-      word-break:break-word;
-    }
-
-    .badge{
-      display:inline-flex;
-      align-items:center;
-      padding:4px 8px;
-      border-radius:999px;
-      border:1px solid rgba(255,255,255,.12);
-      color:#dbeafe;
-      background:rgba(255,255,255,.06);
-      font-size:11px;
-      font-weight:900;
+      min-width:0;
+      overflow:hidden;
+      color:#20322d;
+      font-size:13px;
+      font-weight:720;
+      text-overflow:ellipsis;
       white-space:nowrap;
     }
 
+    .badge{
+      min-width:24px;
+      display:inline-flex;
+      align-items:center;
+      justify-content:center;
+      flex:0 0 auto;
+      padding:3px 7px;
+      border:1px solid #cbd9d5;
+      border-radius:999px;
+      background:#ffffff;
+      color:#37655d;
+      font-size:12px;
+      font-weight:700;
+    }
+
     .preview{
-      color:#cbd5e1;
-      font-size:13px;
-      line-height:1.4;
+      color:#4d5c57;
+      font-size:12px;
+      line-height:1.45;
       display:-webkit-box;
       -webkit-line-clamp:2;
       -webkit-box-orient:vertical;
       overflow:hidden;
-      word-break:break-word;
+      overflow-wrap:anywhere;
     }
 
     .muted{
-      color:var(--muted);
+      color:#7a8883;
       font-size:12px;
       line-height:1.4;
     }
 
     .messages{
+      min-height:650px;
       display:flex;
       flex-direction:column;
-      min-height:620px;
+      background:#ffffff;
     }
 
     .chat-head{
+      min-height:78px;
       display:flex;
       align-items:center;
       justify-content:space-between;
       gap:14px;
-      padding:16px 18px;
-      border-bottom:1px solid rgba(255,255,255,.10);
-      background:linear-gradient(135deg, rgba(15,23,42,.92), rgba(37,99,235,.16));
+      padding:14px 18px;
+      border-bottom:1px solid var(--line);
+      background:#ffffff;
     }
 
     .contact-card{
-      display:flex;
-      gap:12px;
-      align-items:center;
       min-width:0;
+      display:flex;
+      align-items:center;
+      gap:12px;
     }
 
     .avatar{
-      width:46px;
-      height:46px;
-      border-radius:50%;
+      width:44px;
+      height:44px;
       display:grid;
       place-items:center;
       flex:0 0 auto;
-      border:1px solid rgba(34,197,94,.36);
-      background:linear-gradient(180deg, rgba(34,197,94,.28), rgba(96,165,250,.15));
-      color:#dcfce7;
-      font-weight:950;
+      border:1px solid #b8dbce;
+      border-radius:50%;
+      background:#e8f5f0;
+      color:#176650;
+      font-size:12px;
+      font-weight:800;
     }
 
-    .contact-main{
-      min-width:0;
-    }
+    .contact-main{min-width:0}
 
     .contact-title{
-      font-size:16px;
-      font-weight:950;
       overflow:hidden;
+      color:#1c2925;
+      font-size:15px;
+      font-weight:720;
       text-overflow:ellipsis;
       white-space:nowrap;
     }
 
     .contact-meta{
       margin-top:4px;
-      color:#aebbd0;
+      color:var(--muted);
       font-size:12px;
     }
 
     .chat-stats{
       display:flex;
-      gap:8px;
-      flex-wrap:wrap;
       justify-content:flex-end;
+      gap:7px;
+      flex-wrap:wrap;
     }
 
     .stat-pill{
+      min-height:28px;
       display:inline-flex;
       align-items:center;
-      min-height:30px;
-      padding:6px 10px;
+      padding:5px 9px;
+      border:1px solid #d7e0dd;
       border-radius:999px;
-      border:1px solid rgba(255,255,255,.12);
-      background:rgba(255,255,255,.06);
-      color:#dbeafe;
+      background:#f5f8f7;
+      color:#53615c;
       font-size:11px;
-      font-weight:900;
+      font-weight:650;
       white-space:nowrap;
     }
 
     .thread{
       flex:1;
+      min-height:360px;
       display:flex;
       flex-direction:column;
       gap:12px;
-      padding:18px;
+      padding:22px 20px;
       overflow:auto;
       background:
-        linear-gradient(90deg, rgba(255,255,255,.028) 1px, transparent 1px),
-        linear-gradient(180deg, rgba(255,255,255,.022) 1px, transparent 1px);
-      background-size:34px 34px;
+        radial-gradient(circle at 12% 8%, rgba(15,111,102,.055), transparent 28%),
+        linear-gradient(180deg, #f4f8f6 0%, #f7f9f8 100%);
+      scrollbar-color:#bdcbc7 transparent;
+      scrollbar-width:thin;
     }
 
     .bubble{
-      width:min(680px, 84%);
-      padding:12px 14px 10px;
-      border-radius:18px;
-      border:1px solid rgba(255,255,255,.12);
+      width:min(680px, 82%);
+      padding:11px 13px 10px;
+      border:1px solid #d8e2df;
+      border-radius:14px;
+      background:#ffffff;
+      color:var(--text);
       line-height:1.5;
-      word-break:break-word;
+      overflow-wrap:anywhere;
       white-space:pre-wrap;
-      box-shadow:0 12px 30px rgba(0,0,0,.22);
+      box-shadow:0 4px 13px rgba(28,52,45,.055);
     }
 
     .bubble.inbound{
       align-self:flex-start;
-      border-top-left-radius:7px;
-      background:linear-gradient(180deg, rgba(255,255,255,.12), rgba(255,255,255,.07));
+      border-top-left-radius:5px;
     }
 
     .bubble.outbound{
       align-self:flex-end;
-      border-top-right-radius:7px;
-      background:linear-gradient(180deg, rgba(96,165,250,.28), rgba(37,99,235,.16));
-      border-color:rgba(96,165,250,.32);
+      border-color:#b9d9d2;
+      border-top-right-radius:5px;
+      background:#e6f3f0;
     }
 
     .bubble-meta{
       display:flex;
       justify-content:space-between;
       gap:10px;
-      margin-bottom:7px;
-      color:#bfdbfe;
-      font-size:11px;
-      font-weight:900;
+      margin-bottom:6px;
+      color:#4e625c;
+      font-size:12px;
+      font-weight:750;
+      letter-spacing:.045em;
       text-transform:uppercase;
-      letter-spacing:.04em;
     }
 
     .message-text{
-      color:#f8fbff;
+      color:#202d29;
       font-size:14px;
+      line-height:1.55;
     }
 
     .message-footer{
       display:flex;
       justify-content:space-between;
       gap:10px;
-      margin-top:9px;
-      color:#9fb0c6;
-      font-size:11px;
-      font-weight:750;
+      margin-top:8px;
+      color:#71807b;
+      font-size:12px;
+      font-weight:600;
     }
 
-    .status-local{
-      color:#fed7aa;
-    }
-
-    .status-ok{
-      color:#bbf7d0;
-    }
-
-    .status-failed{
-      color:#fecaca;
-    }
+    .status-local{color:#9a6418}
+    .status-ok{color:#246e52}
+    .status-failed{color:#a3312e}
 
     .message-error{
       margin-top:8px;
       padding:8px 10px;
-      border-radius:12px;
-      border:1px solid rgba(239,68,68,.24);
-      background:rgba(239,68,68,.10);
-      color:#fecaca;
+      border:1px solid #edc4c2;
+      border-radius:8px;
+      background:var(--danger-soft);
+      color:#99302c;
       font-size:12px;
-      line-height:1.35;
+      line-height:1.4;
       white-space:normal;
     }
 
     .composer{
-      padding:16px 18px 18px;
-      border-top:1px solid rgba(255,255,255,.10);
-      background:rgba(3,7,18,.42);
+      padding:15px 18px 17px;
+      border-top:1px solid var(--line);
+      background:#ffffff;
     }
 
-    .reply-form{
-      display:grid;
-      gap:10px;
-    }
+    .reply-form{display:grid;gap:10px}
 
     .reply-input{
-      width:100%;
       min-height:92px;
-      resize:vertical;
-      padding:13px 14px;
-      border-radius:16px;
-      border:1px solid rgba(255,255,255,.14);
-      color:var(--text);
-      background:rgba(15,23,42,.82);
-      outline:none;
-      font:inherit;
-      line-height:1.5;
-    }
-
-    .reply-input:focus{
-      border-color:rgba(96,165,250,.44);
-      box-shadow:0 0 0 3px rgba(96,165,250,.12);
+      background:#f8faf9;
     }
 
     .composer-actions{
@@ -540,240 +784,325 @@
       align-items:center;
       justify-content:space-between;
       gap:12px;
-      flex-wrap:wrap;
     }
 
     .composer-note{
-      color:#fed7aa;
+      max-width:670px;
+      color:#697873;
       font-size:12px;
-      line-height:1.4;
+      line-height:1.45;
     }
 
-    .send-btn{
-      min-height:42px;
-      padding:10px 14px;
-      border-radius:14px;
-      border:1px solid rgba(96,165,250,.40);
-      background:linear-gradient(180deg, rgba(96,165,250,.28), rgba(37,99,235,.18));
-      color:var(--text);
-      font-weight:950;
-      cursor:pointer;
-    }
-
-    .send-btn:hover{
-      background:linear-gradient(180deg, rgba(96,165,250,.36), rgba(37,99,235,.24));
-    }
+    .composer-note.warning{color:#855a18}
 
     .empty{
-      padding:18px;
+      padding:24px 18px;
       color:var(--muted);
+      font-size:13px;
       line-height:1.5;
+      text-align:center;
     }
 
-    @media (max-width: 900px){
-      .diagnostics,
+    @media (max-width:1180px){
+      .diagnostics{grid-template-columns:1fr}
+      .status-grid{grid-template-columns:repeat(4, minmax(140px, 1fr));overflow:auto}
+    }
+
+    @media (max-width:980px){
+      .app-shell{display:block}
+      .sidebar{position:relative;width:auto;height:auto;min-height:0;gap:18px;padding:20px}
+      .sidebar-nav{flex-direction:row;flex-wrap:wrap;align-items:center}
+      .nav-section-label{display:none}
+      .nav-btn{width:auto}
+      .nav-btn.intake-link{margin-bottom:0}
+      .sidebar-status{width:max-content;margin-top:2px}
+      .workspace{padding:24px 20px 38px}
+    }
+
+    @media (max-width:820px){
+      .workspace-head{align-items:flex-start}
       .inbox{grid-template-columns:1fr}
-      .status-grid{grid-template-columns:1fr 1fr}
-      h1{font-size:32px}
-      .bubble{width:100%}
+      .conversation-list{max-height:330px}
+      .messages{min-height:620px}
     }
 
-    @media (max-width: 560px){
-      .status-grid,
+    @media (max-width:640px){
+      .sidebar{padding:18px 14px}
+      .sidebar-nav{display:grid;grid-template-columns:1fr 1fr;width:100%}
+      .nav-btn{width:100%}
+      .sidebar-status{width:100%}
+      .workspace{gap:14px;padding:20px 14px 30px}
+      .workspace-head{flex-direction:column;gap:12px}
+      h1{font-size:26px}
+      .readiness-pill{white-space:normal}
+      .status-grid{grid-template-columns:1fr 1fr;overflow:visible}
       .webhook-row{grid-template-columns:1fr}
+      .copy-btn{width:100%}
+      .chat-head{align-items:flex-start;flex-direction:column}
+      .chat-stats{justify-content:flex-start}
+      .thread{padding:16px 12px}
+      .bubble{width:92%}
+      .composer{padding:13px}
+      .composer-actions{align-items:stretch;flex-direction:column}
+      .send-btn{width:100%}
+    }
+
+    @media (max-width:420px){
+      .sidebar-nav{grid-template-columns:1fr}
+      .status-grid{grid-template-columns:1fr}
+      .bubble{width:97%}
+      .message-footer{flex-direction:column;gap:2px}
     }
   </style>
 </head>
 <body>
-  <div class="wrap">
-    <div class="topbar">
-      <div>
-        <div class="eyebrow">WerkstattAI - WhatsApp</div>
-        <h1>WhatsApp Inbox</h1>
-        <div class="sub">
-          Verlauf eingehender WhatsApp-Nachrichten und Antworten aus dem Panel. Mit Access Token werden Antworten ueber Meta API versendet.
-        </div>
+  <div class="app-shell">
+    <aside class="sidebar">
+      <div class="brand">
+        <div class="brand-mark">WerkstattAI</div>
+        <div class="brand-title">{{ workshop.name or "Werkstattbereich" }}</div>
+        <div class="brand-subtitle">Digitaler Werkstattbereich</div>
       </div>
 
-      <div class="top-actions">
-        <a class="nav-btn" href="/dashboard?workshop_id={{ workshop_id }}">Dashboard</a>
-        <a class="nav-btn active" href="/dashboard/whatsapp?workshop_id={{ workshop_id }}">WhatsApp</a>
-        <a class="nav-btn" href="/dashboard/intake?workshop_id={{ workshop_id }}">Direktannahme</a>
+      <nav class="sidebar-nav" aria-label="Hauptnavigation">
+        <div class="nav-section-label">Anfragen</div>
+        <a class="nav-btn" href="/dashboard?workshop_id={{ workshop_id }}">Aktive Tickets</a>
+        <a class="nav-btn active" href="/dashboard/whatsapp?workshop_id={{ workshop_id }}" aria-current="page">WhatsApp</a>
+        <a class="nav-btn intake-link" href="/dashboard/intake?workshop_id={{ workshop_id }}">+ Direktannahme</a>
+
+        <div class="nav-section-label">Verwaltung</div>
+        <a class="nav-btn" href="/dashboard/archive?workshop_id={{ workshop_id }}">Archiv</a>
         <a class="nav-btn" href="/dashboard/settings?workshop_id={{ workshop_id }}">Einstellungen</a>
+        <a class="nav-btn" href="/dashboard/billing?workshop_id={{ workshop_id }}">Abo</a>
         {% if current_user and current_user.role == "admin" %}
           <a class="nav-btn" href="/dashboard/admin/workshops">Admin</a>
         {% endif %}
+        <form class="logout-form" method="post" action="/logout">
+          <button class="nav-btn" type="submit">Abmelden</button>
+        </form>
+      </nav>
+
+      <div class="sidebar-status">
+        <span class="sidebar-status-dot" aria-hidden="true"></span>
+        Sicher angemeldet
       </div>
-    </div>
+    </aside>
 
-    <div class="diagnostics">
-      <section class="panel">
-        <div class="panel-head">
-          <div class="panel-title">
-            WhatsApp Bereitschaft:
-            {% if readiness.is_ready %}bereit{% else %}nicht vollstaendig{% endif %}
-          </div>
-          <div class="panel-sub">
-            Antworten laufen aktuell im Modus:
-            {% if readiness.reply_mode == "meta" %}Meta API{% else %}lokal speichern{% endif %}
-            {% if readiness.display_phone_number %}- {{ readiness.display_phone_number }}{% endif %}
-          </div>
+    <main class="workspace">
+      <header class="workspace-head">
+        <div>
+          <div class="workspace-overline">Kundenkommunikation</div>
+          <h1>WhatsApp-Inbox</h1>
+          <p class="workspace-copy">
+            Eingehende Nachrichten, Werkstattantworten und den Verbindungsstatus übersichtlich an einem Ort verwalten.
+          </p>
         </div>
 
-        <div class="status-grid">
-          {% for check in readiness.checks %}
-            <div class="check">
-              <div class="check-top">
-                <span>{{ check.label }}</span>
-                <span class="dot {% if check.configured %}ok{% endif %}"></span>
-              </div>
-              <div class="check-detail">{{ check.detail }}</div>
+        <div class="readiness-pill {% if readiness.is_ready %}ready{% endif %}">
+          <span class="readiness-dot" aria-hidden="true"></span>
+          {% if readiness.is_ready %}WhatsApp bereit{% else %}Einrichtung unvollständig{% endif %}
+        </div>
+      </header>
+
+      <div class="diagnostics">
+        <section class="panel" aria-labelledby="readiness-title">
+          <div class="panel-head">
+            <div class="panel-title" id="readiness-title">
+              WhatsApp-Bereitschaft:
+              {% if readiness.is_ready %}bereit{% else %}nicht vollständig{% endif %}
             </div>
-          {% endfor %}
-        </div>
-      </section>
-
-      <section class="panel">
-        <div class="panel-head">
-          <div class="panel-title">Webhook & Test</div>
-          <div class="panel-sub">Diese URL in Meta als Callback URL verwenden.</div>
-          {% if readiness.webhook_url_source == "configured" %}
-            <div class="panel-sub">Oeffentliche Proxy-URL aus WHATSAPP_WEBHOOK_PUBLIC_URL.</div>
-          {% endif %}
-        </div>
-
-        <div class="webhook-box">
-          <div class="webhook-row">
-            <input class="readonly-input" id="webhookUrl" value="{{ readiness.webhook_url }}" readonly />
-            <button class="copy-btn" type="button" data-copy-target="webhookUrl">Kopieren</button>
-          </div>
-
-          <form class="test-form" method="post" action="/dashboard/whatsapp/test">
-            <input type="hidden" name="workshop_id" value="{{ workshop_id }}" />
-            <input class="test-input" name="test_phone" placeholder="Testnummer im WhatsApp-Format, z.B. 4917612345678" value="{{ selected_phone }}" required />
-            <textarea class="test-text" name="test_text">WerkstattAI Testnachricht. WhatsApp Verbindung funktioniert.</textarea>
-            <button class="test-btn" type="submit">Testnachricht senden</button>
-          </form>
-        </div>
-
-        {% if test_status %}
-          <div class="test-alert {{ test_status }}">{{ test_detail or "-" }}</div>
-        {% endif %}
-      </section>
-    </div>
-
-    <div class="inbox">
-      <aside class="panel">
-        <div class="panel-head">
-          <div class="panel-title">Konversationen</div>
-          <div class="panel-sub">{{ conversations|length }} aktive WhatsApp-Verlaeufe</div>
-        </div>
-
-        <div class="conversation-list">
-          {% for c in conversations %}
-            <a
-              class="conversation {% if c.customer_phone == selected_phone %}active{% endif %}"
-              href="/dashboard/whatsapp?workshop_id={{ workshop_id }}&phone={{ c.customer_phone }}"
-            >
-              <div class="conversation-top">
-                <div class="phone">{{ c.customer_phone }}</div>
-                <span class="badge">{{ c.message_count }}</span>
-              </div>
-
-              <div class="preview">
-                {% if c.last_direction == "outbound" %}WerkstattAI: {% else %}Kunde: {% endif %}
-                {{ c.last_text or "-" }}
-              </div>
-
-              <div class="muted">{{ c.last_created_at or "-" }}</div>
-            </a>
-          {% endfor %}
-
-          {% if conversations|length == 0 %}
-            <div class="empty">Noch keine WhatsApp-Nachrichten fuer diese Werkstatt.</div>
-          {% endif %}
-        </div>
-      </aside>
-
-      <main class="panel messages">
-        <div class="chat-head">
-          <div class="contact-card">
-            <div class="avatar">WA</div>
-            <div class="contact-main">
-              <div class="contact-title">
-                {% if selected_phone %}{{ selected_phone }}{% else %}Keine Konversation{% endif %}
-              </div>
-              <div class="contact-meta">
-                {% if selected_conversation %}
-                  Zuletzt {{ selected_conversation.last_created_at }}
-                {% else %}
-                  Waehle links einen WhatsApp-Verlauf aus.
-                {% endif %}
-              </div>
+            <div class="panel-sub">
+              Antworten laufen aktuell im Modus:
+              {% if readiness.reply_mode == "meta" %}Meta API{% else %}lokal speichern{% endif %}
+              {% if readiness.display_phone_number %}· {{ readiness.display_phone_number }}{% endif %}
             </div>
           </div>
 
-          <div class="chat-stats">
-            {% if selected_conversation %}
-              <span class="stat-pill">{{ selected_conversation.message_count }} Nachrichten</span>
-              <span class="stat-pill">{{ selected_conversation.inbound_count }} Kunde</span>
-              <span class="stat-pill">{{ selected_conversation.outbound_count }} WerkstattAI</span>
+          <div class="status-grid">
+            {% for check in readiness.checks %}
+              <div class="check">
+                <div class="check-top">
+                  <span>{{ check.label }}</span>
+                  <span
+                    class="dot {% if check.configured %}ok{% endif %}"
+                    title="{% if check.configured %}Konfiguriert{% else %}Nicht konfiguriert{% endif %}"
+                    aria-label="{% if check.configured %}Konfiguriert{% else %}Nicht konfiguriert{% endif %}"
+                  ></span>
+                </div>
+                <div class="check-detail">{{ check.detail }}</div>
+              </div>
+            {% endfor %}
+          </div>
+        </section>
+
+        <section class="panel" aria-labelledby="webhook-title">
+          <div class="panel-head">
+            <div class="panel-title" id="webhook-title">Webhook &amp; Verbindungstest</div>
+            <div class="panel-sub">Diese Adresse in Meta als Callback-URL verwenden.</div>
+            {% if readiness.webhook_url_source == "configured" %}
+              <div class="panel-sub">Öffentliche Proxy-URL aus WHATSAPP_WEBHOOK_PUBLIC_URL.</div>
             {% endif %}
           </div>
-        </div>
 
-        <div class="thread">
-          {% for m in messages %}
-            <div class="bubble {{ m.direction }}">
-              <div class="bubble-meta">
-                <span>{% if m.direction == "outbound" %}WerkstattAI{% else %}Kunde{% endif %}</span>
-                <span class="{{ m.status_class }}">{{ m.status_label }}</span>
-              </div>
-              <div class="message-text">{{ m.text or "-" }}</div>
-              {% if m.message_error %}
-                <div class="message-error">{{ m.message_error }}</div>
-              {% endif %}
-              <div class="message-footer">
-                <span>{{ m.created_at }}</span>
-                {% if m.ticket_id %}<span>Ticket {{ m.ticket_id }}</span>{% endif %}
+          <div class="webhook-box">
+            <div class="field">
+              <label class="field-label" for="webhookUrl">Webhook-URL</label>
+              <div class="webhook-row">
+                <input class="readonly-input" id="webhookUrl" value="{{ readiness.webhook_url }}" readonly />
+                <button class="copy-btn" type="button" data-copy-target="webhookUrl">Kopieren</button>
               </div>
             </div>
-          {% endfor %}
 
-          {% if selected_phone and messages|length == 0 %}
-            <div class="empty">Fuer diesen Kontakt wurden noch keine Nachrichten gespeichert.</div>
-          {% endif %}
-        </div>
-
-        <div class="composer">
-          {% if selected_phone %}
-            <form class="reply-form" method="post" action="/dashboard/whatsapp/reply">
+            <form class="test-form" method="post" action="/dashboard/whatsapp/test">
               <input type="hidden" name="workshop_id" value="{{ workshop_id }}" />
-              <input type="hidden" name="customer_phone" value="{{ selected_phone }}" />
-              <textarea
-                class="reply-input"
-                name="reply_text"
-                placeholder="Antwort an den Kunden schreiben..."
-                required
-              ></textarea>
-              <div class="composer-actions">
-                <div class="composer-note">
-                  {% if readiness.can_send %}
-                    Antwort wird ueber Meta API gesendet und im Verlauf gespeichert.
+              <div class="field">
+                <label class="field-label" for="testPhone">Testnummer</label>
+                <input
+                  class="test-input"
+                  id="testPhone"
+                  name="test_phone"
+                  type="tel"
+                  placeholder="WhatsApp-Format, z. B. 4917612345678"
+                  value="{{ selected_phone }}"
+                  required
+                />
+              </div>
+              <div class="field">
+                <label class="field-label" for="testText">Testnachricht</label>
+                <textarea class="test-text" id="testText" name="test_text">WerkstattAI-Testnachricht: Die WhatsApp-Verbindung funktioniert.</textarea>
+              </div>
+              <button class="test-btn" type="submit">Testnachricht senden</button>
+            </form>
+          </div>
+
+          {% if test_status %}
+            <div class="test-alert {{ test_status }}">{{ test_detail or "-" }}</div>
+          {% endif %}
+        </section>
+      </div>
+
+      <div class="inbox">
+        <aside class="panel conversation-panel" aria-labelledby="conversation-title">
+          <div class="panel-head">
+            <div class="panel-title" id="conversation-title">Konversationen</div>
+            <div class="panel-sub">{{ conversations|length }} aktive WhatsApp-Verläufe</div>
+          </div>
+
+          <div class="conversation-list">
+            {% for c in conversations %}
+              <a
+                class="conversation {% if c.customer_phone == selected_phone %}active{% endif %}"
+                href="/dashboard/whatsapp?workshop_id={{ workshop_id }}&phone={{ c.customer_phone }}"
+              >
+                <div class="conversation-top">
+                  <div class="phone">{{ c.customer_phone }}</div>
+                  <span class="badge" title="{{ c.message_count }} Nachrichten">{{ c.message_count }}</span>
+                </div>
+
+                <div class="preview">
+                  {% if c.last_direction == "outbound" %}WerkstattAI: {% else %}Kunde: {% endif %}
+                  {{ c.last_text or "-" }}
+                </div>
+
+                <div class="muted">{{ c.last_created_at or "-" }}</div>
+              </a>
+            {% endfor %}
+
+            {% if conversations|length == 0 %}
+              <div class="empty">Noch keine WhatsApp-Nachrichten für diese Werkstatt.</div>
+            {% endif %}
+          </div>
+        </aside>
+
+        <section class="panel messages" aria-label="Nachrichtenverlauf">
+          <div class="chat-head">
+            <div class="contact-card">
+              <div class="avatar" aria-hidden="true">WA</div>
+              <div class="contact-main">
+                <div class="contact-title">
+                  {% if selected_phone %}{{ selected_phone }}{% else %}Keine Konversation ausgewählt{% endif %}
+                </div>
+                <div class="contact-meta">
+                  {% if selected_conversation %}
+                    Zuletzt {{ selected_conversation.last_created_at }}
                   {% else %}
-                    Aktuell wird lokal gespeichert. Fuer echten Versand fehlen Access Token oder Phone Number ID.
+                    Wähle links einen WhatsApp-Verlauf aus.
                   {% endif %}
                 </div>
-                <button class="send-btn" type="submit">Antwort speichern</button>
               </div>
-            </form>
-          {% else %}
-            <div class="composer-note">Waehle links eine Konversation aus, um eine Antwort vorzubereiten.</div>
-          {% endif %}
-        </div>
-      </main>
-    </div>
+            </div>
+
+            <div class="chat-stats">
+              {% if selected_conversation %}
+                <span class="stat-pill">{{ selected_conversation.message_count }} Nachrichten</span>
+                <span class="stat-pill">{{ selected_conversation.inbound_count }} vom Kunden</span>
+                <span class="stat-pill">{{ selected_conversation.outbound_count }} von WerkstattAI</span>
+              {% endif %}
+            </div>
+          </div>
+
+          <div class="thread">
+            {% for m in messages %}
+              <div class="bubble {{ m.direction }}">
+                <div class="bubble-meta">
+                  <span>{% if m.direction == "outbound" %}WerkstattAI{% else %}Kunde{% endif %}</span>
+                  <span class="{{ m.status_class }}">{{ m.status_label }}</span>
+                </div>
+                <div class="message-text">{{ m.text or "-" }}</div>
+                {% if m.message_error %}
+                  <div class="message-error">{{ m.message_error }}</div>
+                {% endif %}
+                <div class="message-footer">
+                  <span>{{ m.created_at }}</span>
+                  {% if m.ticket_id %}<span>Ticket {{ m.ticket_id }}</span>{% endif %}
+                </div>
+              </div>
+            {% endfor %}
+
+            {% if selected_phone and messages|length == 0 %}
+              <div class="empty">Für diesen Kontakt wurden noch keine Nachrichten gespeichert.</div>
+            {% endif %}
+
+            {% if not selected_phone %}
+              <div class="empty">Wähle eine Konversation aus, um den Nachrichtenverlauf zu öffnen.</div>
+            {% endif %}
+          </div>
+
+          <div class="composer">
+            {% if selected_phone %}
+              <form class="reply-form" method="post" action="/dashboard/whatsapp/reply">
+                <input type="hidden" name="workshop_id" value="{{ workshop_id }}" />
+                <input type="hidden" name="customer_phone" value="{{ selected_phone }}" />
+                <label class="field-label" for="replyText">Antwort an {{ selected_phone }}</label>
+                <textarea
+                  class="reply-input"
+                  id="replyText"
+                  name="reply_text"
+                  placeholder="Antwort an den Kunden schreiben …"
+                  required
+                ></textarea>
+                <div class="composer-actions">
+                  <div class="composer-note {% if not readiness.can_send %}warning{% endif %}">
+                    {% if readiness.can_send %}
+                      Die Antwort wird über die Meta API gesendet und im Verlauf gespeichert.
+                    {% else %}
+                      Die Antwort wird aktuell nur lokal gespeichert. Für den Versand fehlen Access Token oder Phone Number ID.
+                    {% endif %}
+                  </div>
+                  <button class="send-btn" type="submit">
+                    {% if readiness.can_send %}Antwort senden{% else %}Lokal speichern{% endif %}
+                  </button>
+                </div>
+              </form>
+            {% else %}
+              <div class="composer-note">Wähle eine Konversation aus, um eine Antwort vorzubereiten.</div>
+            {% endif %}
+          </div>
+        </section>
+      </div>
+    </main>
   </div>
+
   <script>
     document.querySelectorAll("[data-copy-target]").forEach((button) => {
       button.addEventListener("click", async () => {

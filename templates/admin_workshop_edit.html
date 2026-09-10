@@ -252,6 +252,421 @@
 
       h1{font-size:32px}
     }
+
+    /* Calm workshop workspace theme */
+    :root{
+      --bg:#f3f6f5;
+      --panel:#ffffff;
+      --line:#dfe6e3;
+      --text:#182522;
+      --muted:#65736f;
+      --petrol:#0f6f66;
+      --petrol-dark:#17413c;
+      --graphite:#172723;
+      --ok:#23815d;
+      --danger:#c44743;
+      --info:#2d6f96;
+      --shadow:0 8px 24px rgba(28,52,45,.08);
+      --shadow-2:0 18px 42px rgba(28,52,45,.12);
+    }
+
+    body{
+      color:var(--text);
+      background:
+        radial-gradient(900px 440px at 72% -10%, rgba(15,111,102,.11), transparent 64%),
+        linear-gradient(180deg, #edf3f1 0, #f7f9f8 420px, #f3f6f5 100%);
+      font-family:"Segoe UI Variable", "Segoe UI", Inter, system-ui, -apple-system, sans-serif;
+    }
+
+    .wrap{
+      width:100%;
+      max-width:none;
+      min-height:100vh;
+      display:grid;
+      grid-template-columns:244px minmax(0, 1fr);
+      align-items:start;
+      margin:0;
+      padding:0;
+    }
+
+    .topbar{
+      position:sticky;
+      top:0;
+      z-index:20;
+      min-height:100vh;
+      height:100vh;
+      overflow-y:auto;
+      display:flex;
+      flex-direction:column;
+      align-items:stretch;
+      justify-content:flex-start;
+      gap:26px;
+      margin:0;
+      padding:26px 18px 20px;
+      border:0;
+      border-radius:0;
+      color:#f5fbf9;
+      background:
+        radial-gradient(360px 220px at 10% 0%, rgba(34,143,131,.24), transparent 70%),
+        linear-gradient(180deg, #172a26 0%, #13231f 100%);
+      box-shadow:8px 0 28px rgba(22,42,36,.10);
+    }
+
+    .topbar > div:first-child{
+      padding:0 8px;
+    }
+
+    .eyebrow{
+      padding:0;
+      border:0;
+      border-radius:0;
+      background:transparent;
+      color:#78c9bd;
+      font-size:11px;
+      font-weight:750;
+      letter-spacing:.09em;
+    }
+
+    h1{
+      margin:7px 0 0;
+      color:#ffffff;
+      font-size:23px;
+      line-height:1.22;
+      font-weight:720;
+      letter-spacing:-.025em;
+      overflow-wrap:anywhere;
+    }
+
+    .sub{
+      margin-top:8px;
+      color:#aebeb9;
+      font-size:12px;
+      line-height:1.55;
+    }
+
+    .top-actions{
+      min-height:0;
+      flex:1;
+      width:100%;
+      display:flex;
+      flex-direction:column;
+      flex-wrap:nowrap;
+      align-items:stretch;
+      gap:5px;
+    }
+
+    .nav-section-label{
+      margin:15px 10px 5px;
+      color:#7f948e;
+      font-size:11px;
+      font-weight:700;
+      letter-spacing:.11em;
+      text-transform:uppercase;
+    }
+
+    .nav-section-label:first-child{margin-top:0}
+
+    .top-actions form{
+      width:100%;
+      margin-top:auto !important;
+    }
+
+    .top-actions .nav-btn{
+      width:100%;
+      min-height:42px;
+      justify-content:flex-start;
+      padding:10px 12px;
+      border:1px solid transparent;
+      border-radius:9px;
+      background:transparent;
+      color:#d5e0dc;
+      font-size:13px;
+      font-weight:600;
+      box-shadow:none;
+      transition:.16s ease;
+    }
+
+    .top-actions .nav-btn:hover{
+      border-color:rgba(255,255,255,.06);
+      background:rgba(255,255,255,.07);
+      color:#ffffff;
+    }
+
+    .top-actions .nav-btn.active{
+      border-color:rgba(86,194,177,.16);
+      background:rgba(64,166,151,.17);
+      color:#ffffff;
+      box-shadow:inset 3px 0 0 #58b8a9;
+    }
+
+    .grid{
+      min-width:0;
+      grid-template-columns:minmax(0, 1fr) minmax(300px, .56fr);
+      gap:18px;
+      padding:30px clamp(20px, 3vw, 46px) 46px;
+    }
+
+    .panel{
+      overflow:hidden;
+      border:1px solid var(--line);
+      border-radius:13px;
+      background:#ffffff;
+      box-shadow:var(--shadow);
+    }
+
+    .grid > aside.panel{
+      position:sticky;
+      top:30px;
+    }
+
+    .panel-head{
+      padding:17px 19px;
+      border-bottom:1px solid var(--line);
+      background:#ffffff;
+    }
+
+    .panel-title{
+      color:#1b2925;
+      font-size:15px;
+      font-weight:720;
+      letter-spacing:-.005em;
+    }
+
+    .panel-sub{
+      margin-top:5px;
+      color:var(--muted);
+      font-size:12px;
+      line-height:1.5;
+    }
+
+    .form,
+    .side-content{
+      padding:20px;
+      gap:16px;
+    }
+
+    .row{
+      gap:14px;
+    }
+
+    label{
+      gap:7px;
+      color:#34433e;
+      font-size:12px;
+      font-weight:700;
+    }
+
+    input,
+    textarea,
+    select{
+      min-height:44px;
+      padding:10px 12px;
+      border:1px solid #d5dfdc;
+      border-radius:9px;
+      background:#ffffff;
+      color:var(--text);
+      font:inherit;
+      box-shadow:none;
+    }
+
+    input[readonly]{
+      background:#f1f4f3;
+      color:#687570;
+      cursor:not-allowed;
+    }
+
+    textarea{
+      min-height:92px;
+    }
+
+    input:focus,
+    textarea:focus,
+    select:focus{
+      border-color:#5b9e94;
+      box-shadow:0 0 0 3px rgba(15,111,102,.11);
+    }
+
+    input:focus-visible,
+    textarea:focus-visible,
+    select:focus-visible,
+    button:focus-visible,
+    a:focus-visible{
+      outline:3px solid rgba(15,111,102,.20);
+      outline-offset:2px;
+    }
+
+    .hint,
+    .muted{
+      color:#74827e;
+      font-size:12px;
+      font-weight:500;
+    }
+
+    .actions{
+      padding-top:3px;
+    }
+
+    button.primary{
+      min-height:44px;
+      padding:10px 16px;
+      border:1px solid #0c625a;
+      border-radius:9px;
+      background:var(--petrol);
+      color:#ffffff;
+      font-weight:700;
+      box-shadow:0 8px 18px rgba(15,111,102,.16);
+      transition:.16s ease;
+    }
+
+    button.primary:hover{
+      transform:translateY(-1px);
+      background:#0c625a;
+    }
+
+    .alert{
+      border-radius:9px;
+      font-size:12px;
+      font-weight:650;
+    }
+
+    .alert.ok{
+      border-color:#b9dcc9;
+      background:#edf8f2;
+      color:#24694e;
+    }
+
+    .alert.error{
+      border-color:#ebc0bd;
+      background:#fff0ef;
+      color:#a3312e;
+    }
+
+    .item{
+      padding:14px;
+      border:1px solid #dfe6e3;
+      border-radius:10px;
+      background:#f7f9f8;
+      color:#2d3d38;
+      overflow-wrap:anywhere;
+    }
+
+    .item b{
+      color:#39736c;
+      font-size:11px;
+      font-weight:750;
+    }
+
+    .quick-links{
+      gap:8px;
+    }
+
+    .quick-links .nav-btn{
+      width:100%;
+      min-height:40px;
+      padding:9px 11px;
+      border:1px solid #d7e0dd;
+      border-radius:8px;
+      background:#ffffff;
+      color:#35534c;
+      font-size:12px;
+      font-weight:650;
+      text-decoration:none;
+      box-shadow:none;
+    }
+
+    .quick-links .nav-btn:hover{
+      border-color:#b8d0c9;
+      background:#edf5f3;
+      color:#164f47;
+    }
+
+    @media (max-width: 1200px){
+      .grid{
+        grid-template-columns:1fr;
+      }
+
+      .grid > aside.panel{
+        position:static;
+      }
+    }
+
+    @media (max-width: 980px){
+      .wrap{
+        display:block;
+      }
+
+      .topbar{
+        position:relative;
+        width:auto;
+        height:auto;
+        min-height:0;
+        gap:18px;
+        padding:20px;
+      }
+
+      .top-actions{
+        display:flex;
+        flex-direction:row;
+        flex-wrap:wrap;
+        align-items:center;
+      }
+
+      .nav-section-label{display:none}
+
+      .top-actions form,
+      .top-actions .nav-btn{
+        width:auto;
+      }
+
+      .top-actions form{margin-top:0 !important}
+
+      .grid{
+        padding:24px 20px 38px;
+      }
+    }
+
+    @media (max-width: 680px){
+      h1{
+        font-size:22px;
+      }
+
+      .topbar{
+        padding:18px 14px;
+      }
+
+      .topbar > div:first-child{
+        padding:0;
+      }
+
+      .top-actions{
+        display:grid;
+        grid-template-columns:1fr;
+      }
+
+      .top-actions form,
+      .top-actions .nav-btn{
+        width:100%;
+      }
+
+      .grid{
+        padding:18px 14px 30px;
+      }
+
+      .row,
+      .quick-links{
+        grid-template-columns:1fr;
+      }
+
+      .form,
+      .side-content{
+        padding:16px;
+      }
+
+      .actions,
+      .actions button{
+        width:100%;
+      }
+    }
   </style>
 </head>
 <body>
@@ -261,15 +676,25 @@
         <div class="eyebrow">WerkstattAI - Admin</div>
         <h1>{{ account.name }}</h1>
         <div class="sub">
-          Werkstattkonto {{ account.id }} bearbeiten, Zugriff steuern und Owner-Passwort zuruecksetzen.
+          Werkstattkonto {{ account.id }} bearbeiten, Zugriff steuern und Owner-Passwort zurücksetzen.
         </div>
       </div>
 
-      <div class="top-actions">
-        <a class="nav-btn" href="/dashboard/admin/workshops">Alle Werkstaetten</a>
-        <a class="nav-btn" href="/dashboard?workshop_id={{ account.id }}">Dashboard</a>
+      <nav class="top-actions" aria-label="Hauptnavigation">
+        <div class="nav-section-label">Anfragen</div>
+        <a class="nav-btn" href="/dashboard?workshop_id={{ account.id }}">Aktive Tickets</a>
+        <a class="nav-btn" href="/dashboard/whatsapp?workshop_id={{ account.id }}">WhatsApp</a>
+        <a class="nav-btn" href="/dashboard/intake?workshop_id={{ account.id }}">+ Direktannahme</a>
+
+        <div class="nav-section-label">Verwaltung</div>
+        <a class="nav-btn" href="/dashboard/archive?workshop_id={{ account.id }}">Archiv</a>
         <a class="nav-btn" href="/dashboard/settings?workshop_id={{ account.id }}">Einstellungen</a>
-      </div>
+        <a class="nav-btn" href="/dashboard/billing?workshop_id={{ account.id }}">Abo</a>
+        <a class="nav-btn active" href="/dashboard/admin/workshops" aria-current="page">Admin</a>
+        <form method="post" action="/logout" style="margin:0;">
+          <button class="nav-btn" type="submit">Abmelden</button>
+        </form>
+      </nav>
     </div>
 
     <div class="grid">
@@ -284,7 +709,7 @@
             <div class="alert ok">Werkstattkonto wurde gespeichert.</div>
           {% endif %}
           {% if reset %}
-            <div class="alert ok">Passwort fuer {{ reset }} wurde aktualisiert.</div>
+            <div class="alert ok">Passwort für {{ reset }} wurde aktualisiert.</div>
           {% endif %}
           {% if error %}
             <div class="alert error">{{ error }}</div>
@@ -317,7 +742,7 @@
 
           <div class="row">
             <label>
-              Kontakt E-Mail
+              Kontakt-E-Mail
               <input name="email" type="email" value="{{ account.email or '' }}" />
             </label>
 
@@ -328,7 +753,7 @@
           </div>
 
           <label>
-            Oeffnungszeiten
+            Öffnungszeiten
             <textarea name="opening_hours">{{ account.opening_hours or '' }}</textarea>
           </label>
 
@@ -345,10 +770,10 @@
             <label>
               Status
               <select name="subscription_status">
-                <option value="trialing" {% if account.subscription_status == "trialing" %}selected{% endif %}>Trialing</option>
-                <option value="active" {% if account.subscription_status == "active" %}selected{% endif %}>Active</option>
-                <option value="inactive" {% if account.subscription_status == "inactive" %}selected{% endif %}>Inactive</option>
-                <option value="past_due" {% if account.subscription_status == "past_due" %}selected{% endif %}>Past due</option>
+                <option value="trialing" {% if account.subscription_status == "trialing" %}selected{% endif %}>Testphase</option>
+                <option value="active" {% if account.subscription_status == "active" %}selected{% endif %}>Aktiv</option>
+                <option value="inactive" {% if account.subscription_status == "inactive" %}selected{% endif %}>Inaktiv</option>
+                <option value="past_due" {% if account.subscription_status == "past_due" %}selected{% endif %}>Zahlung offen</option>
               </select>
             </label>
           </div>
@@ -378,7 +803,7 @@
           </div>
 
           <label>
-            Preisinfo
+            Preisangaben
             <textarea name="pricing_info">{{ account.pricing_info or '' }}</textarea>
           </label>
 
@@ -388,7 +813,7 @@
           </label>
 
           <div class="actions">
-            <button class="primary" type="submit">Aenderungen speichern</button>
+            <button class="primary" type="submit">Änderungen speichern</button>
           </div>
         </form>
       </section>
@@ -396,14 +821,14 @@
       <aside class="panel">
         <div class="panel-head">
           <div class="panel-title">Zugriff & Schnellaktionen</div>
-          <div class="panel-sub">Owner-Login pruefen, Passwort neu setzen und direkt in Kundenbereiche springen.</div>
+          <div class="panel-sub">Owner-Login prüfen, Passwort neu setzen und direkt in Kundenbereiche springen.</div>
         </div>
 
         <div class="side-content">
           <div class="item">
             <b>Owner Login</b>
             <div>{{ account.owner_email or '-' }}</div>
-            <div class="muted">{{ account.users|length }} Nutzer fuer dieses Konto</div>
+            <div class="muted">{{ account.users|length }} Nutzer für dieses Konto</div>
           </div>
 
           <div class="quick-links">
@@ -430,7 +855,7 @@
             </label>
 
             <div class="actions">
-              <button class="primary" type="submit">Passwort zuruecksetzen</button>
+              <button class="primary" type="submit">Passwort zurücksetzen</button>
             </div>
           </form>
         </div>
