@@ -33,7 +33,12 @@ from app.admin import (
     reset_workshop_owner_password,
     update_workshop_account,
 )
-from app.db import get_conn, init_db
+from app.db import (
+    get_conn,
+    get_whatsapp_conversation_control,
+    init_db,
+    set_whatsapp_conversation_control,
+)
 from app.config import settings
 from app.conversation.analysis import analyze_problem
 from app.conversation.existing_ticket import handle_existing_ticket
@@ -50,8 +55,9 @@ from app.conversation.intent import (
     detect_intent,
 )
 from app.conversation.router import next_step
-from app.models import IntakeState
+from app.models import ChatResponse, IntakeState
 from app.main import (
+    _response_ticket_id,
     StatusUpdate,
     patch_ticket_status,
     ticket_by_id,
@@ -78,9 +84,17 @@ from app.whatsapp import (
     parse_meta_messages,
     parse_meta_statuses,
     save_whatsapp_message,
+    send_whatsapp_template_message,
+    update_whatsapp_message_status,
+    verify_signature,
+    whatsapp_customer_service_window,
+    whatsapp_customer_service_window_for_phone,
     WhatsAppSendResult,
 )
 from app.web import (
+    _decorate_whatsapp_messages,
+    _message_status_class,
+    _message_status_label,
     datenschutz_page,
     dashboard_admin_workshops,
     dashboard_admin_workshops_create,
@@ -91,11 +105,18 @@ from app.web import (
     ticket_add_note,
     ticket_send_customer_message,
     dashboard_whatsapp_reply,
+    dashboard_whatsapp_control,
+    dashboard_whatsapp_open_manual,
+    dashboard_whatsapp_start_template,
     dashboard_whatsapp_test,
     _whatsapp_readiness,
     _workshop_id_for_request,
 )
-from app.workshops import get_workshop, update_workshop
+from app.workshops import (
+    find_workshop_id_by_whatsapp_phone_number_id,
+    get_workshop,
+    update_workshop,
+)
 
 
 def _asgi_request(body: bytes, headers: dict[str, str] | None = None) -> Request:
@@ -501,6 +522,49 @@ class WhatsAppWebhookTests(unittest.TestCase):
             "whatsapp:4917612345678",
         )
 
+    def test_whatsapp_signature_verification_fails_closed_without_app_secret(self) -> None:
+        self.assertFalse(verify_signature(b"{}", "sha256=anything", ""))
+        self.assertFalse(verify_signature(b"{}", None, None))
+
+    def test_meta_webhook_rejects_request_when_app_secret_is_missing(self) -> None:
+        old_secret = settings.whatsapp_app_secret
+        object.__setattr__(settings, "whatsapp_app_secret", "")
+        try:
+            request = _asgi_request(
+                json.dumps(self.META_PAYLOAD).encode("utf-8"),
+                headers={"content-type": "application/json"},
+            )
+            with self.assertRaises(HTTPException) as ctx:
+                asyncio.run(whatsapp_webhook(request))
+
+            self.assertEqual(ctx.exception.status_code, 403)
+        finally:
+            object.__setattr__(settings, "whatsapp_app_secret", old_secret)
+
+    def test_meta_acceptance_is_not_labeled_as_delivery(self) -> None:
+        self.assertEqual(_message_status_label("sent"), "An Meta übergeben")
+        self.assertEqual(_message_status_class("sent"), "status-local")
+        self.assertEqual(_message_status_label("delivered"), "Zugestellt")
+        self.assertEqual(_message_status_class("delivered"), "status-ok")
+
+    def test_customer_service_window_uses_latest_customer_message_for_24_hours(self) -> None:
+        now = datetime(2026, 9, 11, 12, 0, tzinfo=timezone.utc)
+        open_window = whatsapp_customer_service_window(
+            "2026-09-10T13:00:00+00:00",
+            now=now,
+        )
+        closed_window = whatsapp_customer_service_window(
+            "2026-09-10T11:59:59+00:00",
+            now=now,
+        )
+        missing_window = whatsapp_customer_service_window(None, now=now)
+
+        self.assertTrue(open_window["service_window_open"])
+        self.assertEqual(open_window["service_window_remaining_seconds"], 3600)
+        self.assertFalse(closed_window["service_window_open"])
+        self.assertFalse(missing_window["service_window_open"])
+        self.assertIsNone(missing_window["service_window_expires_at"])
+
     def test_meta_webhook_verification_accepts_valid_token(self) -> None:
         old_token = settings.whatsapp_verify_token
         object.__setattr__(settings, "whatsapp_verify_token", "verify-test-token")
@@ -585,6 +649,69 @@ class WhatsAppWebhookTests(unittest.TestCase):
             self.assertEqual(ctx.exception.status_code, 403)
         finally:
             object.__setattr__(settings, "whatsapp_app_secret", old_secret)
+
+    def test_failed_delivery_status_keeps_meta_error_for_the_inbox(self) -> None:
+        init_db()
+        message_id = "wamid.failed-delivery-visible"
+        customer_phone = "4917612345099"
+        with get_conn() as conn:
+            conn.execute(
+                "DELETE FROM whatsapp_messages WHERE workshop_id = ? AND wa_message_id = ?",
+                ("demo-werkstatt", message_id),
+            )
+            conn.commit()
+
+        try:
+            save_whatsapp_message(
+                workshop_id="demo-werkstatt",
+                phone_number_id="wa-phone-123",
+                customer_phone=customer_phone,
+                direction="outbound",
+                text="Bitte bestätigen Sie den Termin.",
+                wa_message_id=message_id,
+                status="sent",
+                payload={"meta_response": {"messages": [{"id": message_id}]}},
+            )
+            updated = update_whatsapp_message_status(
+                workshop_id="demo-werkstatt",
+                wa_message_id=message_id,
+                status="failed",
+                payload={
+                    "id": message_id,
+                    "status": "failed",
+                    "errors": [
+                        {
+                            "code": 131047,
+                            "title": "Re-engagement message",
+                            "message": "Customer service window expired.",
+                            "error_data": {
+                                "details": "Eine freigegebene Nachrichtenvorlage ist erforderlich."
+                            },
+                        }
+                    ],
+                },
+            )
+
+            self.assertTrue(updated)
+            messages = list_whatsapp_messages(
+                workshop_id="demo-werkstatt",
+                customer_phone=customer_phone,
+            )
+            self.assertEqual(messages[0]["status"], "failed")
+            stored_payload = json.loads(messages[0]["payload_json"])
+            self.assertEqual(stored_payload["delivery_error"]["code"], "131047")
+            decorated = _decorate_whatsapp_messages(messages)
+            self.assertEqual(
+                decorated[0]["message_error"],
+                "Eine freigegebene Nachrichtenvorlage ist erforderlich. (Meta-Code 131047)",
+            )
+        finally:
+            with get_conn() as conn:
+                conn.execute(
+                    "DELETE FROM whatsapp_messages WHERE workshop_id = ? AND wa_message_id = ?",
+                    ("demo-werkstatt", message_id),
+                )
+                conn.commit()
 
     def test_meta_webhook_processes_text_message_for_mapped_workshop(self) -> None:
         init_db()
@@ -983,6 +1110,9 @@ class WhatsAppWebhookTests(unittest.TestCase):
         self.assertEqual(selected[0]["message_count"], 2)
         self.assertEqual(selected[0]["last_direction"], "outbound")
         self.assertEqual(selected[0]["last_text"], "Antwort vom Bot")
+        self.assertTrue(selected[0]["service_window_open"])
+        self.assertIsNotNone(selected[0]["last_customer_message_at"])
+        self.assertIsNotNone(selected[0]["service_window_expires_at"])
 
     def test_whatsapp_readiness_uses_request_webhook_url_by_default(self) -> None:
         old_public_url = settings.whatsapp_webhook_public_url
@@ -1076,6 +1206,15 @@ class WhatsAppWebhookTests(unittest.TestCase):
         old_token = settings.whatsapp_access_token
         object.__setattr__(settings, "whatsapp_access_token", "test-access-token")
         try:
+            save_whatsapp_message(
+                workshop_id="demo-werkstatt",
+                phone_number_id="wa-phone-123",
+                customer_phone="4917633333333",
+                direction="inbound",
+                text="Kundenantwort zum Öffnen des Fensters",
+                wa_message_id="wamid.window-inbox-direct",
+                status="received",
+            )
             with patch("app.web.send_whatsapp_text_message") as send_mock:
                 send_mock.return_value = WhatsAppSendResult(
                     ok=True,
@@ -1101,10 +1240,10 @@ class WhatsAppWebhookTests(unittest.TestCase):
                 customer_phone="4917633333333",
             )
 
-            self.assertEqual(len(messages), 1)
-            self.assertEqual(messages[0]["direction"], "outbound")
-            self.assertEqual(messages[0]["status"], "sent")
-            self.assertEqual(messages[0]["wa_message_id"], "wamid.outbound-1")
+            outbound = [message for message in messages if message["direction"] == "outbound"]
+            self.assertEqual(len(outbound), 1)
+            self.assertEqual(outbound[0]["status"], "sent")
+            self.assertEqual(outbound[0]["wa_message_id"], "wamid.outbound-1")
         finally:
             object.__setattr__(settings, "whatsapp_access_token", old_token)
 
@@ -1205,6 +1344,16 @@ class WhatsAppWebhookTests(unittest.TestCase):
                 telefon="0151 17031175",
             ),
             workshop_id="demo-werkstatt",
+        )
+        save_whatsapp_message(
+            workshop_id="demo-werkstatt",
+            phone_number_id="wa-phone-active-ticket",
+            customer_phone="4915117031175",
+            direction="inbound",
+            text="Bitte schicken Sie mir den Kostenvoranschlag.",
+            wa_message_id="wamid.window-active-ticket",
+            ticket_id=ticket_id,
+            status="received",
         )
 
         old_token = settings.whatsapp_access_token
@@ -1365,6 +1514,16 @@ class WhatsAppWebhookTests(unittest.TestCase):
             ticket_id=ticket_id,
             status="sent",
         )
+        save_whatsapp_message(
+            workshop_id="demo-werkstatt",
+            phone_number_id="wa-phone-ticket-reply",
+            customer_phone=customer_phone,
+            direction="inbound",
+            text="Ja, bitte nennen Sie mir einen Termin.",
+            wa_message_id="wamid.window-ticket-reply",
+            ticket_id=ticket_id,
+            status="received",
+        )
 
         old_token = settings.whatsapp_access_token
         object.__setattr__(settings, "whatsapp_access_token", "test-access-token")
@@ -1489,6 +1648,16 @@ class WhatsAppWebhookTests(unittest.TestCase):
             ticket_id=ticket_id,
             status="sent",
         )
+        save_whatsapp_message(
+            workshop_id="demo-werkstatt",
+            phone_number_id="wa-phone-ticket-failed",
+            customer_phone=customer_phone,
+            direction="inbound",
+            text="Bitte antworten Sie mir.",
+            wa_message_id="wamid.window-ticket-failed",
+            ticket_id=ticket_id,
+            status="received",
+        )
 
         old_token = settings.whatsapp_access_token
         object.__setattr__(settings, "whatsapp_access_token", "test-access-token")
@@ -1572,6 +1741,16 @@ class WhatsAppWebhookTests(unittest.TestCase):
             )
             conn.commit()
 
+        save_whatsapp_message(
+            workshop_id="demo-werkstatt",
+            phone_number_id="wa-phone-test",
+            customer_phone="4917655555555",
+            direction="inbound",
+            text="Testfenster öffnen",
+            wa_message_id="wamid.window-dashboard-test",
+            status="received",
+        )
+
         old_token = settings.whatsapp_access_token
         object.__setattr__(settings, "whatsapp_access_token", "test-access-token")
         try:
@@ -1601,10 +1780,10 @@ class WhatsAppWebhookTests(unittest.TestCase):
                 customer_phone="4917655555555",
             )
 
-            self.assertEqual(len(messages), 1)
-            self.assertEqual(messages[0]["direction"], "outbound")
-            self.assertEqual(messages[0]["status"], "sent")
-            self.assertEqual(messages[0]["wa_message_id"], "wamid.test-send-1")
+            outbound = [message for message in messages if message["direction"] == "outbound"]
+            self.assertEqual(len(outbound), 1)
+            self.assertEqual(outbound[0]["status"], "sent")
+            self.assertEqual(outbound[0]["wa_message_id"], "wamid.test-send-1")
         finally:
             object.__setattr__(settings, "whatsapp_access_token", old_token)
 
@@ -2929,6 +3108,725 @@ class TicketMetadataTests(unittest.TestCase):
             with get_conn() as conn:
                 conn.execute("DELETE FROM tickets WHERE ticket_id = ?", (ticket_id,))
                 conn.commit()
+
+
+class WhatsAppConversationControlTests(unittest.TestCase):
+    PHONE_PREFIX = "49157990"
+
+    def setUp(self) -> None:
+        init_db()
+        with get_conn() as conn:
+            conn.execute(
+                "DELETE FROM whatsapp_conversation_controls WHERE customer_phone LIKE ?",
+                (f"{self.PHONE_PREFIX}%",),
+            )
+            conn.execute(
+                "DELETE FROM whatsapp_messages WHERE customer_phone LIKE ?",
+                (f"{self.PHONE_PREFIX}%",),
+            )
+            conn.execute(
+                "DELETE FROM whatsapp_events WHERE from_phone LIKE ?",
+                (f"{self.PHONE_PREFIX}%",),
+            )
+            conn.execute("DELETE FROM tickets WHERE ticket_id LIKE 'WS-FLOW-%'")
+            conn.execute(
+                """
+                UPDATE workshops
+                SET subscription_status = 'trialing',
+                    trial_ends_at = ?,
+                    whatsapp_phone_number_id = ?
+                WHERE id = 'demo-werkstatt'
+                """,
+                (
+                    (datetime.now(timezone.utc) + timedelta(days=14)).isoformat(),
+                    "wa-flow-default",
+                ),
+            )
+            conn.commit()
+
+    def tearDown(self) -> None:
+        with get_conn() as conn:
+            conn.execute(
+                "DELETE FROM whatsapp_conversation_controls WHERE customer_phone LIKE ?",
+                (f"{self.PHONE_PREFIX}%",),
+            )
+            conn.execute(
+                "DELETE FROM whatsapp_messages WHERE customer_phone LIKE ?",
+                (f"{self.PHONE_PREFIX}%",),
+            )
+            conn.execute(
+                "DELETE FROM whatsapp_events WHERE from_phone LIKE ?",
+                (f"{self.PHONE_PREFIX}%",),
+            )
+            conn.execute("DELETE FROM tickets WHERE ticket_id LIKE 'WS-FLOW-%'")
+            conn.commit()
+
+    @staticmethod
+    def _save_ticket(ticket_id: str, phone: str, *, source: str = "whatsapp") -> None:
+        save_ticket(
+            IntakeState(
+                ticket_id=ticket_id,
+                workshop_id="demo-werkstatt",
+                source=source,
+                step="fertig",
+                mode="new",
+                fahrzeug="Testfahrzeug",
+                problem="WhatsApp-Flusstest",
+                telefon=phone,
+            ),
+            workshop_id="demo-werkstatt",
+        )
+
+    @staticmethod
+    def _meta_payload(*, phone_number_id: str, customer_phone: str, message_id: str) -> dict:
+        return {
+            "object": "whatsapp_business_account",
+            "entry": [
+                {
+                    "id": "waba-flow",
+                    "changes": [
+                        {
+                            "field": "messages",
+                            "value": {
+                                "messaging_product": "whatsapp",
+                                "metadata": {
+                                    "display_phone_number": "49123450000",
+                                    "phone_number_id": phone_number_id,
+                                },
+                                "messages": [
+                                    {
+                                        "from": customer_phone,
+                                        "id": message_id,
+                                        "timestamp": "1789128000",
+                                        "type": "text",
+                                        "text": {"body": "Hallo Werkstatt"},
+                                    }
+                                ],
+                            },
+                        }
+                    ],
+                }
+            ],
+        }
+
+    def test_control_is_tenant_scoped_normalizes_phone_and_preserves_ticket(self) -> None:
+        phone = f"{self.PHONE_PREFIX}01"
+        local_phone = "0157 990 01"
+        ticket_id = "WS-FLOW-CONTROL"
+        self._save_ticket(ticket_id, local_phone)
+
+        default_control = get_whatsapp_conversation_control(
+            workshop_id="demo-werkstatt",
+            customer_phone=local_phone,
+        )
+        self.assertEqual(default_control["mode"], "assistant")
+        self.assertEqual(default_control["customer_phone"], phone)
+
+        set_whatsapp_conversation_control(
+            workshop_id="demo-werkstatt",
+            customer_phone=f"+{phone}",
+            mode="manual",
+            active_ticket_id=ticket_id,
+        )
+        set_whatsapp_conversation_control(
+            workshop_id="tenant-other",
+            customer_phone=phone,
+            mode="assistant",
+        )
+        switched = set_whatsapp_conversation_control(
+            workshop_id="demo-werkstatt",
+            customer_phone=f"00{phone}",
+            mode="assistant",
+        )
+
+        self.assertEqual(switched["mode"], "assistant")
+        self.assertEqual(switched["active_ticket_id"], ticket_id)
+        other = get_whatsapp_conversation_control(
+            workshop_id="tenant-other",
+            customer_phone=phone,
+        )
+        self.assertEqual(other["mode"], "assistant")
+        self.assertIsNone(other["active_ticket_id"])
+        with self.assertRaises(ValueError):
+            set_whatsapp_conversation_control(
+                workshop_id="tenant-other",
+                customer_phone=phone,
+                mode="manual",
+                active_ticket_id=ticket_id,
+            )
+        with self.assertRaises(ValueError):
+            set_whatsapp_conversation_control(
+                workshop_id="demo-werkstatt",
+                customer_phone=phone,
+                mode="bot",
+            )
+
+    def test_response_ticket_id_does_not_turn_none_into_string(self) -> None:
+        response = ChatResponse(reply="Weiter", done=False, data={"ticket_id": None})
+        self.assertIsNone(_response_ticket_id(response))
+
+    def test_duplicate_phone_number_id_is_not_routed_to_an_arbitrary_tenant(self) -> None:
+        phone_number_id = "wa-flow-duplicate-tenant"
+        workshop_ids = ("flow-duplicate-a", "flow-duplicate-b")
+        try:
+            with get_conn() as conn:
+                for workshop_id in workshop_ids:
+                    conn.execute(
+                        """
+                        INSERT INTO workshops (id, name, whatsapp_phone_number_id)
+                        VALUES (?, ?, ?)
+                        ON CONFLICT(id) DO UPDATE SET
+                            whatsapp_phone_number_id = excluded.whatsapp_phone_number_id
+                        """,
+                        (workshop_id, workshop_id, phone_number_id),
+                    )
+                conn.commit()
+
+            self.assertIsNone(
+                find_workshop_id_by_whatsapp_phone_number_id(phone_number_id)
+            )
+
+            with get_conn() as conn:
+                conn.execute(
+                    "UPDATE workshops SET whatsapp_phone_number_id = NULL WHERE id = ?",
+                    (workshop_ids[1],),
+                )
+                conn.commit()
+            self.assertEqual(
+                find_workshop_id_by_whatsapp_phone_number_id(phone_number_id),
+                workshop_ids[0],
+            )
+        finally:
+            with get_conn() as conn:
+                conn.execute(
+                    "DELETE FROM workshops WHERE id IN (?, ?)",
+                    workshop_ids,
+                )
+                conn.commit()
+
+    def test_template_sender_builds_parameter_free_meta_payload(self) -> None:
+        with patch("app.whatsapp._post_graph_api_json") as post_mock:
+            post_mock.return_value = (200, {"messages": [{"id": "wamid.flow-template"}]})
+            result = send_whatsapp_template_message(
+                phone_number_id="phone-id-flow",
+                customer_phone=f"{self.PHONE_PREFIX}02",
+                template_name="hello_world",
+                template_language="en_US",
+                access_token="not-a-real-token",
+                graph_api_version="v23.0",
+            )
+
+        self.assertTrue(result.ok)
+        self.assertEqual(result.wa_message_id, "wamid.flow-template")
+        self.assertEqual(
+            post_mock.call_args.kwargs["payload"],
+            {
+                "messaging_product": "whatsapp",
+                "recipient_type": "individual",
+                "to": f"{self.PHONE_PREFIX}02",
+                "type": "template",
+                "template": {
+                    "name": "hello_world",
+                    "language": {"code": "en_US"},
+                },
+            },
+        )
+
+        with patch("app.whatsapp._post_graph_api_json") as missing_post:
+            missing = send_whatsapp_template_message(
+                phone_number_id="phone-id-flow",
+                customer_phone=f"{self.PHONE_PREFIX}02",
+                template_name="",
+                template_language="en_US",
+                access_token="not-a-real-token",
+            )
+        self.assertFalse(missing.ok)
+        self.assertIn("template name", missing.error or "")
+        missing_post.assert_not_called()
+
+    def test_service_window_uses_only_latest_inbound_and_is_tenant_scoped(self) -> None:
+        phone = f"{self.PHONE_PREFIX}03"
+        save_whatsapp_message(
+            workshop_id="demo-werkstatt",
+            customer_phone=phone,
+            direction="outbound",
+            text="Ausgehend öffnet kein Fenster",
+            status="sent",
+        )
+        self.assertFalse(
+            whatsapp_customer_service_window_for_phone(
+                workshop_id="demo-werkstatt",
+                customer_phone=phone,
+            )["service_window_open"]
+        )
+
+        save_whatsapp_message(
+            workshop_id="demo-werkstatt",
+            customer_phone=phone,
+            direction="inbound",
+            text="Frische Kundennachricht",
+            status="received",
+        )
+        for index in range(25):
+            save_whatsapp_message(
+                workshop_id="demo-werkstatt",
+                customer_phone=phone,
+                direction="outbound",
+                text=f"Antwort {index}",
+                status="sent",
+            )
+
+        self.assertTrue(
+            whatsapp_customer_service_window_for_phone(
+                workshop_id="demo-werkstatt",
+                customer_phone=phone,
+            )["service_window_open"]
+        )
+        self.assertFalse(
+            whatsapp_customer_service_window_for_phone(
+                workshop_id="tenant-other",
+                customer_phone=phone,
+            )["service_window_open"]
+        )
+        conversations = list_whatsapp_conversations(workshop_id="demo-werkstatt", limit=1)
+        selected = next(item for item in conversations if item["customer_phone"] == phone)
+        self.assertTrue(selected["service_window_open"])
+
+        boundary_now = datetime(2026, 9, 11, 12, 0, tzinfo=timezone.utc)
+        boundary = whatsapp_customer_service_window(
+            "2026-09-10T12:00:00+00:00",
+            now=boundary_now,
+        )
+        self.assertFalse(boundary["service_window_open"])
+
+    def test_manual_webhook_saves_and_links_inbound_without_bot_reply(self) -> None:
+        phone = f"{self.PHONE_PREFIX}04"
+        ticket_id = "WS-FLOW-MANUAL-WEBHOOK"
+        phone_number_id = "wa-flow-manual"
+        self._save_ticket(ticket_id, phone)
+        with get_conn() as conn:
+            conn.execute(
+                "UPDATE workshops SET whatsapp_phone_number_id = ? WHERE id = ?",
+                (phone_number_id, "demo-werkstatt"),
+            )
+            conn.commit()
+        set_whatsapp_conversation_control(
+            workshop_id="demo-werkstatt",
+            customer_phone=phone,
+            mode="manual",
+            active_ticket_id=ticket_id,
+        )
+        payload = self._meta_payload(
+            phone_number_id=phone_number_id,
+            customer_phone=phone,
+            message_id="wamid.flow-manual-inbound",
+        )
+        body = json.dumps(payload).encode("utf-8")
+        old_secret = settings.whatsapp_app_secret
+        object.__setattr__(settings, "whatsapp_app_secret", "flow-secret")
+        try:
+            request = _asgi_request(
+                body,
+                headers={"x-hub-signature-256": build_signature(body, "flow-secret")},
+            )
+            with patch("app.main.process_chat_message") as process_mock, patch(
+                "app.main._save_or_send_whatsapp_reply"
+            ) as send_mock:
+                result = asyncio.run(whatsapp_webhook(request))
+        finally:
+            object.__setattr__(settings, "whatsapp_app_secret", old_secret)
+
+        process_mock.assert_not_called()
+        send_mock.assert_not_called()
+        self.assertEqual(result["manual_pending"], 1)
+        self.assertEqual(result["processed"], 0)
+        self.assertEqual(result["manual_messages"][0]["active_ticket_id"], ticket_id)
+        inbound = list_whatsapp_messages(
+            workshop_id="demo-werkstatt",
+            customer_phone=phone,
+        )
+        self.assertEqual(len(inbound), 1)
+        self.assertEqual(inbound[0]["ticket_id"], ticket_id)
+
+    def test_assistant_webhook_preserves_auto_reply_and_race_recheck(self) -> None:
+        phone = f"{self.PHONE_PREFIX}05"
+        phone_number_id = "wa-flow-assistant"
+        with get_conn() as conn:
+            conn.execute(
+                "UPDATE workshops SET whatsapp_phone_number_id = ? WHERE id = ?",
+                (phone_number_id, "demo-werkstatt"),
+            )
+            conn.commit()
+        payload = self._meta_payload(
+            phone_number_id=phone_number_id,
+            customer_phone=phone,
+            message_id="wamid.flow-assistant-inbound",
+        )
+        body = json.dumps(payload).encode("utf-8")
+        old_secret = settings.whatsapp_app_secret
+        object.__setattr__(settings, "whatsapp_app_secret", "flow-secret")
+        try:
+            request = _asgi_request(
+                body,
+                headers={"x-hub-signature-256": build_signature(body, "flow-secret")},
+            )
+            with patch("app.main.process_chat_message") as process_mock, patch(
+                "app.main._save_or_send_whatsapp_reply"
+            ) as send_mock:
+                process_mock.return_value = ChatResponse(
+                    reply="Assistenten-Antwort",
+                    done=False,
+                    data={"ticket_id": None},
+                )
+                send_mock.return_value = {
+                    "status": "sent",
+                    "wa_message_id": "wamid.flow-bot-reply",
+                    "meta_status_code": 200,
+                    "meta_error": None,
+                }
+                result = asyncio.run(whatsapp_webhook(request))
+
+            self.assertEqual(result["processed"], 1)
+            self.assertEqual(result["manual_pending"], 0)
+            process_mock.assert_called_once()
+            send_mock.assert_called_once()
+            self.assertIsNone(result["replies"][0]["active_ticket_id"])
+
+            race_payload = self._meta_payload(
+                phone_number_id=phone_number_id,
+                customer_phone=phone,
+                message_id="wamid.flow-race-inbound",
+            )
+            race_body = json.dumps(race_payload).encode("utf-8")
+            race_request = _asgi_request(
+                race_body,
+                headers={"x-hub-signature-256": build_signature(race_body, "flow-secret")},
+            )
+
+            def take_over_during_processing(**_: object) -> ChatResponse:
+                set_whatsapp_conversation_control(
+                    workshop_id="demo-werkstatt",
+                    customer_phone=phone,
+                    mode="manual",
+                )
+                return ChatResponse(reply="Zu spät", done=False, data={})
+
+            with patch(
+                "app.main.process_chat_message",
+                side_effect=take_over_during_processing,
+            ), patch("app.main._save_or_send_whatsapp_reply") as race_send:
+                race_result = asyncio.run(whatsapp_webhook(race_request))
+            race_send.assert_not_called()
+            self.assertEqual(race_result["manual_pending"], 1)
+            self.assertEqual(
+                race_result["manual_messages"][0]["action"],
+                "manual_takeover_before_assistant_reply",
+            )
+        finally:
+            object.__setattr__(settings, "whatsapp_app_secret", old_secret)
+
+    def test_inbox_free_text_is_blocked_when_window_closed(self) -> None:
+        phone = f"{self.PHONE_PREFIX}06"
+        save_whatsapp_message(
+            workshop_id="demo-werkstatt",
+            customer_phone=phone,
+            direction="outbound",
+            text="Nur ein alter Ausgang",
+            status="sent",
+        )
+        old_token = settings.whatsapp_access_token
+        object.__setattr__(settings, "whatsapp_access_token", "flow-token")
+        try:
+            with patch("app.web.send_whatsapp_text_message") as send_mock:
+                response = dashboard_whatsapp_reply(
+                    _dashboard_request(),
+                    customer_phone=phone,
+                    reply_text="Darf nicht rausgehen",
+                    ticket_id=None,
+                    workshop_id=None,
+                )
+        finally:
+            object.__setattr__(settings, "whatsapp_access_token", old_token)
+
+        self.assertIn("reply_status=failed", response.headers["location"])
+        self.assertIn("24-Stunden", response.headers["location"])
+        send_mock.assert_not_called()
+        control = get_whatsapp_conversation_control(
+            workshop_id="demo-werkstatt",
+            customer_phone=phone,
+        )
+        self.assertEqual(control["mode"], "assistant")
+
+    def test_inbox_free_text_in_open_window_switches_to_manual(self) -> None:
+        phone = f"{self.PHONE_PREFIX}07"
+        save_whatsapp_message(
+            workshop_id="demo-werkstatt",
+            customer_phone=phone,
+            direction="inbound",
+            text="Bitte antworten",
+            status="received",
+        )
+        old_token = settings.whatsapp_access_token
+        object.__setattr__(settings, "whatsapp_access_token", "flow-token")
+        try:
+            with patch("app.web.send_whatsapp_text_message") as send_mock:
+                send_mock.return_value = WhatsAppSendResult(
+                    True,
+                    200,
+                    "wamid.flow-human",
+                    {"messages": [{"id": "wamid.flow-human"}]},
+                )
+                response = dashboard_whatsapp_reply(
+                    _dashboard_request(),
+                    customer_phone=phone,
+                    reply_text="Werkstatt antwortet",
+                    ticket_id=None,
+                    workshop_id=None,
+                )
+        finally:
+            object.__setattr__(settings, "whatsapp_access_token", old_token)
+
+        self.assertIn("reply_status=sent", response.headers["location"])
+        send_mock.assert_called_once()
+        control = get_whatsapp_conversation_control(
+            workshop_id="demo-werkstatt",
+            customer_phone=phone,
+        )
+        self.assertEqual(control["mode"], "manual")
+
+    def test_template_start_route_uses_server_config_stores_and_links_ticket(self) -> None:
+        phone = f"{self.PHONE_PREFIX}08"
+        ticket_id = "WS-FLOW-TEMPLATE"
+        self._save_ticket(ticket_id, phone, source="web_chat")
+        old_values = (
+            settings.whatsapp_access_token,
+            settings.whatsapp_start_template_name,
+            settings.whatsapp_start_template_language,
+        )
+        object.__setattr__(settings, "whatsapp_access_token", "flow-token")
+        object.__setattr__(settings, "whatsapp_start_template_name", "hello_world")
+        object.__setattr__(settings, "whatsapp_start_template_language", "en_US")
+        try:
+            with patch("app.web.send_whatsapp_template_message") as send_mock:
+                send_mock.return_value = WhatsAppSendResult(
+                    True,
+                    200,
+                    "wamid.flow-template-route",
+                    {"messages": [{"id": "wamid.flow-template-route"}]},
+                )
+                response = dashboard_whatsapp_start_template(
+                    _dashboard_request(),
+                    customer_phone=phone,
+                    workshop_id=None,
+                    ticket_id=ticket_id,
+                    context="dashboard",
+                )
+        finally:
+            object.__setattr__(settings, "whatsapp_access_token", old_values[0])
+            object.__setattr__(settings, "whatsapp_start_template_name", old_values[1])
+            object.__setattr__(settings, "whatsapp_start_template_language", old_values[2])
+
+        self.assertIn("message_status=template_sent", response.headers["location"])
+        self.assertEqual(send_mock.call_args.kwargs["template_name"], "hello_world")
+        self.assertEqual(send_mock.call_args.kwargs["template_language"], "en_US")
+        messages = list_whatsapp_messages(
+            workshop_id="demo-werkstatt",
+            ticket_id=ticket_id,
+        )
+        self.assertEqual(len(messages), 1)
+        self.assertEqual(messages[0]["message_type"], "template")
+        self.assertEqual(messages[0]["status"], "sent")
+        control = get_whatsapp_conversation_control(
+            workshop_id="demo-werkstatt",
+            customer_phone=phone,
+        )
+        self.assertEqual(control["mode"], "manual")
+        self.assertEqual(control["active_ticket_id"], ticket_id)
+        self.assertFalse(
+            whatsapp_customer_service_window_for_phone(
+                workshop_id="demo-werkstatt",
+                customer_phone=phone,
+            )["service_window_open"]
+        )
+
+    def test_template_start_missing_configuration_has_no_side_effect(self) -> None:
+        phone = f"{self.PHONE_PREFIX}09"
+        ticket_id = "WS-FLOW-TEMPLATE-MISSING"
+        self._save_ticket(ticket_id, phone, source="web_chat")
+        old_values = (
+            settings.whatsapp_access_token,
+            settings.whatsapp_start_template_name,
+            settings.whatsapp_start_template_language,
+        )
+        object.__setattr__(settings, "whatsapp_access_token", "flow-token")
+        object.__setattr__(settings, "whatsapp_start_template_name", "")
+        object.__setattr__(settings, "whatsapp_start_template_language", "")
+        try:
+            with patch("app.web.send_whatsapp_template_message") as send_mock:
+                response = dashboard_whatsapp_start_template(
+                    _dashboard_request(),
+                    customer_phone=phone,
+                    workshop_id=None,
+                    ticket_id=ticket_id,
+                    context="ticket",
+                )
+        finally:
+            object.__setattr__(settings, "whatsapp_access_token", old_values[0])
+            object.__setattr__(settings, "whatsapp_start_template_name", old_values[1])
+            object.__setattr__(settings, "whatsapp_start_template_language", old_values[2])
+
+        self.assertIn("reply_status=failed", response.headers["location"])
+        self.assertIn("WHATSAPP_START_TEMPLATE_NAME", response.headers["location"])
+        send_mock.assert_not_called()
+        self.assertEqual(
+            list_whatsapp_messages(workshop_id="demo-werkstatt", ticket_id=ticket_id),
+            [],
+        )
+
+    def test_mode_route_is_tenant_scoped_and_keeps_active_ticket(self) -> None:
+        phone = f"{self.PHONE_PREFIX}10"
+        ticket_id = "WS-FLOW-MODE-ROUTE"
+        self._save_ticket(ticket_id, phone)
+        save_whatsapp_message(
+            workshop_id="demo-werkstatt",
+            customer_phone=phone,
+            direction="inbound",
+            text="Hallo",
+            ticket_id=ticket_id,
+            status="received",
+        )
+        set_whatsapp_conversation_control(
+            workshop_id="demo-werkstatt",
+            customer_phone=phone,
+            mode="manual",
+            active_ticket_id=ticket_id,
+        )
+        set_whatsapp_conversation_control(
+            workshop_id="tenant-other",
+            customer_phone=phone,
+            mode="manual",
+        )
+
+        response = dashboard_whatsapp_control(
+            _dashboard_request("demo-werkstatt"),
+            customer_phone=phone,
+            mode="assistant",
+            workshop_id="tenant-other",
+            ticket_id=ticket_id,
+            context="ticket",
+        )
+
+        self.assertIn("reply_status=saved", response.headers["location"])
+        own = get_whatsapp_conversation_control(
+            workshop_id="demo-werkstatt",
+            customer_phone=phone,
+        )
+        other = get_whatsapp_conversation_control(
+            workshop_id="tenant-other",
+            customer_phone=phone,
+        )
+        self.assertEqual(own["mode"], "assistant")
+        self.assertEqual(own["active_ticket_id"], ticket_id)
+        self.assertEqual(other["mode"], "manual")
+
+    def test_inbox_ticket_binding_fails_closed_on_wrong_phone(self) -> None:
+        ticket_phone = f"{self.PHONE_PREFIX}11"
+        posted_phone = f"{self.PHONE_PREFIX}12"
+        ticket_id = "WS-FLOW-BINDING"
+        self._save_ticket(ticket_id, ticket_phone)
+        save_whatsapp_message(
+            workshop_id="demo-werkstatt",
+            customer_phone=posted_phone,
+            direction="inbound",
+            text="Fremder Verlauf",
+            status="received",
+        )
+
+        with patch("app.web.send_whatsapp_text_message") as send_mock:
+            response = dashboard_whatsapp_reply(
+                _dashboard_request(),
+                customer_phone=posted_phone,
+                reply_text="Nicht senden",
+                ticket_id=ticket_id,
+                workshop_id=None,
+            )
+
+        self.assertIn("reply_status=failed", response.headers["location"])
+        send_mock.assert_not_called()
+        control = get_whatsapp_conversation_control(
+            workshop_id="demo-werkstatt",
+            customer_phone=posted_phone,
+        )
+        self.assertEqual(control["mode"], "assistant")
+
+    def test_manual_whatsapp_fallback_pauses_assistant_before_redirect(self) -> None:
+        phone = f"{self.PHONE_PREFIX}14"
+        ticket_id = "WS-FLOW-MANUAL-FALLBACK"
+        self._save_ticket(ticket_id, phone, source="web_chat")
+
+        response = dashboard_whatsapp_open_manual(
+            _dashboard_request(),
+            customer_phone=phone,
+            workshop_id=None,
+            ticket_id=ticket_id,
+            context="dashboard",
+            reply_text=None,
+            message_text="Bitte antworten Sie uns.",
+        )
+
+        self.assertEqual(response.status_code, 303)
+        self.assertTrue(response.headers["location"].startswith(f"https://wa.me/{phone}?"))
+        self.assertIn("Bitte+antworten+Sie+uns", response.headers["location"])
+        control = get_whatsapp_conversation_control(
+            workshop_id="demo-werkstatt",
+            customer_phone=phone,
+        )
+        self.assertEqual(control["mode"], "manual")
+        self.assertEqual(control["active_ticket_id"], ticket_id)
+
+    def test_uncertain_transport_keeps_manual_mode_and_unknown_audit(self) -> None:
+        phone = f"{self.PHONE_PREFIX}13"
+        save_whatsapp_message(
+            workshop_id="demo-werkstatt",
+            customer_phone=phone,
+            direction="inbound",
+            text="Fenster offen",
+            status="received",
+        )
+        old_token = settings.whatsapp_access_token
+        object.__setattr__(settings, "whatsapp_access_token", "flow-token")
+        try:
+            with patch("app.web.send_whatsapp_text_message") as send_mock:
+                send_mock.return_value = WhatsAppSendResult(
+                    False,
+                    None,
+                    None,
+                    {},
+                    "timeout",
+                )
+                response = dashboard_whatsapp_reply(
+                    _dashboard_request(),
+                    customer_phone=phone,
+                    reply_text="Möglicherweise angenommen",
+                    ticket_id=None,
+                    workshop_id=None,
+                )
+        finally:
+            object.__setattr__(settings, "whatsapp_access_token", old_token)
+
+        self.assertIn("reply_status=unknown", response.headers["location"])
+        self.assertIn("nicht+erneut+senden", response.headers["location"])
+        control = get_whatsapp_conversation_control(
+            workshop_id="demo-werkstatt",
+            customer_phone=phone,
+        )
+        self.assertEqual(control["mode"], "manual")
+        messages = list_whatsapp_messages(
+            workshop_id="demo-werkstatt",
+            customer_phone=phone,
+        )
+        outbound = [message for message in messages if message["direction"] == "outbound"]
+        self.assertEqual(outbound[0]["status"], "unknown")
 
 
 if __name__ == "__main__":

@@ -1641,6 +1641,30 @@
     .delivery-info.warning .delivery-dot{background:#c9892e}
     .delivery-info a{color:inherit;font-weight:750}
     .note-submit button:disabled{border-color:#d6dfdc;background:#e8eeec;color:#83908c;cursor:not-allowed}
+    .conversation-control-bar,
+    .template-start-card{
+      display:flex;
+      align-items:center;
+      justify-content:space-between;
+      gap:12px;
+      margin:0 0 12px;
+      padding:10px 11px;
+      border:1px solid #cbded8;
+      border-radius:9px;
+      background:#f3f8f6;
+      color:#426159;
+      font-size:12px;
+      line-height:1.45;
+    }
+    .conversation-control-bar strong,.template-start-card strong{display:block;color:#284d44}
+    .conversation-control-bar form,.template-start-card form{flex:0 0 auto}
+    .conversation-mode-button,.template-start-button{min-height:38px;padding:8px 12px;border-radius:8px;font-weight:750;white-space:nowrap}
+    .conversation-mode-button{border-color:#acd0c5;background:#e8f5f1;color:#176657}
+    .conversation-mode-button.assistant{border-color:#dccb9b;background:#fff7e5;color:#765616}
+    .template-start-card{border-color:#e3d2aa;background:#fff9eb;color:#74591f}
+    .template-start-card strong{color:#604614}
+    .template-start-button{border-color:#ceb66e;background:#fff2ca;color:#6d4e0e}
+    .template-start-button:disabled{border-color:#d8d6cf;background:#eceeeb;color:#858b87;cursor:not-allowed}
 
     .toast{
       border-color:#31534a;
@@ -1745,6 +1769,9 @@
       .actions > form button{
         width:100%;
       }
+      .conversation-control-bar,.template-start-card{align-items:stretch;flex-direction:column}
+      .conversation-control-bar form,.template-start-card form,
+      .conversation-mode-button,.template-start-button{width:100%}
     }
   </style>
 </head>
@@ -1784,8 +1811,8 @@
     </div>
 
     {% if reply_detail %}
-      <div class="reply-alert {% if reply_status == 'failed' %}failed{% endif %}">
-        {{ reply_detail }}
+      <div class="reply-alert {% if reply_status in ['failed', 'unknown'] %}failed{% endif %}" role="{% if reply_status in ['failed', 'unknown'] %}alert{% else %}status{% endif %}">
+        <strong>{% if reply_status == 'failed' %}Nachricht nicht gesendet: {% elif reply_status == 'unknown' %}Versandstatus unklar: {% elif reply_status == 'template_sent' %}Startvorlage an Meta übergeben: {% elif reply_status == 'sent' %}An Meta übergeben: {% elif reply_status == 'saved' %}Gespeichert: {% endif %}</strong>{{ reply_detail }}
       </div>
     {% endif %}
 
@@ -2011,7 +2038,7 @@
               </span>
             </div>
 
-            <div class="delivery-info {% if (ticket.has_whatsapp_conversation or ticket.source == 'whatsapp') and (not whatsapp_readiness.can_send or not ticket.whatsapp_phone) %}warning{% endif %}">
+            <div class="delivery-info {% if (ticket.has_whatsapp_conversation or ticket.source == 'whatsapp') and (not whatsapp_readiness.can_send or not ticket.whatsapp_phone or not ticket.service_window_open) %}warning{% endif %}">
               <span class="delivery-dot" aria-hidden="true"></span>
               <div>
                 {% if ticket.has_whatsapp_conversation or ticket.source == "whatsapp" %}
@@ -2020,8 +2047,11 @@
                   {% elif not whatsapp_readiness.can_send %}
                     Automatischer Versand ist noch nicht eingerichtet. Access Token oder Phone Number ID fehlt.
                     <a href="/dashboard/settings?workshop_id={{ workshop_id }}">Einstellungen öffnen</a>
+                  {% elif not ticket.service_window_open %}
+                    Das 24-Stunden-Fenster ist geschlossen. Freitext wird serverseitig blockiert.
+                    Senden Sie zuerst die separate Startvorlage und warten Sie auf die Antwort des Kunden.
                   {% else %}
-                    Die Nachricht wird über Meta an {{ ticket.whatsapp_phone }} gesendet und nur bei erfolgreicher Übergabe als Kundenantwort gespeichert.
+                    Freie Antwort ist im 24-Stunden-Fenster möglich. Beim Senden übernimmt die Werkstatt die Unterhaltung und der Assistent pausiert. Erst „Zugestellt“ bestätigt den Empfang.
                   {% endif %}
                 {% elif ticket.source == "web_chat" %}
                   Diese Antwort wird für den Web-Chat gespeichert und dem Kunden bei seiner nächsten Ticket-Abfrage angezeigt.
@@ -2031,11 +2061,32 @@
               </div>
             </div>
 
-            <form class="note-form" method="post" action="/dashboard/ticket/{{ ticket.ticket_view_id }}/notes">
+            {% if (ticket.has_whatsapp_conversation or ticket.source == "whatsapp") and ticket.whatsapp_phone %}
+              <div class="conversation-control-bar">
+                <div>
+                  <strong>{% if ticket.whatsapp_mode == "manual" %}Werkstatt antwortet{% else %}Assistent antwortet{% endif %}</strong>
+                  {% if ticket.whatsapp_mode == "manual" %}Automatische Antworten sind pausiert.{% else %}Der Assistent reagiert auf die nächste Kundennachricht.{% endif %}
+                </div>
+                <form method="post" action="/dashboard/whatsapp/control">
+                  <input type="hidden" name="workshop_id" value="{{ workshop_id }}" />
+                  <input type="hidden" name="customer_phone" value="{{ ticket.whatsapp_phone }}" />
+                  <input type="hidden" name="ticket_id" value="{{ ticket.ticket_view_id }}" />
+                  <input type="hidden" name="context" value="ticket" />
+                  {% if ticket.whatsapp_mode == "manual" %}
+                    <button class="conversation-mode-button assistant" type="submit" name="mode" value="assistant">Assistent übernimmt</button>
+                  {% else %}
+                    <button class="conversation-mode-button" type="submit" name="mode" value="manual">Werkstatt übernimmt</button>
+                  {% endif %}
+                </form>
+              </div>
+            {% endif %}
+
+            <form class="note-form customer-reply-form" method="post" action="/dashboard/ticket/{{ ticket.ticket_view_id }}/notes">
               <input type="hidden" name="workshop_id" value="{{ workshop_id }}" />
               <input type="hidden" name="note_type" value="customer_reply">
               <div class="note-form-row">
                 <textarea
+                  id="ticketCustomerReplyText"
                   name="note_text"
                   placeholder="Antwort an den Kunden formulieren..."
                   maxlength="4096"
@@ -2045,7 +2096,7 @@
                 <div class="note-submit">
                   <button
                     type="submit"
-                    {% if (ticket.has_whatsapp_conversation or ticket.source == 'whatsapp') and (not whatsapp_readiness.can_send or not ticket.whatsapp_phone) %}disabled{% endif %}
+                    {% if (ticket.has_whatsapp_conversation or ticket.source == 'whatsapp') and (not whatsapp_readiness.can_send or not ticket.whatsapp_phone or not ticket.service_window_open) %}disabled{% endif %}
                   >
                     {% if ticket.has_whatsapp_conversation or ticket.source == "whatsapp" %}
                       Über WhatsApp senden
@@ -2058,6 +2109,26 @@
                 </div>
               </div>
             </form>
+
+            {% if ticket.whatsapp_phone and not ticket.service_window_open %}
+              <div class="template-start-card">
+                <div>
+                  <strong>Gespräch mit Startvorlage öffnen</strong>
+                  Die Vorlage bittet den Kunden zu antworten. Der Text im Feld oben wird nicht
+                  als Vorlage versendet und bleibt in diesem Browser als Entwurf erhalten. Erst
+                  die Kundenantwort öffnet das 24-Stunden-Fenster.
+                </div>
+                <form class="guarded-send-form" method="post" action="/dashboard/whatsapp/start-template">
+                  <input type="hidden" name="workshop_id" value="{{ workshop_id }}" />
+                  <input type="hidden" name="customer_phone" value="{{ ticket.whatsapp_phone }}" />
+                  <input type="hidden" name="ticket_id" value="{{ ticket.ticket_view_id }}" />
+                  <input type="hidden" name="context" value="ticket" />
+                  <button class="template-start-button" type="submit" {% if not whatsapp_readiness.can_start_template %}disabled title="Startvorlage oder WhatsApp-Verbindung fehlt"{% endif %}>
+                    {% if whatsapp_readiness.can_start_template %}Startvorlage senden{% else %}Startvorlage einrichten{% endif %}
+                  </button>
+                </form>
+              </div>
+            {% endif %}
 
             {% if ticket.customer_replies %}
               <div class="note-stack">
@@ -2246,6 +2317,35 @@
   <div id="toast" class="toast">✅ Kopiert!</div>
 
   <script>
+    const ticketCustomerReplyText = document.getElementById("ticketCustomerReplyText");
+    const ticketHasWhatsappRecipient = {{ (ticket.whatsapp_phone | length > 0) | tojson }};
+    const ticketReplyUsesWhatsapp = {{ (ticket.has_whatsapp_conversation or ticket.source == "whatsapp") | tojson }};
+    const ticketReplyStatus = {{ reply_status | tojson }};
+    const ticketDraftKey = "werkstattai:ticket-detail-whatsapp-draft:{{ workshop_id }}:{{ ticket.ticket_view_id }}";
+    if (ticketCustomerReplyText && ticketHasWhatsappRecipient) {
+      if (ticketReplyStatus === "sent" || (ticketReplyStatus === "saved" && !ticketReplyUsesWhatsapp)) {
+        window.sessionStorage.removeItem(ticketDraftKey);
+      } else if (!ticketCustomerReplyText.value) {
+        ticketCustomerReplyText.value = window.sessionStorage.getItem(ticketDraftKey) || "";
+      }
+      ticketCustomerReplyText.addEventListener("input", () => {
+        if (ticketCustomerReplyText.value) {
+          window.sessionStorage.setItem(ticketDraftKey, ticketCustomerReplyText.value);
+        } else {
+          window.sessionStorage.removeItem(ticketDraftKey);
+        }
+      });
+    }
+
+    document.querySelectorAll(".customer-reply-form, .guarded-send-form").forEach((form) => {
+      form.addEventListener("submit", (event) => {
+        const submitButton = event.submitter;
+        if (!submitButton || submitButton.disabled) return;
+        submitButton.disabled = true;
+        submitButton.textContent = "Wird gesendet …";
+      });
+    });
+
     async function copyText(text) {
       try {
         if (navigator.clipboard && window.isSecureContext) {

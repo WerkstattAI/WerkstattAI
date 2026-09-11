@@ -6,14 +6,23 @@ import json
 import urllib.error
 import urllib.request
 from dataclasses import dataclass
-from datetime import datetime
+from datetime import datetime, timedelta, timezone
 from typing import Any
 
 from app.db import get_conn
 
 
 MESSAGE_DIRECTIONS = {"inbound", "outbound"}
-MESSAGE_STATUSES = {"received", "sent_local", "sent", "delivered", "read", "failed"}
+MESSAGE_STATUSES = {
+    "received",
+    "sent_local",
+    "sent",
+    "delivered",
+    "read",
+    "failed",
+    "unknown",
+}
+CUSTOMER_SERVICE_WINDOW = timedelta(hours=24)
 
 
 @dataclass(frozen=True)
@@ -60,7 +69,7 @@ def build_signature(body: bytes, app_secret: str) -> str:
 def verify_signature(body: bytes, signature_header: str | None, app_secret: str | None) -> bool:
     secret = str(app_secret or "").strip()
     if not secret:
-        return True
+        return False
 
     expected = build_signature(body, secret)
     provided = str(signature_header or "").strip()
@@ -210,6 +219,117 @@ def _now_iso() -> str:
     return datetime.now().isoformat(timespec="seconds")
 
 
+def _parse_message_datetime(value: Any) -> datetime | None:
+    if isinstance(value, datetime):
+        return value
+
+    text = str(value or "").strip()
+    if not text:
+        return None
+
+    try:
+        return datetime.fromisoformat(text.replace("Z", "+00:00"))
+    except (TypeError, ValueError):
+        return None
+
+
+def whatsapp_customer_service_window(
+    last_customer_message_at: Any,
+    *,
+    now: datetime | None = None,
+) -> dict[str, Any]:
+    """Return Meta's rolling 24-hour free-form reply window for a conversation."""
+    last_customer_message = _parse_message_datetime(last_customer_message_at)
+    if last_customer_message is None:
+        return {
+            "service_window_open": False,
+            "service_window_expires_at": None,
+            "service_window_remaining_seconds": 0,
+        }
+
+    if now is None:
+        current_time = (
+            datetime.now(timezone.utc)
+            if last_customer_message.tzinfo is not None
+            else datetime.now()
+        )
+    else:
+        current_time = now
+        if last_customer_message.tzinfo is None and current_time.tzinfo is not None:
+            current_time = current_time.replace(tzinfo=None)
+        elif last_customer_message.tzinfo is not None and current_time.tzinfo is None:
+            current_time = current_time.replace(tzinfo=timezone.utc)
+
+    expires_at = last_customer_message + CUSTOMER_SERVICE_WINDOW
+    remaining_seconds = max(0, int((expires_at - current_time).total_seconds()))
+    return {
+        "service_window_open": current_time < expires_at,
+        "service_window_expires_at": expires_at.isoformat(timespec="seconds"),
+        "service_window_remaining_seconds": remaining_seconds,
+    }
+
+
+def whatsapp_customer_service_window_for_phone(
+    *,
+    workshop_id: str,
+    customer_phone: str,
+    now: datetime | None = None,
+) -> dict[str, Any]:
+    """Return the free-text window from the latest inbound message in this tenant."""
+    wid = str(workshop_id or "").strip()
+    phone = str(customer_phone or "").strip()
+    if not wid or not phone:
+        return whatsapp_customer_service_window(None, now=now)
+
+    with get_conn() as conn:
+        row = conn.execute(
+            """
+            SELECT MAX(created_at) AS last_customer_message_at
+            FROM whatsapp_messages
+            WHERE workshop_id = ?
+              AND customer_phone = ?
+              AND direction = 'inbound'
+            """,
+            (wid, phone),
+        ).fetchone()
+
+    last_customer_message_at = row["last_customer_message_at"] if row else None
+    result = whatsapp_customer_service_window(last_customer_message_at, now=now)
+    result["last_customer_message_at"] = last_customer_message_at
+    return result
+
+
+def _meta_status_error(payload: dict[str, Any] | None) -> dict[str, Any] | None:
+    if not isinstance(payload, dict):
+        return None
+
+    errors = payload.get("errors")
+    if not isinstance(errors, list):
+        return None
+
+    for error in errors:
+        if not isinstance(error, dict):
+            continue
+
+        error_data = error.get("error_data")
+        details = (
+            str(error_data.get("details") or "").strip()
+            if isinstance(error_data, dict)
+            else ""
+        )
+        message = str(error.get("message") or "").strip()
+        title = str(error.get("title") or "").strip()
+        code = str(error.get("code") or "").strip()
+        detail = details or message or title
+        if detail or code:
+            return {
+                "message": detail or "Meta hat die Nachricht nicht zugestellt.",
+                "code": code or None,
+            }
+
+    return None
+
+
 def _normalize_direction(direction: str) -> str:
     normalized = str(direction or "").strip().lower()
     if normalized not in MESSAGE_DIRECTIONS:
@@ -342,6 +462,10 @@ def update_whatsapp_message_status(
             status_events = []
         status_events.append(payload or {})
         current_payload["status_events"] = status_events[-20:]
+        if normalized_status == "failed":
+            delivery_error = _meta_status_error(payload)
+            if delivery_error:
+                current_payload["delivery_error"] = delivery_error
 
         conn.execute(
             """
@@ -511,6 +635,84 @@ def send_whatsapp_text_message(
     )
 
 
+def send_whatsapp_template_message(
+    *,
+    phone_number_id: str,
+    customer_phone: str,
+    template_name: str,
+    template_language: str,
+    access_token: str,
+    graph_api_version: str = "v23.0",
+) -> WhatsAppSendResult:
+    """Send a parameter-free, pre-approved WhatsApp template through Cloud API."""
+    normalized_phone_number_id = str(phone_number_id or "").strip()
+    normalized_customer_phone = str(customer_phone or "").strip()
+    normalized_template_name = str(template_name or "").strip()
+    normalized_template_language = str(template_language or "").strip()
+    normalized_token = str(access_token or "").strip()
+    version = str(graph_api_version or "v23.0").strip().lstrip("/") or "v23.0"
+
+    if not normalized_phone_number_id:
+        return WhatsAppSendResult(False, None, None, {}, "phone_number_id is missing")
+    if not normalized_customer_phone:
+        return WhatsAppSendResult(False, None, None, {}, "customer_phone is missing")
+    if not normalized_template_name:
+        return WhatsAppSendResult(False, None, None, {}, "template name is missing")
+    if not normalized_template_language:
+        return WhatsAppSendResult(False, None, None, {}, "template language is missing")
+    if not normalized_token:
+        return WhatsAppSendResult(False, None, None, {}, "access token is missing")
+
+    payload = {
+        "messaging_product": "whatsapp",
+        "recipient_type": "individual",
+        "to": normalized_customer_phone,
+        "type": "template",
+        "template": {
+            "name": normalized_template_name,
+            "language": {"code": normalized_template_language},
+        },
+    }
+    url = f"https://graph.facebook.com/{version}/{normalized_phone_number_id}/messages"
+
+    try:
+        status_code, response_payload = _post_graph_api_json(
+            url=url,
+            access_token=normalized_token,
+            payload=payload,
+        )
+    except urllib.error.HTTPError as exc:
+        error_body = exc.read().decode("utf-8", errors="replace")
+        try:
+            error_payload = json.loads(error_body) if error_body else {}
+        except json.JSONDecodeError:
+            error_payload = {"raw": error_body}
+        return WhatsAppSendResult(
+            False,
+            exc.code,
+            None,
+            error_payload if isinstance(error_payload, dict) else {},
+            f"Meta API HTTP {exc.code}",
+        )
+    except Exception as exc:
+        return WhatsAppSendResult(False, None, None, {}, str(exc))
+
+    message_id = None
+    messages = response_payload.get("messages")
+    if isinstance(messages, list) and messages:
+        first = messages[0]
+        if isinstance(first, dict):
+            message_id = str(first.get("id") or "").strip() or None
+
+    return WhatsAppSendResult(
+        ok=200 <= int(status_code or 0) < 300,
+        status_code=status_code,
+        wa_message_id=message_id,
+        payload=response_payload,
+        error=None,
+    )
+
+
 def list_whatsapp_conversations(*, workshop_id: str, limit: int = 100) -> list[dict[str, Any]]:
     wid = str(workshop_id or "").strip()
     safe_limit = max(1, min(int(limit), 500))
@@ -560,12 +762,23 @@ def list_whatsapp_conversations(*, workshop_id: str, limit: int = 100) -> list[d
                 "message_count": 0,
                 "inbound_count": 0,
                 "outbound_count": 0,
+                "last_customer_message_at": None,
             }
 
         conversations[phone]["message_count"] += 1
         if item.get("direction") == "inbound":
             conversations[phone]["inbound_count"] += 1
+            if not conversations[phone]["last_customer_message_at"]:
+                conversations[phone]["last_customer_message_at"] = item.get("created_at")
         elif item.get("direction") == "outbound":
             conversations[phone]["outbound_count"] += 1
 
-    return list(conversations.values())[:safe_limit]
+    result = list(conversations.values())[:safe_limit]
+    for conversation in result:
+        conversation.update(
+            whatsapp_customer_service_window_for_phone(
+                workshop_id=wid,
+                customer_phone=str(conversation.get("customer_phone") or ""),
+            )
+        )
+    return result

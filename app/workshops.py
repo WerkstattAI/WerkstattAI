@@ -97,17 +97,18 @@ def find_workshop_id_by_whatsapp_phone_number_id(phone_number_id: str | None) ->
         return None
 
     with get_conn() as conn:
-        row = conn.execute(
+        rows = conn.execute(
             """
             SELECT id
             FROM workshops
             WHERE whatsapp_phone_number_id = ?
-            LIMIT 1
+            ORDER BY id ASC
+            LIMIT 2
             """,
             (normalized,),
-        ).fetchone()
+        ).fetchall()
 
-    return str(row["id"]) if row else None
+    return str(rows[0]["id"]) if len(rows) == 1 else None
 
 
 def update_workshop(

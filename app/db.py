@@ -9,6 +9,10 @@ from app.config import settings
 from app.security import hash_password
 
 
+WHATSAPP_CONVERSATION_MODES = frozenset({"assistant", "manual"})
+_UNSET_ACTIVE_TICKET = object()
+
+
 def _project_root() -> str:
     return os.path.dirname(os.path.dirname(__file__))
 
@@ -507,4 +511,168 @@ def init_db() -> None:
             """
         )
 
+        conn.execute(
+            """
+            CREATE TABLE IF NOT EXISTS whatsapp_conversation_controls (
+                workshop_id TEXT NOT NULL,
+                customer_phone TEXT NOT NULL,
+                mode TEXT NOT NULL DEFAULT 'assistant'
+                    CHECK (mode IN ('assistant', 'manual')),
+                active_ticket_id TEXT,
+                created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+                updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+                PRIMARY KEY (workshop_id, customer_phone)
+            )
+            """
+        )
+
+        conn.execute(
+            """
+            CREATE INDEX IF NOT EXISTS idx_whatsapp_conversation_controls_ticket
+            ON whatsapp_conversation_controls(workshop_id, active_ticket_id)
+            """
+        )
+
         conn.commit()
+
+
+def _normalize_whatsapp_control_phone(customer_phone: str) -> str:
+    digits = "".join(character for character in str(customer_phone or "") if character.isdigit())
+    if digits.startswith("00"):
+        digits = digits[2:]
+    elif digits.startswith("0"):
+        digits = f"49{digits[1:]}"
+    if not digits:
+        raise ValueError("customer_phone is required")
+    return digits
+
+
+def _normalize_whatsapp_conversation_scope(
+    *,
+    workshop_id: str,
+    customer_phone: str,
+) -> tuple[str, str]:
+    wid = str(workshop_id or "").strip()
+    if not wid:
+        raise ValueError("workshop_id is required")
+    return wid, _normalize_whatsapp_control_phone(customer_phone)
+
+
+def get_whatsapp_conversation_control(
+    *,
+    workshop_id: str,
+    customer_phone: str,
+) -> dict[str, Any]:
+    """Return the tenant-scoped WhatsApp mode, defaulting to assistant mode."""
+    wid, phone = _normalize_whatsapp_conversation_scope(
+        workshop_id=workshop_id,
+        customer_phone=customer_phone,
+    )
+
+    with get_conn() as conn:
+        row = conn.execute(
+            """
+            SELECT
+                workshop_id,
+                customer_phone,
+                mode,
+                active_ticket_id,
+                created_at,
+                updated_at
+            FROM whatsapp_conversation_controls
+            WHERE workshop_id = ? AND customer_phone = ?
+            LIMIT 1
+            """,
+            (wid, phone),
+        ).fetchone()
+
+    if row:
+        return dict(row)
+
+    return {
+        "workshop_id": wid,
+        "customer_phone": phone,
+        "mode": "assistant",
+        "active_ticket_id": None,
+        "created_at": None,
+        "updated_at": None,
+    }
+
+
+def set_whatsapp_conversation_control(
+    *,
+    workshop_id: str,
+    customer_phone: str,
+    mode: str,
+    active_ticket_id: str | None | object = _UNSET_ACTIVE_TICKET,
+) -> dict[str, Any]:
+    """Persist a tenant-scoped WhatsApp mode and optionally change its ticket link.
+
+    Omitting ``active_ticket_id`` preserves an existing ticket link. Passing
+    ``None`` explicitly clears it.
+    """
+    wid, phone = _normalize_whatsapp_conversation_scope(
+        workshop_id=workshop_id,
+        customer_phone=customer_phone,
+    )
+    normalized_mode = str(mode or "").strip().lower()
+    if normalized_mode not in WHATSAPP_CONVERSATION_MODES:
+        raise ValueError("mode must be 'assistant' or 'manual'")
+
+    ticket_was_provided = active_ticket_id is not _UNSET_ACTIVE_TICKET
+    normalized_ticket_id: str | None = None
+    if ticket_was_provided:
+        normalized_ticket_id = str(active_ticket_id or "").strip() or None
+
+    with get_conn() as conn:
+        if normalized_ticket_id:
+            ticket = conn.execute(
+                """
+                SELECT 1
+                FROM tickets
+                WHERE workshop_id = ? AND ticket_id = ?
+                LIMIT 1
+                """,
+                (wid, normalized_ticket_id),
+            ).fetchone()
+            if not ticket:
+                raise ValueError("active_ticket_id does not belong to workshop_id")
+
+        if ticket_was_provided:
+            conn.execute(
+                """
+                INSERT INTO whatsapp_conversation_controls (
+                    workshop_id,
+                    customer_phone,
+                    mode,
+                    active_ticket_id
+                )
+                VALUES (?, ?, ?, ?)
+                ON CONFLICT(workshop_id, customer_phone) DO UPDATE SET
+                    mode = excluded.mode,
+                    active_ticket_id = excluded.active_ticket_id,
+                    updated_at = CURRENT_TIMESTAMP
+                """,
+                (wid, phone, normalized_mode, normalized_ticket_id),
+            )
+        else:
+            conn.execute(
+                """
+                INSERT INTO whatsapp_conversation_controls (
+                    workshop_id,
+                    customer_phone,
+                    mode
+                )
+                VALUES (?, ?, ?)
+                ON CONFLICT(workshop_id, customer_phone) DO UPDATE SET
+                    mode = excluded.mode,
+                    updated_at = CURRENT_TIMESTAMP
+                """,
+                (wid, phone, normalized_mode),
+            )
+        conn.commit()
+
+    return get_whatsapp_conversation_control(
+        workshop_id=wid,
+        customer_phone=phone,
+    )

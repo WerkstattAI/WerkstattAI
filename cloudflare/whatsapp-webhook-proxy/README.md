@@ -21,11 +21,17 @@ so the dashboard shows the public callback URL.
 1. Open Cloudflare Workers.
 2. Create a new Worker.
 3. Paste `worker.js`.
-4. Add environment variables:
+4. Add the upstream as an environment variable and the verify token as an
+   encrypted secret. Generate your own long random verify token; never commit it.
 
 ```text
-WHATSAPP_VERIFY_TOKEN=werkstattai-whatsapp-verify-2026
 UPSTREAM_URL=https://werkstattai-whatsapp.up.railway.app/meta/whatsapp
+```
+
+With Wrangler, store the verify token separately:
+
+```powershell
+wrangler secret put WHATSAPP_VERIFY_TOKEN
 ```
 
 5. Deploy.
@@ -56,7 +62,7 @@ Use the exact Worker URL without a trailing slash if Cloudflare shows it that wa
 Verify token:
 
 ```text
-werkstattai-whatsapp-verify-2026
+<the same private verify token configured in Cloudflare and Railway>
 ```
 
 For Graph API Explorer:
@@ -65,7 +71,7 @@ For Graph API Explorer:
 {
   "object": "whatsapp_business_account",
   "callback_url": "https://<your-worker-url>",
-  "verify_token": "werkstattai-whatsapp-verify-2026",
+  "verify_token": "<the same private verify token>",
   "fields": "messages"
 }
 ```

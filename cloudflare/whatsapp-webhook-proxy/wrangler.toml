@@ -4,4 +4,6 @@ compatibility_date = "2026-07-21"
 
 [vars]
 UPSTREAM_URL = "https://werkstattai-whatsapp.up.railway.app/meta/whatsapp"
-WHATSAPP_VERIFY_TOKEN = "werkstattai-whatsapp-verify-2026"
+
+# Set WHATSAPP_VERIFY_TOKEN as a Wrangler secret instead of committing it:
+#   wrangler secret put WHATSAPP_VERIFY_TOKEN

@@ -728,6 +728,35 @@
       flex-wrap:wrap;
     }
 
+    .mode-form{display:flex;flex:0 0 auto}
+    .mode-button,
+    .template-button{
+      min-height:36px;
+      padding:8px 11px;
+      border:1px solid #b8d8cf;
+      border-radius:9px;
+      background:#edf7f4;
+      color:#17665a;
+      font-size:11px;
+      font-weight:750;
+      cursor:pointer;
+    }
+    .mode-button:hover,.template-button:hover{border-color:#8fc4b7;background:#e2f2ed}
+    .mode-button.assistant{border-color:#d8c999;background:#fff8e7;color:#785818}
+    .conversation-mode{
+      display:inline-flex;
+      width:max-content;
+      margin-top:6px;
+      padding:3px 7px;
+      border:1px solid #c6ddd6;
+      border-radius:999px;
+      background:#edf7f4;
+      color:#27695b;
+      font-size:10px;
+      font-weight:750;
+    }
+    .conversation-mode.assistant{border-color:#d9dfe0;background:#f3f6f6;color:#586764}
+
     .stat-pill{
       min-height:28px;
       display:inline-flex;
@@ -740,6 +769,20 @@
       font-size:11px;
       font-weight:650;
       white-space:nowrap;
+    }
+    a.stat-pill{text-decoration:none}
+    a.stat-pill:hover{border-color:#a9c9c0;background:#edf5f2}
+
+    .stat-pill.window-open{
+      border-color:#a9d7c5;
+      background:#e9f7f0;
+      color:#17654e;
+    }
+
+    .stat-pill.window-closed{
+      border-color:#e6cf9d;
+      background:#fff8e8;
+      color:#805d19;
     }
 
     .thread{
@@ -989,6 +1032,26 @@
       text-underline-offset:2px;
     }
 
+    .template-start{
+      display:flex;
+      align-items:center;
+      justify-content:space-between;
+      gap:12px;
+      margin-top:11px;
+      padding:11px 12px;
+      border:1px solid #e2d2aa;
+      border-radius:10px;
+      background:#fff9eb;
+      color:#76591f;
+      font-size:12px;
+      line-height:1.45;
+    }
+    .template-start strong{display:block;margin-bottom:2px;color:#604614}
+    .template-start form{flex:0 0 auto}
+    .template-button{border-color:#d1b86f;background:#fff3cf;color:#6f5011;white-space:nowrap}
+    .template-button:disabled{border-color:#d9d7cf;background:#eeefec;color:#858a86;cursor:not-allowed}
+    .test-actions{display:flex;gap:8px;flex-wrap:wrap}
+
     .empty{
       padding:24px 18px;
       color:var(--muted);
@@ -1087,6 +1150,8 @@
       .composer{padding:13px}
       .composer-actions{align-items:stretch;flex-direction:column}
       .composer-buttons{display:grid;grid-template-columns:1fr}
+      .template-start{align-items:stretch;flex-direction:column}
+      .template-start form,.template-button{width:100%}
       .manual-send-link{width:100%}
       .send-btn{width:100%}
     }
@@ -1197,17 +1262,17 @@
               </div>
             </div>
 
-            <form class="test-form" method="post" action="/dashboard/whatsapp/test">
+            <form class="test-form guarded-send-form" method="post" action="/dashboard/whatsapp/test">
               <input type="hidden" name="workshop_id" value="{{ workshop_id }}" />
               <div class="field">
                 <label class="field-label" for="testPhone">Testnummer</label>
                 <input
                   class="test-input"
                   id="testPhone"
-                  name="test_phone"
+                  name="customer_phone"
                   type="tel"
                   placeholder="WhatsApp-Format, z. B. 4917612345678"
-                  value="{{ selected_phone }}"
+                  value=""
                   required
                 />
               </div>
@@ -1215,7 +1280,23 @@
                 <label class="field-label" for="testText">Testnachricht</label>
                 <textarea class="test-text" id="testText" name="test_text">WerkstattAI-Testnachricht: Die WhatsApp-Verbindung funktioniert.</textarea>
               </div>
-              <button class="test-btn" type="submit">Testnachricht senden</button>
+              <div class="test-actions">
+                <button class="test-btn" type="submit">Freitext im offenen Fenster testen</button>
+                <button
+                  class="template-button"
+                  type="submit"
+                  name="context"
+                  value="test"
+                  formaction="/dashboard/whatsapp/start-template"
+                  {% if not readiness.can_start_template %}disabled title="Startvorlage oder WhatsApp-Verbindung fehlt"{% endif %}
+                >Startvorlage testen</button>
+              </div>
+              <div class="panel-sub">
+                Beim Vorlagentest wird der Text im Feld nicht versendet. Die konfigurierte Vorlage
+                {% if readiness.start_template_name %}„{{ readiness.start_template_name }}“{% endif %}
+                bittet den Kunden um eine Antwort; erst diese öffnet das 24-Stunden-Fenster.
+                Der Testkontakt wird dabei von der Werkstatt übernommen und der Assistent pausiert.
+              </div>
             </form>
           </div>
 
@@ -1249,6 +1330,7 @@
                 </div>
 
                 <div class="muted">{{ c.last_created_at_display or "-" }}</div>
+                <span class="conversation-mode {{ c.mode }}">{{ c.mode_label }}</span>
               </a>
             {% endfor %}
 
@@ -1281,8 +1363,33 @@
                 <span class="stat-pill">{{ selected_conversation.message_count }} Nachrichten</span>
                 <span class="stat-pill">{{ selected_conversation.inbound_count }} vom Kunden</span>
                 <span class="stat-pill">{{ selected_conversation.outbound_count }} von der Werkstatt</span>
+                {% if selected_conversation.active_ticket_id %}
+                  <a class="stat-pill" href="/dashboard/ticket/{{ selected_conversation.active_ticket_id }}?workshop_id={{ workshop_id }}">Aktives Ticket {{ selected_conversation.active_ticket_id }}</a>
+                {% endif %}
+                {% if selected_conversation.service_window_open %}
+                  <span class="stat-pill window-open">24-h-Fenster offen bis {{ selected_conversation.service_window_expires_at_display }}</span>
+                {% elif selected_conversation.last_customer_message_at %}
+                  <span class="stat-pill window-closed">24-h-Fenster geschlossen</span>
+                {% else %}
+                  <span class="stat-pill window-closed">Noch kein Kundenfenster</span>
+                {% endif %}
               {% endif %}
             </div>
+            {% if selected_conversation %}
+              <form class="mode-form" method="post" action="/dashboard/whatsapp/control">
+                <input type="hidden" name="workshop_id" value="{{ workshop_id }}" />
+                <input type="hidden" name="customer_phone" value="{{ selected_phone }}" />
+                <input type="hidden" name="context" value="inbox" />
+                {% if selected_conversation.active_ticket_id %}
+                  <input type="hidden" name="ticket_id" value="{{ selected_conversation.active_ticket_id }}" />
+                {% endif %}
+                {% if selected_conversation.mode == "manual" %}
+                  <button class="mode-button assistant" type="submit" name="mode" value="assistant">Assistent übernimmt</button>
+                {% else %}
+                  <button class="mode-button" type="submit" name="mode" value="manual">Werkstatt übernimmt</button>
+                {% endif %}
+              </form>
+            {% endif %}
           </div>
 
           <div class="thread" id="messageThread">
@@ -1315,13 +1422,17 @@
           <div class="composer">
             {% if reply_detail %}
               <div
-                class="reply-alert {% if reply_status == 'failed' %}failed{% endif %}"
-                role="{% if reply_status == 'failed' %}alert{% else %}status{% endif %}"
+                class="reply-alert {% if reply_status in ['failed', 'unknown'] %}failed{% endif %}"
+                role="{% if reply_status in ['failed', 'unknown'] %}alert{% else %}status{% endif %}"
               >
                 <span class="reply-alert-dot" aria-hidden="true"></span>
                 <div>
                   <strong>
-                    {% if reply_status == "failed" %}Nachricht nicht gesendet{% else %}Nachricht gesendet{% endif %}
+                    {% if reply_status == "failed" %}Nachricht nicht gesendet
+                    {% elif reply_status == "unknown" %}Versandstatus unklar
+                    {% elif reply_status == "saved" %}Gesprächsmodus geändert
+                    {% elif reply_status == "template_sent" %}Startvorlage an Meta übergeben
+                    {% else %}An Meta übergeben{% endif %}
                   </strong>
                   {{ reply_detail }}
                 </div>
@@ -1332,8 +1443,9 @@
               <form class="reply-form" method="post" action="/dashboard/whatsapp/reply">
                 <input type="hidden" name="workshop_id" value="{{ workshop_id }}" />
                 <input type="hidden" name="customer_phone" value="{{ selected_phone }}" />
-                {% if selected_conversation and selected_conversation.last_ticket_id %}
-                  <input type="hidden" name="ticket_id" value="{{ selected_conversation.last_ticket_id }}" />
+                <input type="hidden" name="context" value="inbox" />
+                {% if selected_conversation and selected_conversation.active_ticket_id %}
+                  <input type="hidden" name="ticket_id" value="{{ selected_conversation.active_ticket_id }}" />
                 {% endif %}
                 <label class="field-label" for="replyText">Antwort an {{ selected_phone }}</label>
                 <textarea
@@ -1345,32 +1457,59 @@
                   required
                 ></textarea>
                 <div class="composer-actions">
-                  <div class="composer-note {% if not readiness.can_send %}warning{% endif %}">
-                    {% if readiness.can_send %}
-                      Die Antwort wird über die Meta API gesendet und im Verlauf gespeichert.
-                    {% else %}
+                  <div class="composer-note {% if not readiness.can_send or not selected_conversation or not selected_conversation.service_window_open %}warning{% endif %}">
+                    {% if not readiness.can_send %}
                       Versand nicht verfügbar: Access Token oder Phone Number ID fehlt.
                       <a class="composer-settings-link" href="/dashboard/settings?workshop_id={{ workshop_id }}">Zu den Einstellungen</a>
+                    {% elif selected_conversation and selected_conversation.service_window_open %}
+                      Freie Antwort möglich bis {{ selected_conversation.service_window_expires_at_display }}. „An Meta übergeben“ bedeutet noch nicht „zugestellt“.
+                    {% elif selected_conversation and selected_conversation.last_customer_message_at %}
+                      Das 24-Stunden-Kundenfenster ist geschlossen. Meta verlangt jetzt eine freigegebene Nachrichtenvorlage; eine freie Textnachricht kann abgelehnt werden.
+                    {% else %}
+                      Es ist noch keine Kundennachricht eingegangen. Für den Gesprächsstart verlangt Meta eine freigegebene Nachrichtenvorlage; eine freie Textnachricht kann abgelehnt werden.
                     {% endif %}
                   </div>
                   <div class="composer-buttons">
-                    <a
+                    <button
                       class="manual-send-link"
                       id="inboxManualLink"
-                      href="https://wa.me/{{ selected_phone }}"
-                      target="_blank"
-                      rel="noopener"
-                    >In WhatsApp öffnen</a>
+                      type="submit"
+                      formaction="/dashboard/whatsapp/open-manual"
+                      formtarget="_blank"
+                    >In WhatsApp öffnen</button>
                     <button
                       class="send-btn"
                       type="submit"
-                      {% if not readiness.can_send %}disabled aria-disabled="true" title="WhatsApp-Einrichtung fehlt"{% endif %}
+                      {% if not readiness.can_send or not selected_conversation or not selected_conversation.service_window_open %}disabled aria-disabled="true" title="{% if not readiness.can_send %}WhatsApp-Einrichtung fehlt{% else %}24-Stunden-Fenster geschlossen{% endif %}"{% endif %}
                     >
-                      {% if readiness.can_send %}Antwort senden{% else %}Einrichtung fehlt{% endif %}
+                      {% if not readiness.can_send %}Einrichtung fehlt
+                      {% elif not selected_conversation or not selected_conversation.service_window_open %}Fenster geschlossen
+                      {% else %}Antwort senden{% endif %}
                     </button>
                   </div>
                 </div>
               </form>
+              {% if not selected_conversation or not selected_conversation.service_window_open %}
+                <div class="template-start">
+                  <div>
+                    <strong>Unterhaltung mit Startvorlage öffnen</strong>
+                    Die Vorlage bittet den Kunden zu antworten. Ihr eigener Text oben wird dabei
+                    nicht gesendet und bleibt in diesem Browser als Entwurf erhalten. Erst die
+                    Kundenantwort erlaubt eine freie Nachricht.
+                  </div>
+                  <form class="guarded-send-form" method="post" action="/dashboard/whatsapp/start-template">
+                    <input type="hidden" name="workshop_id" value="{{ workshop_id }}" />
+                    <input type="hidden" name="customer_phone" value="{{ selected_phone }}" />
+                    <input type="hidden" name="context" value="inbox" />
+                    {% if selected_conversation and selected_conversation.active_ticket_id %}
+                      <input type="hidden" name="ticket_id" value="{{ selected_conversation.active_ticket_id }}" />
+                    {% endif %}
+                    <button class="template-button" type="submit" {% if not readiness.can_start_template %}disabled title="Startvorlage oder WhatsApp-Verbindung fehlt"{% endif %}>
+                      {% if readiness.can_start_template %}Startvorlage senden{% else %}Startvorlage einrichten{% endif %}
+                    </button>
+                  </form>
+                </div>
+              {% endif %}
             {% else %}
               <div class="composer-note">Wähle eine Konversation aus, um eine Antwort vorzubereiten.</div>
             {% endif %}
@@ -1393,22 +1532,37 @@
     const whatsappReplyForm = document.querySelector(".reply-form");
     if (whatsappReplyForm) {
       const replyInput = whatsappReplyForm.querySelector("textarea[name='reply_text']");
-      const manualLink = document.getElementById("inboxManualLink");
       const manualPhone = {{ selected_phone | tojson }};
-      const updateManualLink = () => {
-        if (!replyInput || !manualLink) return;
-        manualLink.href = `https://wa.me/${manualPhone}?text=${encodeURIComponent(replyInput.value.trim())}`;
-      };
-      if (replyInput) replyInput.addEventListener("input", updateManualLink);
-      updateManualLink();
-
-      whatsappReplyForm.addEventListener("submit", () => {
-        const submitButton = whatsappReplyForm.querySelector("button[type='submit']");
+      const replyStatus = {{ reply_status | tojson }};
+      const draftKey = `werkstattai:whatsapp-draft:{{ workshop_id }}:${manualPhone}`;
+      if (replyInput) {
+        if (replyStatus === "sent") {
+          window.sessionStorage.removeItem(draftKey);
+        } else if (!replyInput.value) {
+          replyInput.value = window.sessionStorage.getItem(draftKey) || "";
+        }
+        replyInput.addEventListener("input", () => {
+          if (replyInput.value) window.sessionStorage.setItem(draftKey, replyInput.value);
+          else window.sessionStorage.removeItem(draftKey);
+        });
+      }
+      whatsappReplyForm.addEventListener("submit", (event) => {
+        const submitButton = event.submitter;
+        if (submitButton && submitButton.id === "inboxManualLink") return;
         if (!submitButton) return;
         submitButton.disabled = true;
         submitButton.textContent = "Wird gesendet …";
       });
     }
+
+    document.querySelectorAll(".guarded-send-form").forEach((form) => {
+      form.addEventListener("submit", (event) => {
+        const submitButton = event.submitter;
+        if (!submitButton || submitButton.disabled) return;
+        submitButton.disabled = true;
+        submitButton.textContent = "Wird gesendet …";
+      });
+    });
 
     document.querySelectorAll("[data-copy-target]").forEach((button) => {
       button.addEventListener("click", async () => {
