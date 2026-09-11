@@ -6,10 +6,10 @@
   <title>WerkstattAI – WhatsApp</title>
   <style>
     :root{
-      --page:#f3f6f5;
-      --page-soft:#edf3f1;
+      --page:#edf2f0;
+      --page-soft:#e6eeeb;
       --surface:#ffffff;
-      --surface-soft:#f7faf9;
+      --surface-soft:#f5f8f7;
       --surface-tint:#edf7f4;
       --sidebar:#172a26;
       --sidebar-deep:#13231f;
@@ -27,8 +27,8 @@
       --warn-soft:#fff6e5;
       --danger:#b83f3a;
       --danger-soft:#fff0ef;
-      --shadow:0 7px 22px rgba(28,52,45,.07);
-      --shadow-strong:0 18px 44px rgba(28,52,45,.11);
+      --shadow:0 8px 24px rgba(25,47,41,.07);
+      --shadow-strong:0 22px 58px rgba(22,43,37,.13);
     }
 
     *{box-sizing:border-box}
@@ -39,8 +39,8 @@
       min-height:100vh;
       color:var(--text);
       background:
-        radial-gradient(900px 440px at 72% -10%, rgba(15,111,102,.11), transparent 64%),
-        linear-gradient(180deg, var(--page-soft) 0, #f8faf9 420px, var(--page) 100%);
+        radial-gradient(860px 430px at 73% -12%, rgba(15,111,102,.12), transparent 64%),
+        linear-gradient(180deg, #f4f7f6 0, var(--page) 520px, #eaf0ee 100%);
       font-family:"Segoe UI Variable", "Segoe UI", Inter, system-ui, -apple-system, sans-serif;
       -webkit-font-smoothing:antialiased;
     }
@@ -79,8 +79,8 @@
       overflow-y:auto;
       display:flex;
       flex-direction:column;
-      gap:26px;
-      padding:26px 18px 20px;
+      gap:24px;
+      padding:24px 16px 18px;
       color:#f5fbf9;
       background:
         radial-gradient(360px 220px at 10% 0%, rgba(34,143,131,.24), transparent 70%),
@@ -208,17 +208,20 @@
 
     .workspace{
       min-width:0;
+      width:min(1640px, 100%);
+      margin:0 auto;
       display:grid;
-      gap:18px;
-      padding:30px clamp(20px, 3vw, 46px) 46px;
+      gap:16px;
+      padding:26px clamp(18px, 2.6vw, 40px) 38px;
     }
 
     .workspace-head{
       display:flex;
-      align-items:flex-end;
+      align-items:center;
       justify-content:space-between;
       gap:24px;
-      padding:2px 2px 4px;
+      padding:2px 3px 6px;
+      order:1;
     }
 
     .workspace-overline{
@@ -241,7 +244,7 @@
 
     .workspace-copy{
       max-width:720px;
-      margin:8px 0 0;
+      margin:6px 0 0;
       color:var(--muted);
       font-size:14px;
       line-height:1.55;
@@ -285,21 +288,23 @@
 
     .diagnostics{
       display:grid;
-      grid-template-columns:minmax(0, 1.35fr) minmax(320px, .8fr);
-      gap:14px;
+      grid-template-columns:minmax(0, 1.2fr) minmax(340px, .8fr);
+      gap:12px;
+      order:3;
+      margin-top:2px;
     }
 
     .panel{
       min-width:0;
       overflow:hidden;
       border:1px solid var(--line);
-      border-radius:13px;
+      border-radius:14px;
       background:var(--surface);
       box-shadow:var(--shadow);
     }
 
     .panel-head{
-      padding:16px 18px;
+      padding:14px 16px;
       border-bottom:1px solid var(--line);
       background:var(--surface);
     }
@@ -321,15 +326,15 @@
     .status-grid{
       display:grid;
       grid-template-columns:repeat(4, minmax(0, 1fr));
-      gap:10px;
-      padding:14px;
+      gap:8px;
+      padding:10px;
     }
 
     .check{
       min-width:0;
-      padding:12px;
+      padding:10px 11px;
       border:1px solid var(--line);
-      border-radius:10px;
+      border-radius:9px;
       background:var(--surface-soft);
     }
 
@@ -367,8 +372,8 @@
 
     .webhook-box{
       display:grid;
-      gap:14px;
-      padding:14px;
+      gap:11px;
+      padding:11px;
     }
 
     .field{
@@ -416,7 +421,7 @@
 
     .test-text,
     .reply-input{
-      min-height:80px;
+      min-height:72px;
       resize:vertical;
       line-height:1.5;
     }
@@ -493,41 +498,87 @@
     }
 
     .inbox{
-      min-height:650px;
+      min-height:620px;
+      height:clamp(620px, calc(100vh - 164px), 790px);
       display:grid;
-      grid-template-columns:minmax(285px, 350px) minmax(0, 1fr);
-      gap:14px;
+      grid-template-columns:minmax(278px, 330px) minmax(0, 1fr);
+      gap:0;
+      order:2;
+      overflow:hidden;
+      border:1px solid var(--line-strong);
+      border-radius:18px;
+      background:var(--surface);
+      box-shadow:var(--shadow-strong);
     }
 
     .conversation-panel,
-    .messages{box-shadow:var(--shadow-strong)}
+    .messages{
+      border:0;
+      border-radius:0;
+      box-shadow:none;
+    }
 
     .conversation-panel{
       display:flex;
       flex-direction:column;
       min-height:0;
+      border-right:1px solid var(--line);
+      background:#fbfcfc;
+    }
+
+    .conversation-panel .panel-head{
+      position:sticky;
+      top:0;
+      z-index:2;
+      background:rgba(251,252,252,.96);
+      backdrop-filter:blur(10px);
+    }
+
+    .conversation-panel .panel-sub{
+      width:max-content;
+      margin-top:7px;
+      padding:4px 8px;
+      border:1px solid #d7e5e1;
+      border-radius:999px;
+      background:#f0f6f4;
+      color:#49645c;
+      font-size:11px;
+      font-weight:700;
     }
 
     .conversation-list{
       display:grid;
       align-content:start;
-      gap:7px;
-      padding:10px;
-      max-height:650px;
+      gap:6px;
+      padding:9px;
+      max-height:none;
+      min-height:0;
+      flex:1;
       overflow:auto;
       scrollbar-color:#bdcbc7 transparent;
       scrollbar-width:thin;
+    }
+
+    .conversation-list::-webkit-scrollbar,
+    .thread::-webkit-scrollbar{width:8px;height:8px}
+
+    .conversation-list::-webkit-scrollbar-thumb,
+    .thread::-webkit-scrollbar-thumb{
+      border:2px solid transparent;
+      border-radius:999px;
+      background:#bdcbc7;
+      background-clip:padding-box;
     }
 
     .conversation{
       position:relative;
       min-width:0;
       display:grid;
-      gap:7px;
-      padding:13px 13px 13px 15px;
+      gap:6px;
+      padding:12px 12px 12px 15px;
       border:1px solid transparent;
-      border-radius:10px;
-      background:#f7f9f8;
+      border-radius:11px;
+      background:transparent;
       color:var(--text);
       text-decoration:none;
     }
@@ -535,8 +586,8 @@
     .conversation::before{
       content:"";
       position:absolute;
-      top:11px;
-      bottom:11px;
+      top:10px;
+      bottom:10px;
       left:0;
       width:3px;
       border-radius:0 3px 3px 0;
@@ -544,16 +595,25 @@
     }
 
     .conversation:hover{
-      border-color:#d5e2de;
-      background:#f0f6f4;
+      border-color:#d9e4e1;
+      background:#f1f6f4;
     }
 
     .conversation.active{
-      border-color:#b9d6d0;
-      background:var(--petrol-soft);
+      border-color:#afd2cb;
+      background:linear-gradient(135deg, #e4f2ef 0%, #eef7f5 100%);
+      box-shadow:0 5px 14px rgba(15,111,102,.08);
     }
 
     .conversation.active::before{background:var(--petrol)}
+
+    .conversation.active .phone{color:var(--petrol-dark)}
+
+    .conversation.active .badge{
+      border-color:var(--petrol);
+      background:var(--petrol);
+      color:#ffffff;
+    }
 
     .conversation-top{
       min-width:0;
@@ -606,21 +666,21 @@
     }
 
     .messages{
-      min-height:650px;
+      min-height:0;
       display:flex;
       flex-direction:column;
       background:#ffffff;
     }
 
     .chat-head{
-      min-height:78px;
+      min-height:72px;
       display:flex;
       align-items:center;
       justify-content:space-between;
       gap:14px;
-      padding:14px 18px;
+      padding:12px 17px;
       border-bottom:1px solid var(--line);
-      background:#ffffff;
+      background:linear-gradient(180deg, #ffffff 0%, #fbfcfc 100%);
     }
 
     .contact-card{
@@ -631,16 +691,16 @@
     }
 
     .avatar{
-      width:44px;
-      height:44px;
+      width:42px;
+      height:42px;
       display:grid;
       place-items:center;
       flex:0 0 auto;
-      border:1px solid #b8dbce;
+      border:1px solid #abd6c7;
       border-radius:50%;
-      background:#e8f5f0;
+      background:linear-gradient(145deg, #dff2eb, #f0faf6);
       color:#176650;
-      font-size:12px;
+      font-size:11px;
       font-weight:800;
     }
 
@@ -684,51 +744,76 @@
 
     .thread{
       flex:1;
-      min-height:360px;
+      min-height:0;
       display:flex;
       flex-direction:column;
-      gap:12px;
-      padding:22px 20px;
+      gap:9px;
+      padding:18px clamp(14px, 2vw, 26px);
       overflow:auto;
-      background:
-        radial-gradient(circle at 12% 8%, rgba(15,111,102,.055), transparent 28%),
-        linear-gradient(180deg, #f4f8f6 0%, #f7f9f8 100%);
+      background-color:#eef4f1;
+      background-image:
+        radial-gradient(circle at 15% 10%, rgba(15,111,102,.045), transparent 28%),
+        radial-gradient(rgba(73,104,95,.055) .75px, transparent .75px);
+      background-size:auto, 17px 17px;
       scrollbar-color:#bdcbc7 transparent;
       scrollbar-width:thin;
     }
 
     .bubble{
-      width:min(680px, 82%);
-      padding:11px 13px 10px;
-      border:1px solid #d8e2df;
-      border-radius:14px;
+      position:relative;
+      width:min(660px, 76%);
+      padding:10px 12px 9px;
+      border:1px solid #d4dfdc;
+      border-radius:13px;
       background:#ffffff;
       color:var(--text);
       line-height:1.5;
       overflow-wrap:anywhere;
       white-space:pre-wrap;
-      box-shadow:0 4px 13px rgba(28,52,45,.055);
+      box-shadow:0 3px 10px rgba(28,52,45,.07);
     }
 
     .bubble.inbound{
       align-self:flex-start;
-      border-top-left-radius:5px;
+      border-top-left-radius:4px;
+    }
+
+    .bubble.inbound::before,
+    .bubble.outbound::before{
+      content:"";
+      position:absolute;
+      top:-1px;
+      width:9px;
+      height:11px;
+      background:inherit;
+    }
+
+    .bubble.inbound::before{
+      left:-6px;
+      border-left:1px solid #d4dfdc;
+      clip-path:polygon(100% 0, 100% 100%, 0 0);
     }
 
     .bubble.outbound{
       align-self:flex-end;
-      border-color:#b9d9d2;
-      border-top-right-radius:5px;
-      background:#e6f3f0;
+      border-color:#afd5cd;
+      border-top-right-radius:4px;
+      background:linear-gradient(145deg, #daf0eb, #e7f5f2);
+    }
+
+    .bubble.outbound::before{
+      right:-6px;
+      border-right:1px solid #afd5cd;
+      clip-path:polygon(0 0, 100% 0, 0 100%);
     }
 
     .bubble-meta{
       display:flex;
       justify-content:space-between;
       gap:10px;
-      margin-bottom:6px;
+      margin-bottom:5px;
       color:#4e625c;
-      font-size:12px;
+      font-size:10px;
       font-weight:750;
       letter-spacing:.045em;
       text-transform:uppercase;
@@ -736,7 +821,7 @@
 
     .message-text{
       color:#202d29;
-      font-size:14px;
+      font-size:13px;
       line-height:1.55;
     }
 
@@ -744,11 +829,13 @@
       display:flex;
       justify-content:space-between;
       gap:10px;
-      margin-top:8px;
+      margin-top:6px;
       color:#71807b;
-      font-size:12px;
+      font-size:11px;
       font-weight:600;
     }
+    .message-footer a{color:inherit;font-weight:750;text-decoration:none}
+    .message-footer a:hover{text-decoration:underline}
 
     .status-local{color:#9a6418}
     .status-ok{color:#246e52}
@@ -767,16 +854,59 @@
     }
 
     .composer{
-      padding:15px 18px 17px;
+      padding:12px 16px 14px;
       border-top:1px solid var(--line);
-      background:#ffffff;
+      background:linear-gradient(180deg, #ffffff 0%, #fbfcfc 100%);
+    }
+
+    .reply-alert{
+      display:flex;
+      align-items:flex-start;
+      gap:10px;
+      margin:0 0 11px;
+      padding:10px 12px;
+      border:1px solid #b9ddce;
+      border-radius:10px;
+      background:var(--ok-soft);
+      color:#245f4a;
+      font-size:12px;
+      line-height:1.45;
+    }
+
+    .reply-alert.failed{
+      border-color:#edc4c2;
+      background:var(--danger-soft);
+      color:#8e302c;
+    }
+
+    .reply-alert-dot{
+      width:8px;
+      height:8px;
+      flex:0 0 auto;
+      margin-top:5px;
+      border-radius:50%;
+      background:var(--ok);
+      box-shadow:0 0 0 3px rgba(35,129,93,.12);
+    }
+
+    .reply-alert.failed .reply-alert-dot{
+      background:var(--danger);
+      box-shadow:0 0 0 3px rgba(184,63,58,.11);
+    }
+
+    .reply-alert strong{
+      display:block;
+      margin-bottom:1px;
+      color:inherit;
+      font-size:12px;
     }
 
     .reply-form{display:grid;gap:10px}
 
     .reply-input{
-      min-height:92px;
-      background:#f8faf9;
+      min-height:72px;
+      max-height:150px;
+      background:#f6f9f8;
     }
 
     .composer-actions{
@@ -784,6 +914,62 @@
       align-items:center;
       justify-content:space-between;
       gap:12px;
+    }
+
+    .send-btn{
+      display:inline-flex;
+      align-items:center;
+      justify-content:center;
+      gap:8px;
+      min-width:146px;
+      border-radius:10px;
+    }
+
+    .composer-buttons{display:flex;align-items:center;gap:8px;flex:0 0 auto}
+    .manual-send-link{
+      display:inline-flex;
+      min-height:42px;
+      align-items:center;
+      justify-content:center;
+      padding:9px 12px;
+      border:1px solid #b7d6cd;
+      border-radius:10px;
+      background:#eff8f5;
+      color:#17675d;
+      text-decoration:none;
+      font-size:12px;
+      font-weight:750;
+      white-space:nowrap;
+    }
+    .manual-send-link:hover{background:#e2f1ed;border-color:#91c3b7}
+
+    .send-btn::after{
+      content:"›";
+      display:grid;
+      width:18px;
+      height:18px;
+      place-items:center;
+      border-radius:50%;
+      background:rgba(255,255,255,.15);
+      font-size:17px;
+      line-height:1;
+    }
+
+    .send-btn:disabled{
+      border-color:#c9d3d0;
+      background:#dfe5e3;
+      color:#72807b;
+      cursor:not-allowed;
+      box-shadow:none;
+      transform:none;
+    }
+
+    .send-btn:disabled::after{background:rgba(91,107,101,.10)}
+
+    .send-btn:disabled:hover{
+      background:#dfe5e3;
+      box-shadow:none;
+      transform:none;
     }
 
     .composer-note{
@@ -795,12 +981,44 @@
 
     .composer-note.warning{color:#855a18}
 
+    .composer-settings-link{
+      display:inline-block;
+      margin-left:4px;
+      color:var(--petrol-dark);
+      font-weight:750;
+      text-underline-offset:2px;
+    }
+
     .empty{
       padding:24px 18px;
       color:var(--muted);
       font-size:13px;
       line-height:1.5;
       text-align:center;
+    }
+
+    .thread > .empty{
+      width:min(390px, 90%);
+      margin:auto;
+      padding:24px;
+      border:1px dashed #c8d8d3;
+      border-radius:14px;
+      background:rgba(255,255,255,.64);
+      box-shadow:0 8px 24px rgba(31,57,49,.05);
+    }
+
+    .thread > .empty::before{
+      content:"•••";
+      width:38px;
+      height:30px;
+      display:grid;
+      place-items:center;
+      margin:0 auto 10px;
+      border-radius:10px 10px 10px 3px;
+      background:var(--petrol-soft);
+      color:var(--petrol);
+      font-weight:800;
+      letter-spacing:2px;
     }
 
     @media (max-width:1180px){
@@ -821,8 +1039,32 @@
 
     @media (max-width:820px){
       .workspace-head{align-items:flex-start}
-      .inbox{grid-template-columns:1fr}
-      .conversation-list{max-height:330px}
+      .inbox{
+        height:auto;
+        min-height:0;
+        grid-template-columns:1fr;
+        gap:12px;
+        overflow:visible;
+        border:0;
+        border-radius:0;
+        background:transparent;
+        box-shadow:none;
+      }
+      .conversation-panel,
+      .messages{
+        overflow:hidden;
+        border:1px solid var(--line-strong);
+        border-radius:15px;
+        box-shadow:var(--shadow);
+      }
+      .conversation-panel{border-right:1px solid var(--line-strong)}
+      .conversation-list{
+        display:flex;
+        max-height:none;
+        overflow-x:auto;
+        overflow-y:hidden;
+      }
+      .conversation{flex:0 0 min(285px, 82vw)}
       .messages{min-height:620px}
     }
 
@@ -844,6 +1086,8 @@
       .bubble{width:92%}
       .composer{padding:13px}
       .composer-actions{align-items:stretch;flex-direction:column}
+      .composer-buttons{display:grid;grid-template-columns:1fr}
+      .manual-send-link{width:100%}
       .send-btn{width:100%}
     }
 
@@ -913,7 +1157,7 @@
             </div>
             <div class="panel-sub">
               Antworten laufen aktuell im Modus:
-              {% if readiness.reply_mode == "meta" %}Meta API{% else %}lokal speichern{% endif %}
+              {% if readiness.reply_mode == "meta" %}Meta API{% else %}Versand nicht verfügbar{% endif %}
               {% if readiness.display_phone_number %}· {{ readiness.display_phone_number }}{% endif %}
             </div>
           </div>
@@ -1000,11 +1244,11 @@
                 </div>
 
                 <div class="preview">
-                  {% if c.last_direction == "outbound" %}WerkstattAI: {% else %}Kunde: {% endif %}
+                  {% if c.last_direction == "outbound" %}Werkstatt: {% else %}Kunde: {% endif %}
                   {{ c.last_text or "-" }}
                 </div>
 
-                <div class="muted">{{ c.last_created_at or "-" }}</div>
+                <div class="muted">{{ c.last_created_at_display or "-" }}</div>
               </a>
             {% endfor %}
 
@@ -1024,7 +1268,7 @@
                 </div>
                 <div class="contact-meta">
                   {% if selected_conversation %}
-                    Zuletzt {{ selected_conversation.last_created_at }}
+                    Zuletzt {{ selected_conversation.last_created_at_display }}
                   {% else %}
                     Wähle links einen WhatsApp-Verlauf aus.
                   {% endif %}
@@ -1036,16 +1280,16 @@
               {% if selected_conversation %}
                 <span class="stat-pill">{{ selected_conversation.message_count }} Nachrichten</span>
                 <span class="stat-pill">{{ selected_conversation.inbound_count }} vom Kunden</span>
-                <span class="stat-pill">{{ selected_conversation.outbound_count }} von WerkstattAI</span>
+                <span class="stat-pill">{{ selected_conversation.outbound_count }} von der Werkstatt</span>
               {% endif %}
             </div>
           </div>
 
-          <div class="thread">
+          <div class="thread" id="messageThread">
             {% for m in messages %}
               <div class="bubble {{ m.direction }}">
                 <div class="bubble-meta">
-                  <span>{% if m.direction == "outbound" %}WerkstattAI{% else %}Kunde{% endif %}</span>
+                  <span>{{ m.sender_label }}</span>
                   <span class="{{ m.status_class }}">{{ m.status_label }}</span>
                 </div>
                 <div class="message-text">{{ m.text or "-" }}</div>
@@ -1053,8 +1297,8 @@
                   <div class="message-error">{{ m.message_error }}</div>
                 {% endif %}
                 <div class="message-footer">
-                  <span>{{ m.created_at }}</span>
-                  {% if m.ticket_id %}<span>Ticket {{ m.ticket_id }}</span>{% endif %}
+                  <span>{{ m.created_at_display }}</span>
+                  {% if m.ticket_id %}<a href="/dashboard/ticket/{{ m.ticket_id }}?workshop_id={{ workshop_id }}">Ticket {{ m.ticket_id }}</a>{% endif %}
                 </div>
               </div>
             {% endfor %}
@@ -1069,15 +1313,34 @@
           </div>
 
           <div class="composer">
+            {% if reply_detail %}
+              <div
+                class="reply-alert {% if reply_status == 'failed' %}failed{% endif %}"
+                role="{% if reply_status == 'failed' %}alert{% else %}status{% endif %}"
+              >
+                <span class="reply-alert-dot" aria-hidden="true"></span>
+                <div>
+                  <strong>
+                    {% if reply_status == "failed" %}Nachricht nicht gesendet{% else %}Nachricht gesendet{% endif %}
+                  </strong>
+                  {{ reply_detail }}
+                </div>
+              </div>
+            {% endif %}
+
             {% if selected_phone %}
               <form class="reply-form" method="post" action="/dashboard/whatsapp/reply">
                 <input type="hidden" name="workshop_id" value="{{ workshop_id }}" />
                 <input type="hidden" name="customer_phone" value="{{ selected_phone }}" />
+                {% if selected_conversation and selected_conversation.last_ticket_id %}
+                  <input type="hidden" name="ticket_id" value="{{ selected_conversation.last_ticket_id }}" />
+                {% endif %}
                 <label class="field-label" for="replyText">Antwort an {{ selected_phone }}</label>
                 <textarea
                   class="reply-input"
                   id="replyText"
                   name="reply_text"
+                  maxlength="4096"
                   placeholder="Antwort an den Kunden schreiben …"
                   required
                 ></textarea>
@@ -1086,12 +1349,26 @@
                     {% if readiness.can_send %}
                       Die Antwort wird über die Meta API gesendet und im Verlauf gespeichert.
                     {% else %}
-                      Die Antwort wird aktuell nur lokal gespeichert. Für den Versand fehlen Access Token oder Phone Number ID.
+                      Versand nicht verfügbar: Access Token oder Phone Number ID fehlt.
+                      <a class="composer-settings-link" href="/dashboard/settings?workshop_id={{ workshop_id }}">Zu den Einstellungen</a>
                     {% endif %}
                   </div>
-                  <button class="send-btn" type="submit">
-                    {% if readiness.can_send %}Antwort senden{% else %}Lokal speichern{% endif %}
-                  </button>
+                  <div class="composer-buttons">
+                    <a
+                      class="manual-send-link"
+                      id="inboxManualLink"
+                      href="https://wa.me/{{ selected_phone }}"
+                      target="_blank"
+                      rel="noopener"
+                    >In WhatsApp öffnen</a>
+                    <button
+                      class="send-btn"
+                      type="submit"
+                      {% if not readiness.can_send %}disabled aria-disabled="true" title="WhatsApp-Einrichtung fehlt"{% endif %}
+                    >
+                      {% if readiness.can_send %}Antwort senden{% else %}Einrichtung fehlt{% endif %}
+                    </button>
+                  </div>
                 </div>
               </form>
             {% else %}
@@ -1104,6 +1381,35 @@
   </div>
 
   <script>
+    const whatsappWorkspace = document.querySelector(".workspace");
+    const whatsappDiagnostics = document.querySelector(".diagnostics");
+    if (whatsappWorkspace && whatsappDiagnostics) {
+      whatsappWorkspace.appendChild(whatsappDiagnostics);
+    }
+
+    const messageThread = document.getElementById("messageThread");
+    if (messageThread) messageThread.scrollTop = messageThread.scrollHeight;
+
+    const whatsappReplyForm = document.querySelector(".reply-form");
+    if (whatsappReplyForm) {
+      const replyInput = whatsappReplyForm.querySelector("textarea[name='reply_text']");
+      const manualLink = document.getElementById("inboxManualLink");
+      const manualPhone = {{ selected_phone | tojson }};
+      const updateManualLink = () => {
+        if (!replyInput || !manualLink) return;
+        manualLink.href = `https://wa.me/${manualPhone}?text=${encodeURIComponent(replyInput.value.trim())}`;
+      };
+      if (replyInput) replyInput.addEventListener("input", updateManualLink);
+      updateManualLink();
+
+      whatsappReplyForm.addEventListener("submit", () => {
+        const submitButton = whatsappReplyForm.querySelector("button[type='submit']");
+        if (!submitButton) return;
+        submitButton.disabled = true;
+        submitButton.textContent = "Wird gesendet …";
+      });
+    }
+
     document.querySelectorAll("[data-copy-target]").forEach((button) => {
       button.addEventListener("click", async () => {
         const target = document.getElementById(button.dataset.copyTarget);
@@ -1118,6 +1424,15 @@
         }
       });
     });
+
+    window.setInterval(() => {
+      if (document.hidden) return;
+      const replyText = document.getElementById("replyText");
+      if (replyText && replyText.value.trim()) return;
+      const activeTag = document.activeElement ? document.activeElement.tagName : "";
+      if (["INPUT", "TEXTAREA", "BUTTON"].includes(activeTag)) return;
+      window.location.reload();
+    }, 15000);
   </script>
 </body>
 </html>

@@ -1880,6 +1880,9 @@
       font-size:12px;
       font-weight:650;
       letter-spacing:.055em;
+      line-height:1.25;
+      overflow-wrap:break-word;
+      hyphens:auto;
     }
 
     .kpi .value{
@@ -1982,6 +1985,20 @@
     .table-title{color:#1b2925;font-size:16px;font-weight:720}
     .table-sub{margin-top:4px;font-size:13px;line-height:1.45}
     .table-sub,.muted{color:var(--muted)}
+    .table-count{
+      flex:0 0 auto;
+      display:inline-flex;
+      align-items:center;
+      min-height:34px;
+      padding:7px 11px;
+      border:1px solid #cfe0dc;
+      border-radius:999px;
+      background:#edf6f3;
+      color:#1b6259;
+      font-size:12px;
+      font-weight:750;
+      white-space:nowrap;
+    }
     table.ticket-table{min-width:1240px;border-spacing:0 5px;background:#ffffff;table-layout:fixed}
     .ticket-table th:nth-child(1){width:142px}
     .ticket-table th:nth-child(2){width:138px}
@@ -2012,7 +2029,17 @@
     .new{border-color:#e9cf9e;background:#fff4dc;color:#8a5b14}
     .customer-question-badge{border-color:#b8d8d1;background:#eaf6f3;color:#17675d}
     .priority,.request-type,.tiny-badge{border-color:#d8e1de;background:#f1f5f3;color:#4c5a55;font-size:11px;line-height:1.3}
-    .request-type{max-width:none;white-space:normal;text-align:center}
+    .request-type{
+      display:inline-block;
+      max-width:100%;
+      overflow:visible;
+      text-overflow:clip;
+      white-space:normal;
+      overflow-wrap:break-word;
+      hyphens:auto;
+      line-height:1.25;
+      text-align:center;
+    }
     .new,.customer-question-badge{font-size:11px;line-height:1.3}
     .customer-question-badge{white-space:normal}
     .p-niedrig,.rt-service{border-color:#bfdfd0;background:#edf8f2;color:#267153}
@@ -2035,8 +2062,41 @@
     .open{border-color:#0e675f;background:var(--petrol);color:#ffffff}
     .open:hover{background:#0c625a}
     .details-btn,.mini-action{border-color:#d5dfdc;background:#ffffff;color:#41504b}
-    .open,.details-btn,.mini-action,.archive-btn{min-height:38px;font-size:12px}
+    .open,.details-btn,.mini-action,.archive-btn,.whatsapp-action{min-height:38px;font-size:12px}
     .details-btn:hover,.mini-action:hover{transform:none;background:#edf4f2}
+    .whatsapp-action{
+      display:inline-flex;
+      align-items:center;
+      justify-content:center;
+      gap:7px;
+      padding:8px 11px;
+      border:1px solid #75b99d;
+      border-radius:9px;
+      background:#e8f7ef;
+      color:#176b50;
+      font-weight:750;
+      white-space:nowrap;
+      cursor:pointer;
+    }
+    .whatsapp-action:hover{background:#d9f0e4;border-color:#55a884}
+    .whatsapp-action:disabled{
+      border-color:#d8e1de;
+      background:#f3f6f5;
+      color:#8b9894;
+      cursor:not-allowed;
+    }
+    .whatsapp-mark{
+      display:inline-grid;
+      width:19px;
+      height:19px;
+      place-items:center;
+      border-radius:50%;
+      background:#238667;
+      color:#fff;
+      font-size:10px;
+      font-weight:850;
+    }
+    .whatsapp-action:disabled .whatsapp-mark{background:#aab6b2}
     .quick{border-color:#dce4e1;background:#f3f6f5}
     .archive-btn{border-color:#edc4c2;background:#fff0ef;color:#a3312e}
     .archive-btn:hover{transform:none;background:#fce4e2}
@@ -2057,6 +2117,89 @@
     pre{border-color:#d8e1de;background:#eff3f1;color:#33423d}
     .toast{border-color:#31534a;background:#18332c;color:#ffffff;box-shadow:var(--shadow-2)}
 
+    .message-feedback{
+      display:flex;
+      align-items:flex-start;
+      gap:10px;
+      padding:13px 15px;
+      border:1px solid #b9dccc;
+      border-radius:11px;
+      background:#edf8f2;
+      color:#22664f;
+      font-size:13px;
+      line-height:1.45;
+      box-shadow:0 5px 16px rgba(28,52,45,.05);
+    }
+    .message-feedback.failed{border-color:#edc4c2;background:#fff0ef;color:#94322e}
+    .message-feedback strong{display:block;margin-bottom:2px;color:inherit}
+    .message-feedback-dot{
+      flex:0 0 auto;
+      width:9px;
+      height:9px;
+      margin-top:5px;
+      border-radius:50%;
+      background:#2f8b68;
+      box-shadow:0 0 0 4px rgba(47,139,104,.12);
+    }
+    .message-feedback.failed .message-feedback-dot{
+      background:#c44743;
+      box-shadow:0 0 0 4px rgba(196,71,67,.11);
+    }
+    .message-feedback a{color:inherit;font-weight:750}
+
+    .message-modal{width:min(590px,100%)}
+    .message-modal .modal-body{display:block;padding:20px}
+    .message-form{display:grid;gap:16px}
+    .message-recipient{
+      display:grid;
+      grid-template-columns:minmax(0,1fr) minmax(190px,.7fr);
+      gap:11px;
+    }
+    .message-field{display:grid;gap:7px}
+    .message-field label{
+      color:#4e5d58;
+      font-size:12px;
+      font-weight:750;
+    }
+    .message-field input,.message-field textarea{
+      width:100%;
+      padding:11px 12px;
+      border:1px solid #d5dfdc;
+      border-radius:9px;
+      background:#fff;
+      color:#1c2925;
+      font:inherit;
+    }
+    .message-field textarea{min-height:138px;resize:vertical;line-height:1.5}
+    .message-help{
+      padding:11px 12px;
+      border:1px solid #e5dcc8;
+      border-radius:9px;
+      background:#fffaf0;
+      color:#735d32;
+      font-size:12px;
+      line-height:1.45;
+    }
+    .message-form-actions{display:flex;justify-content:flex-end;gap:9px}
+    .message-cancel,.message-send,.message-manual{min-height:41px;padding:9px 15px}
+    .message-cancel{border-color:#d5dfdc;background:#fff;color:#4b5a55}
+    .message-send{border-color:#176b50;background:#238667;color:#fff}
+    .message-send:hover{background:#176b50}
+    .message-send:disabled{border-color:#d5dfdc;background:#e9eeec;color:#84918d;cursor:not-allowed}
+    .message-manual{
+      display:inline-flex;
+      align-items:center;
+      justify-content:center;
+      border:1px solid #9bcdb8;
+      border-radius:9px;
+      background:#eff9f4;
+      color:#176b50;
+      text-decoration:none;
+      font-size:13px;
+      font-weight:750;
+    }
+    .message-manual.is-disabled{pointer-events:none;opacity:.5}
+
     a:focus-visible,
     button:focus-visible,
     input:focus-visible,
@@ -2072,7 +2215,7 @@
       *,*::before,*::after{transition-duration:.01ms !important;animation-duration:.01ms !important}
     }
 
-    @media (max-width:1260px){
+    @media (max-width:1540px){
       .cards{grid-template-columns:repeat(6,minmax(0,1fr))}
       .kpi-primary{grid-column:span 3}
       .kpi-compact{grid-column:span 2}
@@ -2127,9 +2270,9 @@
 
       .ticket-table tbody tr{
         display:grid;
-        grid-template-columns:minmax(135px,.72fr) minmax(165px,.9fr) minmax(240px,1.45fr);
+        grid-template-columns:minmax(230px,1.15fr) minmax(145px,.7fr) minmax(270px,1.25fr);
         grid-template-areas:
-          "status type vehicle"
+          "vehicle status type"
           "problem problem problem"
           "contact date actions";
         overflow:hidden;
@@ -2183,9 +2326,31 @@
         text-transform:uppercase;
       }
 
+      .ticket-table tbody td:nth-child(1) .cell-label,
+      .ticket-table tbody td:nth-child(2) .cell-label,
+      .ticket-table tbody td:nth-child(3) .cell-label{display:none}
+
+      .ticket-table .vehicle .title{font-size:17px;line-height:1.25}
+
       .ticket-table .right{text-align:left}
-      .ticket-table .actions,
-      .ticket-table .quick{justify-content:flex-start}
+      .ticket-table .actions{
+        display:grid;
+        grid-template-columns:minmax(0,1fr) minmax(0,1fr);
+        align-items:stretch;
+        justify-content:stretch;
+      }
+      .ticket-table .open,
+      .ticket-table .details-btn,
+      .ticket-table .whatsapp-action{width:100%}
+      .ticket-table .open{grid-column:1 / -1}
+      .ticket-table .quick{
+        grid-column:1 / -1;
+        display:grid;
+        grid-template-columns:minmax(0,1fr) auto;
+        justify-content:stretch;
+      }
+      .ticket-table .archive-form{grid-column:1 / -1}
+      .ticket-table .archive-btn{width:100%}
       .ticket-table .date-cell{white-space:normal}
     }
 
@@ -2193,8 +2358,8 @@
       .ticket-table tbody tr{
         grid-template-columns:minmax(0,1fr) minmax(0,1fr);
         grid-template-areas:
-          "status type"
           "vehicle vehicle"
+          "status type"
           "problem problem"
           "contact date"
           "actions actions";
@@ -2211,9 +2376,9 @@
       .ticket-table tbody tr{
         grid-template-columns:1fr;
         grid-template-areas:
+          "vehicle"
           "status"
           "type"
-          "vehicle"
           "problem"
           "contact"
           "date"
@@ -2230,6 +2395,9 @@
       .ticket-table .quick{display:grid;grid-template-columns:1fr}
       .ticket-table .quick select,
       .ticket-table .quick button{width:100%}
+      .message-recipient{grid-template-columns:1fr}
+      .message-form-actions{display:grid;grid-template-columns:1fr}
+      .message-cancel,.message-send{width:100%}
     }
   </style>
 </head>
@@ -2426,6 +2594,17 @@
       </section>
       {% endif %}
 
+      {% if message_detail and not archive_mode %}
+      <div class="message-feedback {% if message_status == 'failed' %}failed{% endif %}" role="{% if message_status == 'failed' %}alert{% else %}status{% endif %}">
+        <span class="message-feedback-dot" aria-hidden="true"></span>
+        <div>
+          <strong>{% if message_status == 'failed' %}Nachricht nicht gesendet{% else %}Nachricht gesendet{% endif %}</strong>
+          {{ message_detail }}
+          {% if message_ticket %}<div><a href="#ticket-{{ message_ticket }}">Betroffenes Ticket anzeigen</a></div>{% endif %}
+        </div>
+      </div>
+      {% endif %}
+
       <div class="table-shell">
         <div class="table-head">
           <div>
@@ -2440,6 +2619,7 @@
               Übersicht aller Vorgänge mit Status, Priorität und Schnellaktionen
             </div>
           </div>
+          <div class="table-count">{{ tickets|length }} {% if tickets|length == 1 %}Ticket{% else %}Tickets{% endif %}</div>
         </div>
 
         <div class="table-wrap" tabindex="0" aria-label="Ticketliste">
@@ -2459,6 +2639,7 @@
             <tbody>
               {% for t in tickets %}
               <tr
+                id="ticket-{{ t.ticket_view_id }}"
                 class="
                   {% if t.priority == 'hoch' %}row-high{% endif %}
                   {% if t.request_type == 'notfall' %}row-notfall{% endif %}
@@ -2578,6 +2759,21 @@
                     >
                       Schnellansicht
                     </button>
+
+                    {% if not archive_mode %}
+                    <button
+                      class="whatsapp-action"
+                      type="button"
+                      data-message-ticket="{{ t.ticket_view_id }}"
+                      data-message-phone="{{ t.whatsapp_phone }}"
+                      data-message-customer="{{ t.kunde_name or 'Kunde' }}"
+                      data-message-vehicle="{{ t.fahrzeug or '-' }}"
+                      {% if not t.can_message_customer %}disabled title="Keine Telefonnummer im Ticket hinterlegt"{% endif %}
+                    >
+                      <span class="whatsapp-mark" aria-hidden="true">W</span>
+                      Kunde schreiben
+                    </button>
+                    {% endif %}
 
                     {% if not archive_mode %}
                     <form class="quick" method="post" action="/dashboard/ticket/{{ t.ticket_view_id }}/status_quick">
@@ -2745,30 +2941,166 @@
     </div>
   </div>
 
+  <div id="messageModalBackdrop" class="modal-backdrop" aria-hidden="true">
+    <div class="modal message-modal" role="dialog" aria-modal="true" aria-labelledby="messageModalTitle">
+      <div class="modal-header">
+        <div>
+          <div class="modal-title" id="messageModalTitle">Kunde über WhatsApp kontaktieren</div>
+          <div class="muted" id="messageModalSubtitle">Nachricht zum Ticket senden</div>
+        </div>
+        <button class="modal-close" type="button" id="messageModalClose" aria-label="Nachrichtenfenster schließen">✕</button>
+      </div>
+
+      <div class="modal-body">
+        <form class="message-form" id="ticketMessageForm" method="post" action="">
+          <input type="hidden" name="workshop_id" value="{{ workshop_id }}" />
+
+          <div class="message-recipient">
+            <div class="message-field">
+              <label for="messageCustomer">Kunde</label>
+              <input id="messageCustomer" type="text" value="" readonly />
+            </div>
+            <div class="message-field">
+              <label for="messagePhone">WhatsApp-Nummer</label>
+              <input id="messagePhone" type="tel" placeholder="Keine Nummer hinterlegt" readonly />
+            </div>
+          </div>
+
+          <div class="message-field">
+            <label for="messageText">Nachricht</label>
+            <textarea
+              id="messageText"
+              name="message_text"
+              maxlength="4096"
+              placeholder="Nachricht an den Kunden schreiben …"
+              required
+            ></textarea>
+          </div>
+
+          <div class="message-help">
+            {% if whatsapp_readiness.can_send %}
+              Die Nachricht wird wirklich über die Meta API versendet. Bei neuen oder älteren Kontakten kann Meta eine freigegebene Nachrichtenvorlage verlangen.
+            {% else %}
+              Der automatische Versand ist noch nicht eingerichtet. Access Token oder Phone Number ID fehlt. Du kannst die Nachricht vorerst in WhatsApp öffnen oder die Verbindung unter
+              <a href="/dashboard/settings?workshop_id={{ workshop_id }}">Einstellungen</a> vervollständigen.
+            {% endif %}
+          </div>
+
+          <div class="message-form-actions">
+            <button class="message-cancel" id="messageModalCancel" type="button">Abbrechen</button>
+            <a class="message-manual is-disabled" id="messageManualLink" target="_blank" rel="noopener" aria-disabled="true" tabindex="-1">In WhatsApp öffnen</a>
+            <button class="message-send" type="submit" {% if not whatsapp_readiness.can_send %}disabled title="WhatsApp-Einrichtung fehlt"{% endif %}>
+              {% if whatsapp_readiness.can_send %}Nachricht senden{% else %}Einrichtung fehlt{% endif %}
+            </button>
+          </div>
+        </form>
+      </div>
+    </div>
+  </div>
+
   <div id="toast" class="toast">✅ Kopiert!</div>
 
   <script>
     const backdrop = document.getElementById("modalBackdrop");
     const closeBtn = document.getElementById("modalClose");
+    const messageBackdrop = document.getElementById("messageModalBackdrop");
+    const messageCloseBtn = document.getElementById("messageModalClose");
+    const messageCancelBtn = document.getElementById("messageModalCancel");
+    const ticketMessageForm = document.getElementById("ticketMessageForm");
+    const messageCustomer = document.getElementById("messageCustomer");
+    const messagePhone = document.getElementById("messagePhone");
+    const messageText = document.getElementById("messageText");
+    const messageManualLink = document.getElementById("messageManualLink");
+    let lastDetailsTrigger = null;
+    let lastMessageTrigger = null;
 
     function openModal() {
       backdrop.style.display = "flex";
       backdrop.setAttribute("aria-hidden", "false");
+      window.setTimeout(() => closeBtn.focus(), 0);
     }
 
     function closeModal() {
+      if (backdrop.style.display !== "flex") return;
       backdrop.style.display = "none";
       backdrop.setAttribute("aria-hidden", "true");
+      if (lastDetailsTrigger) lastDetailsTrigger.focus();
+    }
+
+    function normalizedMessagePhone(value) {
+      let digits = String(value || "").replace(/\D/g, "");
+      if (digits.startsWith("00")) digits = digits.slice(2);
+      else if (digits.startsWith("0")) digits = "49" + digits.slice(1);
+      return digits;
+    }
+
+    function updateManualMessageLink() {
+      const phone = normalizedMessagePhone(messagePhone.value);
+      if (!phone) {
+        messageManualLink.removeAttribute("href");
+        messageManualLink.classList.add("is-disabled");
+        messageManualLink.setAttribute("aria-disabled", "true");
+        messageManualLink.setAttribute("tabindex", "-1");
+        return;
+      }
+
+      messageManualLink.href = `https://wa.me/${phone}?text=${encodeURIComponent(messageText.value.trim())}`;
+      messageManualLink.classList.remove("is-disabled");
+      messageManualLink.removeAttribute("aria-disabled");
+      messageManualLink.setAttribute("tabindex", "0");
+    }
+
+    function openMessageModal(button) {
+      const ticketId = button.dataset.messageTicket || "";
+      const customer = button.dataset.messageCustomer || "Kunde";
+      const vehicle = button.dataset.messageVehicle || "-";
+      const phone = button.dataset.messagePhone || "";
+
+      lastMessageTrigger = button;
+      ticketMessageForm.action = `/dashboard/ticket/${encodeURIComponent(ticketId)}/customer-message`;
+      messageCustomer.value = `${customer} · ${vehicle}`;
+      messagePhone.value = phone;
+      messageText.value = "";
+      document.getElementById("messageModalSubtitle").textContent = `Ticket ${ticketId}`;
+      updateManualMessageLink();
+
+      messageBackdrop.style.display = "flex";
+      messageBackdrop.setAttribute("aria-hidden", "false");
+      window.setTimeout(() => messageText.focus(), 0);
+    }
+
+    function closeMessageModal() {
+      if (messageBackdrop.style.display !== "flex") return;
+      messageBackdrop.style.display = "none";
+      messageBackdrop.setAttribute("aria-hidden", "true");
+      if (lastMessageTrigger) lastMessageTrigger.focus();
     }
 
     backdrop.addEventListener("click", (e) => {
       if (e.target === backdrop) closeModal();
     });
 
+    messageBackdrop.addEventListener("click", (e) => {
+      if (e.target === messageBackdrop) closeMessageModal();
+    });
+
     closeBtn.addEventListener("click", closeModal);
+    messageCloseBtn.addEventListener("click", closeMessageModal);
+    messageCancelBtn.addEventListener("click", closeMessageModal);
+    messagePhone.addEventListener("input", updateManualMessageLink);
+    messageText.addEventListener("input", updateManualMessageLink);
+    ticketMessageForm.addEventListener("submit", () => {
+      const submitButton = ticketMessageForm.querySelector("button[type='submit']");
+      if (!submitButton) return;
+      submitButton.disabled = true;
+      submitButton.textContent = "Wird gesendet …";
+    });
 
     document.addEventListener("keydown", (e) => {
-      if (e.key === "Escape") closeModal();
+      if (e.key === "Escape") {
+        closeModal();
+        closeMessageModal();
+      }
     });
 
     function setText(id, val) {
@@ -2872,8 +3204,15 @@
     }
 
     document.addEventListener("click", async (e) => {
+      const messageBtn = e.target.closest("button[data-message-ticket]");
+      if (messageBtn) {
+        openMessageModal(messageBtn);
+        return;
+      }
+
       const detailsBtn = e.target.closest("button[data-details]");
       if (detailsBtn) {
+        lastDetailsTrigger = detailsBtn;
         let data;
         try {
           data = JSON.parse(detailsBtn.getAttribute("data-details"));
@@ -2935,6 +3274,7 @@
     setInterval(() => {
       if (document.hidden) return;
       if (backdrop.style.display === "flex") return;
+      if (messageBackdrop.style.display === "flex") return;
 
       const active = document.activeElement;
       const tag = active ? active.tagName : "";

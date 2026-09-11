@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+import logging
 from datetime import datetime, timezone
 from typing import Any
 from urllib.parse import urlencode
@@ -39,6 +40,7 @@ from app.workshops import get_workshop, update_workshop
 
 router = APIRouter()
 templates = Jinja2Templates(directory="templates")
+logger = logging.getLogger(__name__)
 
 
 def _normalize_workshop_id(value: str | None = None) -> str:
@@ -270,10 +272,6 @@ def _message_error(payload_json: str | None) -> str:
     if not isinstance(payload, dict):
         return ""
 
-    error = payload.get("meta_error")
-    if isinstance(error, str) and error.strip():
-        return error.strip()
-
     response = payload.get("meta_response")
     if isinstance(response, dict):
         meta_error = response.get("error")
@@ -283,6 +281,10 @@ def _message_error(payload_json: str | None) -> str:
             if message and code:
                 return f"{message} ({code})"
             return message
+
+    error = payload.get("meta_error")
+    if isinstance(error, str) and error.strip():
+        return error.strip()
 
     return ""
 
@@ -294,6 +296,17 @@ def _decorate_whatsapp_messages(messages: list[dict[str, Any]]) -> list[dict[str
         item["status_label"] = _message_status_label(item.get("status"))
         item["status_class"] = _message_status_class(item.get("status"))
         item["message_error"] = _message_error(item.get("payload_json"))
+        item["created_at_display"] = _format_datetime_for_display(item.get("created_at"))
+        item["sender_label"] = "Kunde"
+        if str(item.get("direction") or "").strip().lower() == "outbound":
+            source = ""
+            try:
+                payload = json.loads(item.get("payload_json") or "{}")
+                if isinstance(payload, dict):
+                    source = str(payload.get("source") or "").strip().lower()
+            except Exception:
+                source = ""
+            item["sender_label"] = "Assistent" if source == "webhook" else "Werkstatt"
         decorated.append(item)
     return decorated
 
@@ -333,13 +346,171 @@ def _whatsapp_readiness(request: Request, workshop: dict[str, Any]) -> dict[str,
     return {
         "is_ready": all(check["configured"] for check in checks),
         "can_send": access_token_ready and bool(phone_number_id),
-        "reply_mode": "meta" if access_token_ready and phone_number_id else "local",
+        "reply_mode": "meta" if access_token_ready and phone_number_id else "unavailable",
         "webhook_url": webhook_url,
         "webhook_url_source": "configured" if configured_webhook_url else "request",
         "phone_number_id": phone_number_id,
         "display_phone_number": display_phone_number,
         "checks": checks,
     }
+
+
+def _normalize_whatsapp_recipient(value: str | None) -> str:
+    """Return a WhatsApp/E.164-style recipient without formatting characters."""
+    raw = str(value or "").strip()
+    digits = "".join(character for character in raw if character.isdigit())
+
+    if digits.startswith("00"):
+        digits = digits[2:]
+    elif digits.startswith("0"):
+        # Ticket intake currently targets German workshops. Meta expects the
+        # international number without a leading plus sign.
+        digits = f"49{digits[1:]}"
+
+    return digits
+
+
+def _meta_send_error(send_result: Any) -> str:
+    payload = send_result.payload if isinstance(getattr(send_result, "payload", None), dict) else {}
+    meta_error = payload.get("error") if isinstance(payload, dict) else None
+    if isinstance(meta_error, dict):
+        message = str(meta_error.get("message") or "").strip()
+        code = str(meta_error.get("code") or "").strip()
+        if message and code:
+            return f"{message} (Meta-Code {code})"
+        if message:
+            return message
+
+    return str(getattr(send_result, "error", "") or "Meta hat die WhatsApp-Nachricht abgelehnt.").strip()
+
+
+def _linked_ticket_whatsapp_phone(
+    *,
+    workshop_id: str,
+    ticket_id: str,
+) -> str:
+    linked_messages = list_whatsapp_messages(
+        workshop_id=workshop_id,
+        ticket_id=ticket_id,
+        limit=250,
+    )
+    linked_phone = next(
+        (
+            str(message.get("customer_phone") or "").strip()
+            for message in reversed(linked_messages)
+            if str(message.get("customer_phone") or "").strip()
+        ),
+        "",
+    )
+    return _normalize_whatsapp_recipient(linked_phone)
+
+
+def _ticket_whatsapp_phone(
+    *,
+    workshop_id: str,
+    ticket_id: str,
+    ticket: dict[str, Any],
+) -> str:
+    linked_phone = _linked_ticket_whatsapp_phone(
+        workshop_id=workshop_id,
+        ticket_id=ticket_id,
+    )
+    return linked_phone or _normalize_whatsapp_recipient(ticket.get("telefon"))
+
+
+def _send_ticket_customer_whatsapp(
+    *,
+    request: Request,
+    workshop_id: str,
+    ticket_id: str,
+    ticket: dict[str, Any],
+    text: str,
+    source: str = "dashboard_ticket",
+) -> tuple[bool, str, str]:
+    if not text:
+        return False, "Die Nachricht darf nicht leer sein.", ""
+    if len(text) > 4096:
+        return False, "Die WhatsApp-Nachricht darf höchstens 4096 Zeichen lang sein.", ""
+
+    recipient = _ticket_whatsapp_phone(
+        workshop_id=workshop_id,
+        ticket_id=ticket_id,
+        ticket=ticket,
+    )
+    if not recipient:
+        return False, "Für dieses Ticket ist keine Telefonnummer hinterlegt.", ""
+    if len(recipient) < 8 or len(recipient) > 15:
+        return False, "Die Telefonnummer ist für WhatsApp ungültig. Bitte im Ticket prüfen.", recipient
+
+    workshop = get_workshop(workshop_id)
+    phone_number_id = str(workshop.get("whatsapp_phone_number_id") or "").strip()
+    access_token = str(settings.whatsapp_access_token or "").strip()
+    if not phone_number_id:
+        return False, "Die WhatsApp Phone Number ID fehlt in den Einstellungen.", recipient
+    if not access_token:
+        return False, "Der WhatsApp Access Token fehlt auf dem Server.", recipient
+
+    send_result = send_whatsapp_text_message(
+        phone_number_id=phone_number_id,
+        customer_phone=recipient,
+        text=text,
+        access_token=access_token,
+        graph_api_version=settings.whatsapp_graph_api_version,
+    )
+    message_payload = {
+        "source": source,
+        "local_only": False,
+        "user": (get_current_user(request) or {}).get("email"),
+        "meta_status_code": send_result.status_code,
+        "meta_response": send_result.payload,
+        "meta_error": send_result.error,
+    }
+
+    try:
+        save_whatsapp_message(
+            workshop_id=workshop_id,
+            phone_number_id=phone_number_id,
+            customer_phone=recipient,
+            direction="outbound",
+            message_type="text",
+            text=text,
+            wa_message_id=send_result.wa_message_id,
+            ticket_id=ticket_id,
+            status="sent" if send_result.ok else "failed",
+            payload=message_payload,
+        )
+    except Exception:
+        logger.exception(
+            "Could not persist WhatsApp send result for workshop=%s ticket=%s",
+            workshop_id,
+            ticket_id,
+        )
+        if not send_result.ok:
+            return False, _meta_send_error(send_result), recipient
+        return (
+            True,
+            "Die Nachricht wurde an Meta übergeben, konnte intern aber nicht protokolliert werden. Bitte nicht erneut senden.",
+            recipient,
+        )
+
+    if not send_result.ok:
+        return False, _meta_send_error(send_result), recipient
+
+    try:
+        add_ticket_note(ticket_id, text, note_type="customer_reply", workshop_id=workshop_id)
+    except Exception:
+        logger.exception(
+            "Could not add customer reply note after WhatsApp send for workshop=%s ticket=%s",
+            workshop_id,
+            ticket_id,
+        )
+        return (
+            True,
+            "Die Nachricht wurde an Meta übergeben, die Ticketnotiz konnte aber nicht gespeichert werden. Bitte nicht erneut senden.",
+            recipient,
+        )
+
+    return True, f"WhatsApp-Nachricht wurde an Meta für {recipient} übergeben.", recipient
 
 
 def _pick_first(d: dict, keys: list[str]) -> str:
@@ -440,8 +611,15 @@ def _details_payload(t: dict) -> dict:
 
 
 def _prepare_tickets(limit: int, workshop_id: str | None = None) -> list[dict]:
-    raw = list_latest_tickets(limit=limit, workshop_id=_normalize_workshop_id(workshop_id))
+    wid = _normalize_workshop_id(workshop_id)
+    raw = list_latest_tickets(limit=limit, workshop_id=wid)
     tickets = [_as_dict(t) for t in raw]
+    whatsapp_phone_by_ticket: dict[str, str] = {}
+    for message in list_whatsapp_messages(workshop_id=wid, limit=500):
+        linked_ticket_id = str(message.get("ticket_id") or "").strip()
+        linked_phone = _normalize_whatsapp_recipient(message.get("customer_phone"))
+        if linked_ticket_id and linked_phone:
+            whatsapp_phone_by_ticket[linked_ticket_id] = linked_phone
 
     for t in tickets:
         t["ticket_view_id"] = _ticket_id(t)
@@ -460,6 +638,12 @@ def _prepare_tickets(limit: int, workshop_id: str | None = None) -> list[dict]:
         t["updated_at_display"] = _format_datetime_for_display(t.get("updated_at"))
         t["is_new"] = (t.get("created_at") == t.get("updated_at"))
         t["kunde_name"] = _extract_name(t)
+        linked_whatsapp_phone = whatsapp_phone_by_ticket.get(t["ticket_view_id"], "")
+        t["has_whatsapp_conversation"] = bool(linked_whatsapp_phone)
+        t["whatsapp_phone"] = linked_whatsapp_phone or _normalize_whatsapp_recipient(
+            t.get("telefon")
+        )
+        t["can_message_customer"] = bool(t["whatsapp_phone"])
 
         notes = t.get("notes") if isinstance(t.get("notes"), list) else []
         last_note = notes[-1] if notes else {}
@@ -639,8 +823,12 @@ def _render_dashboard(
     sort: str | None,
     limit: int,
     workshop_id: str | None = None,
+    message_status: str | None = None,
+    message_detail: str | None = None,
+    message_ticket: str | None = None,
 ):
     wid = _normalize_workshop_id(workshop_id)
+    workshop = get_workshop(wid)
     tickets = _prepare_tickets(limit=limit, workshop_id=wid)
 
     if archive_mode:
@@ -693,7 +881,8 @@ def _render_dashboard(
         "dashboard.html",
         _template_context(
             request,
-            workshop=get_workshop(wid),
+            workshop=workshop,
+            whatsapp_readiness=_whatsapp_readiness(request, workshop),
             tickets=tickets,
             attention_tickets=attention_tickets,
             stats=stats,
@@ -708,6 +897,9 @@ def _render_dashboard(
             },
             archive_mode=archive_mode,
             workshop_id=wid,
+            message_status=(message_status or "").strip(),
+            message_detail=(message_detail or "").strip(),
+            message_ticket=(message_ticket or "").strip(),
         ),
     )
 
@@ -808,6 +1000,9 @@ def dashboard(
     sort: str | None = None,
     limit: int = 250,
     workshop_id: str | None = None,
+    message_status: str | None = None,
+    message_detail: str | None = None,
+    message_ticket: str | None = None,
 ):
     wid = _workshop_id_for_request(request, workshop_id)
     return _render_dashboard(
@@ -820,6 +1015,9 @@ def dashboard(
         sort=sort,
         limit=limit,
         workshop_id=wid,
+        message_status=message_status,
+        message_detail=message_detail,
+        message_ticket=message_ticket,
     )
 
 
@@ -845,6 +1043,9 @@ def dashboard_archive(
         sort=sort,
         limit=limit,
         workshop_id=wid,
+        message_status=None,
+        message_detail=None,
+        message_ticket=None,
     )
 
 
@@ -1100,11 +1301,19 @@ def dashboard_whatsapp(
     workshop_id: str | None = None,
     test_status: str | None = None,
     test_detail: str | None = None,
+    reply_status: str | None = None,
+    reply_detail: str | None = None,
 ):
     wid = _workshop_id_for_request(request, workshop_id)
     workshop = get_workshop(wid)
     readiness = _whatsapp_readiness(request, workshop)
-    conversations = list_whatsapp_conversations(workshop_id=wid)
+    conversations = []
+    for conversation in list_whatsapp_conversations(workshop_id=wid):
+        item = dict(conversation)
+        item["last_created_at_display"] = _format_datetime_for_display(
+            item.get("last_created_at")
+        )
+        conversations.append(item)
     selected_phone = (phone or "").strip()
 
     if not selected_phone and conversations:
@@ -1143,6 +1352,8 @@ def dashboard_whatsapp(
             messages=messages,
             test_status=(test_status or "").strip(),
             test_detail=(test_detail or "").strip(),
+            reply_status=(reply_status or "").strip(),
+            reply_detail=(reply_detail or "").strip(),
         ),
     )
 
@@ -1155,7 +1366,7 @@ def dashboard_whatsapp_test(
     workshop_id: str | None = Form(None),
 ):
     wid = _workshop_id_for_request(request, workshop_id)
-    phone = (test_phone or "").strip()
+    phone = _normalize_whatsapp_recipient(test_phone)
     text = (test_text or "").strip() or "WerkstattAI Testnachricht. WhatsApp Verbindung funktioniert."
 
     def redirect(status: str, detail: str) -> RedirectResponse:
@@ -1171,6 +1382,8 @@ def dashboard_whatsapp_test(
 
     if not phone:
         return redirect("failed", "Testnummer fehlt.")
+    if len(phone) < 8 or len(phone) > 15:
+        return redirect("failed", "Die Testnummer ist für WhatsApp ungültig.")
 
     workshop = get_workshop(wid)
     phone_number_id = str(workshop.get("whatsapp_phone_number_id") or "").strip()
@@ -1219,67 +1432,106 @@ def dashboard_whatsapp_reply(
     request: Request,
     customer_phone: str = Form(...),
     reply_text: str = Form(...),
+    ticket_id: str | None = Form(None),
     workshop_id: str | None = Form(None),
 ):
     wid = _workshop_id_for_request(request, workshop_id)
-    phone = (customer_phone or "").strip()
+    phone = _normalize_whatsapp_recipient(customer_phone)
     text = (reply_text or "").strip()
 
+    def redirect(status: str, detail: str) -> RedirectResponse:
+        query = urlencode(
+            {
+                "workshop_id": wid,
+                "phone": phone,
+                "reply_status": status,
+                "reply_detail": detail,
+            }
+        )
+        return RedirectResponse(url=f"/dashboard/whatsapp?{query}", status_code=303)
+
     if not phone:
-        return HTMLResponse("WhatsApp Kontakt fehlt", status_code=400)
+        return redirect("failed", "WhatsApp-Kontakt fehlt.")
+    if len(phone) < 8 or len(phone) > 15:
+        return redirect("failed", "Die Telefonnummer ist für WhatsApp ungültig.")
     if not text:
-        return HTMLResponse("Antwort darf nicht leer sein", status_code=400)
+        return redirect("failed", "Antwort darf nicht leer sein.")
+    if len(text) > 4096:
+        return redirect("failed", "Die WhatsApp-Nachricht darf höchstens 4096 Zeichen lang sein.")
 
     try:
+        normalized_ticket_id = ticket_id.strip() if isinstance(ticket_id, str) else ""
+        if normalized_ticket_id:
+            ticket = find_ticket_by_id(normalized_ticket_id, workshop_id=wid)
+            if ticket and _ticket_whatsapp_phone(
+                workshop_id=wid,
+                ticket_id=normalized_ticket_id,
+                ticket=ticket,
+            ) == phone:
+                sent, detail, _ = _send_ticket_customer_whatsapp(
+                    request=request,
+                    workshop_id=wid,
+                    ticket_id=normalized_ticket_id,
+                    ticket=ticket,
+                    text=text,
+                    source="dashboard_whatsapp_inbox",
+                )
+                return redirect("sent" if sent else "failed", detail)
+
         workshop = get_workshop(wid)
         phone_number_id = str(workshop.get("whatsapp_phone_number_id") or "").strip()
         access_token = str(settings.whatsapp_access_token or "").strip()
-        send_result = None
-        status = "sent_local"
-        wa_message_id = None
-        payload: dict[str, Any] = {
-            "source": "dashboard",
-            "local_only": True,
-            "user": (get_current_user(request) or {}).get("email"),
-        }
+        if not phone_number_id:
+            return redirect("failed", "Die WhatsApp Phone Number ID fehlt in den Einstellungen.")
+        if not access_token:
+            return redirect("failed", "Der WhatsApp Access Token fehlt auf dem Server.")
 
-        if access_token and phone_number_id:
-            send_result = send_whatsapp_text_message(
+        send_result = send_whatsapp_text_message(
+            phone_number_id=phone_number_id,
+            customer_phone=phone,
+            text=text,
+            access_token=access_token,
+            graph_api_version=settings.whatsapp_graph_api_version,
+        )
+        status = "sent" if send_result.ok else "failed"
+
+        try:
+            save_whatsapp_message(
+                workshop_id=wid,
                 phone_number_id=phone_number_id,
                 customer_phone=phone,
+                direction="outbound",
+                message_type="text",
                 text=text,
-                access_token=access_token,
-                graph_api_version=settings.whatsapp_graph_api_version,
+                wa_message_id=send_result.wa_message_id,
+                status=status,
+                payload={
+                    "source": "dashboard",
+                    "local_only": False,
+                    "user": (get_current_user(request) or {}).get("email"),
+                    "meta_status_code": send_result.status_code,
+                    "meta_response": send_result.payload,
+                    "meta_error": send_result.error,
+                },
             )
-            status = "sent" if send_result.ok else "failed"
-            wa_message_id = send_result.wa_message_id
-            payload = {
-                "source": "dashboard",
-                "local_only": False,
-                "user": (get_current_user(request) or {}).get("email"),
-                "meta_status_code": send_result.status_code,
-                "meta_response": send_result.payload,
-                "meta_error": send_result.error,
-            }
+        except Exception:
+            logger.exception(
+                "Could not persist inbox WhatsApp send result for workshop=%s",
+                wid,
+            )
+            if send_result.ok:
+                return redirect(
+                    "sent",
+                    "Die Nachricht wurde an Meta übergeben, konnte intern aber nicht protokolliert werden. Bitte nicht erneut senden.",
+                )
+            return redirect("failed", _meta_send_error(send_result))
 
-        save_whatsapp_message(
-            workshop_id=wid,
-            phone_number_id=phone_number_id or None,
-            customer_phone=phone,
-            direction="outbound",
-            message_type="text",
-            text=text,
-            wa_message_id=wa_message_id,
-            status=status,
-            payload=payload,
-        )
+        if not send_result.ok:
+            return redirect("failed", _meta_send_error(send_result))
     except Exception:
-        return HTMLResponse("Antwort konnte nicht gespeichert werden", status_code=400)
+        return redirect("failed", "Die Antwort konnte technisch nicht gesendet werden.")
 
-    return RedirectResponse(
-        url=f"/dashboard/whatsapp?workshop_id={wid}&phone={phone}",
-        status_code=303,
-    )
+    return redirect("sent", "WhatsApp-Nachricht wurde über Meta gesendet.")
 
 
 @router.post("/dashboard/settings")
@@ -1428,8 +1680,26 @@ def ticket_detail(
     t["request_type_label"] = _request_type_label(t.get("request_type"))
     t["source_label"] = _source_label(t.get("source"))
     t["kunde_name"] = _extract_name(t)
+    t["created_at_display"] = _format_datetime_for_display(t.get("created_at"))
+    t["updated_at_display"] = _format_datetime_for_display(t.get("updated_at"))
+    linked_whatsapp_phone = _linked_ticket_whatsapp_phone(
+        workshop_id=wid,
+        ticket_id=ticket_id,
+    )
+    t["has_whatsapp_conversation"] = bool(linked_whatsapp_phone)
+    t["whatsapp_phone"] = linked_whatsapp_phone or _normalize_whatsapp_recipient(
+        t.get("telefon")
+    )
 
-    notes = t.get("notes") if isinstance(t.get("notes"), list) else []
+    raw_notes = t.get("notes") if isinstance(t.get("notes"), list) else []
+    notes = []
+    for note in raw_notes:
+        if not isinstance(note, dict):
+            continue
+        item = dict(note)
+        item["created_at_display"] = _format_datetime_for_display(item.get("created_at"))
+        notes.append(item)
+    t["notes"] = notes
     t["internal_notes"] = [note for note in notes if _note_type(note) == "internal_note"]
     t["customer_messages"] = [note for note in notes if _note_type(note) == "customer_message"]
     t["customer_replies"] = [note for note in notes if _note_type(note) == "customer_reply"]
@@ -1460,6 +1730,7 @@ def ticket_detail(
             ticket=t,
             workshop_id=wid,
             workshop=workshop,
+            whatsapp_readiness=_whatsapp_readiness(request, workshop),
             reply_status=(reply_status or "").strip(),
             reply_detail=(reply_detail or "").strip(),
         ),
@@ -1500,6 +1771,54 @@ def ticket_set_status_quick(
     return RedirectResponse(url=f"/dashboard?workshop_id={wid}", status_code=303)
 
 
+@router.post("/dashboard/ticket/{ticket_id}/customer-message")
+def ticket_send_customer_message(
+    request: Request,
+    ticket_id: str,
+    message_text: str = Form(...),
+    workshop_id: str | None = Form(None),
+):
+    wid = _workshop_id_for_request(request, workshop_id)
+    text = (message_text or "").strip()
+
+    def redirect(status: str, detail: str) -> RedirectResponse:
+        query = urlencode(
+            {
+                "workshop_id": wid,
+                "message_status": status,
+                "message_detail": detail,
+                "message_ticket": ticket_id,
+            }
+        )
+        return RedirectResponse(
+            url=f"/dashboard?{query}",
+            status_code=303,
+        )
+
+    if not text:
+        return redirect("failed", "Die Nachricht darf nicht leer sein.")
+    if len(text) > 4096:
+        return redirect("failed", "Die WhatsApp-Nachricht darf höchstens 4096 Zeichen lang sein.")
+
+    ticket = find_ticket_by_id(ticket_id, workshop_id=wid)
+    if not ticket:
+        return redirect("failed", "Ticket wurde nicht gefunden.")
+
+    try:
+        sent, detail, _ = _send_ticket_customer_whatsapp(
+            request=request,
+            workshop_id=wid,
+            ticket_id=ticket_id,
+            ticket=ticket,
+            text=text,
+            source="dashboard_active_tickets",
+        )
+    except Exception:
+        return redirect("failed", "Die Nachricht konnte technisch nicht gesendet werden.")
+
+    return redirect("sent" if sent else "failed", detail)
+
+
 @router.post("/dashboard/ticket/{ticket_id}/notes")
 def ticket_add_note(
     request: Request,
@@ -1535,83 +1854,40 @@ def ticket_add_note(
             ticket = find_ticket_by_id(ticket_id, workshop_id=wid)
             if not ticket:
                 return HTMLResponse("Ticket nicht gefunden", status_code=404)
-
-            if str(ticket.get("source") or "").strip().lower() == "whatsapp":
-                linked_messages = list_whatsapp_messages(
+            has_linked_whatsapp = bool(
+                _linked_ticket_whatsapp_phone(workshop_id=wid, ticket_id=ticket_id)
+            )
+            is_whatsapp_ticket = (
+                str(ticket.get("source") or "").strip().lower() == "whatsapp"
+            )
+            if has_linked_whatsapp or is_whatsapp_ticket:
+                sent, detail, _ = _send_ticket_customer_whatsapp(
+                    request=request,
                     workshop_id=wid,
                     ticket_id=ticket_id,
-                    limit=250,
-                )
-                customer_phone = next(
-                    (
-                        str(message.get("customer_phone") or "").strip()
-                        for message in reversed(linked_messages)
-                        if str(message.get("customer_phone") or "").strip()
-                    ),
-                    "",
-                )
-                workshop = get_workshop(wid)
-                phone_number_id = str(workshop.get("whatsapp_phone_number_id") or "").strip()
-                access_token = str(settings.whatsapp_access_token or "").strip()
-
-                if not customer_phone:
-                    return redirect_reply(
-                        "failed",
-                        "Für dieses Ticket wurde kein WhatsApp-Kontakt gefunden.",
-                    )
-                if not phone_number_id or not access_token:
-                    return redirect_reply(
-                        "failed",
-                        "Die WhatsApp-Verbindung der Werkstatt ist nicht vollständig konfiguriert.",
-                    )
-
-                send_result = send_whatsapp_text_message(
-                    phone_number_id=phone_number_id,
-                    customer_phone=customer_phone,
+                    ticket=ticket,
                     text=text,
-                    access_token=access_token,
-                    graph_api_version=settings.whatsapp_graph_api_version,
                 )
-                send_status = "sent" if send_result.ok else "failed"
-                save_whatsapp_message(
-                    workshop_id=wid,
-                    phone_number_id=phone_number_id,
-                    customer_phone=customer_phone,
-                    direction="outbound",
-                    message_type="text",
-                    text=text,
-                    wa_message_id=send_result.wa_message_id,
-                    ticket_id=ticket_id,
-                    status=send_status,
-                    payload={
-                        "source": "dashboard_ticket",
-                        "local_only": False,
-                        "user": (get_current_user(request) or {}).get("email"),
-                        "meta_status_code": send_result.status_code,
-                        "meta_response": send_result.payload,
-                        "meta_error": send_result.error,
-                    },
-                )
+                return redirect_reply("sent" if sent else "failed", detail)
 
-                if not send_result.ok:
-                    return redirect_reply(
-                        "failed",
-                        send_result.error or "Meta hat die WhatsApp-Nachricht abgelehnt.",
-                    )
+            add_ticket_note(
+                ticket_id,
+                text,
+                note_type="customer_reply",
+                workshop_id=wid,
+            )
+            detail = (
+                "Antwort wurde für den Web-Chat gespeichert."
+                if str(ticket.get("source") or "").strip().lower() == "web_chat"
+                else "Antwort wurde im Ticket gespeichert."
+            )
+            return redirect_reply("saved", detail)
 
-        add_ticket_note(ticket_id, text, note_type=note_type, workshop_id=wid)
+        add_ticket_note(ticket_id, text, note_type="internal_note", workshop_id=wid)
     except KeyError:
         return HTMLResponse("Ticket nicht gefunden", status_code=404)
     except Exception:
         return HTMLResponse("Notiz konnte nicht gespeichert werden", status_code=400)
-
-    if note_type == "customer_reply":
-        detail = (
-            "WhatsApp-Nachricht wurde an den Kunden gesendet."
-            if str((ticket or {}).get("source") or "").strip().lower() == "whatsapp"
-            else "Antwort wurde im Ticket gespeichert."
-        )
-        return redirect_reply("sent", detail)
 
     return RedirectResponse(url=f"/dashboard/ticket/{ticket_id}?workshop_id={wid}", status_code=303)
 

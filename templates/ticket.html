@@ -1622,6 +1622,26 @@
       color:#a3312e;
     }
 
+    .delivery-info{
+      display:flex;
+      align-items:flex-start;
+      gap:9px;
+      margin:0 0 12px;
+      padding:10px 11px;
+      border:1px solid #c7ddd7;
+      border-radius:9px;
+      background:#f0f7f5;
+      color:#3e5f57;
+      font-size:12px;
+      line-height:1.45;
+    }
+
+    .delivery-info.warning{border-color:#e7d5ae;background:#fff9ed;color:#795c24}
+    .delivery-dot{flex:0 0 auto;width:8px;height:8px;margin-top:5px;border-radius:50%;background:#2e8a69}
+    .delivery-info.warning .delivery-dot{background:#c9892e}
+    .delivery-info a{color:inherit;font-weight:750}
+    .note-submit button:disabled{border-color:#d6dfdc;background:#e8eeec;color:#83908c;cursor:not-allowed}
+
     .toast{
       border-color:#31534a;
       background:#18332c;
@@ -1870,8 +1890,8 @@
       <div class="card">
         <h3 class="section-title">Zeit</h3>
         <div class="kv">
-          <b>Erstellt</b><div class="muted">{{ ticket.created_at or "-" }}</div>
-          <b>Aktualisiert</b><div class="muted">{{ ticket.updated_at or "-" }}</div>
+          <b>Erstellt</b><div class="muted">{{ ticket.created_at_display or "-" }}</div>
+          <b>Aktualisiert</b><div class="muted">{{ ticket.updated_at_display or "-" }}</div>
         </div>
       </div>
     </div>
@@ -1961,7 +1981,7 @@
                   <div class="note-card internal-note">
                     <div class="note-label">Interne Notiz</div>
                     <div class="note-text">{{ note.text }}</div>
-                    <div class="note-date">{{ note.created_at }}</div>
+                    <div class="note-date">{{ note.created_at_display }}</div>
                   </div>
                 {% endfor %}
               </div>
@@ -1971,7 +1991,13 @@
           </div>
 
           <div class="communication-panel">
-            <h3 class="section-title">Antwort an den Kunden</h3>
+            <h3 class="section-title">
+              {% if ticket.has_whatsapp_conversation or ticket.source == "whatsapp" %}
+                WhatsApp an den Kunden
+              {% else %}
+                Antwort an den Kunden
+              {% endif %}
+            </h3>
             <div style="margin-bottom:10px;">
               <span class="channel-badge {{ ticket.source or 'web_chat' }}">
                 {% if ticket.source == "whatsapp" %}
@@ -1981,8 +2007,28 @@
                 {% else %}
                   <span class="channel-icon">D</span>
                 {% endif %}
-                Kanal: {{ ticket.source_label or "-" }}
+                Ticket-Herkunft: {{ ticket.source_label or "-" }}
               </span>
+            </div>
+
+            <div class="delivery-info {% if (ticket.has_whatsapp_conversation or ticket.source == 'whatsapp') and (not whatsapp_readiness.can_send or not ticket.whatsapp_phone) %}warning{% endif %}">
+              <span class="delivery-dot" aria-hidden="true"></span>
+              <div>
+                {% if ticket.has_whatsapp_conversation or ticket.source == "whatsapp" %}
+                  {% if not ticket.whatsapp_phone %}
+                    Für diese WhatsApp-Unterhaltung wurde kein Empfänger gefunden.
+                  {% elif not whatsapp_readiness.can_send %}
+                    Automatischer Versand ist noch nicht eingerichtet. Access Token oder Phone Number ID fehlt.
+                    <a href="/dashboard/settings?workshop_id={{ workshop_id }}">Einstellungen öffnen</a>
+                  {% else %}
+                    Die Nachricht wird über Meta an {{ ticket.whatsapp_phone }} gesendet und nur bei erfolgreicher Übergabe als Kundenantwort gespeichert.
+                  {% endif %}
+                {% elif ticket.source == "web_chat" %}
+                  Diese Antwort wird für den Web-Chat gespeichert und dem Kunden bei seiner nächsten Ticket-Abfrage angezeigt.
+                {% else %}
+                  Diese Antwort wird zur Dokumentation im Ticket gespeichert. Für einen direkten WhatsApp-Kontakt nutze „Kunde schreiben“ in der Übersicht Aktive Tickets.
+                {% endif %}
+              </div>
             </div>
 
             <form class="note-form" method="post" action="/dashboard/ticket/{{ ticket.ticket_view_id }}/notes">
@@ -1992,12 +2038,22 @@
                 <textarea
                   name="note_text"
                   placeholder="Antwort an den Kunden formulieren..."
+                  maxlength="4096"
                   required
                 ></textarea>
 
                 <div class="note-submit">
-                  <button type="submit">
-                    {% if ticket.source == "whatsapp" %}Über WhatsApp senden{% else %}Antwort speichern{% endif %}
+                  <button
+                    type="submit"
+                    {% if (ticket.has_whatsapp_conversation or ticket.source == 'whatsapp') and (not whatsapp_readiness.can_send or not ticket.whatsapp_phone) %}disabled{% endif %}
+                  >
+                    {% if ticket.has_whatsapp_conversation or ticket.source == "whatsapp" %}
+                      Über WhatsApp senden
+                    {% elif ticket.source == "web_chat" %}
+                      Für Web-Chat speichern
+                    {% else %}
+                      Im Ticket speichern
+                    {% endif %}
                   </button>
                 </div>
               </div>
@@ -2009,7 +2065,7 @@
                   <div class="note-card customer-reply">
                     <div class="note-label">Antwort an den Kunden</div>
                     <div class="note-text">{{ note.text }}</div>
-                    <div class="note-date">{{ note.created_at }}</div>
+                    <div class="note-date">{{ note.created_at_display }}</div>
                   </div>
                 {% endfor %}
               </div>
@@ -2039,7 +2095,7 @@
                   <div class="note-card customer-question">
                     <div class="note-label">Nachricht vom Kunden</div>
                     <div class="note-text">{{ note.text }}</div>
-                    <div class="note-date">{{ note.created_at }}</div>
+                    <div class="note-date">{{ note.created_at_display }}</div>
                   </div>
                 {% endfor %}
               </div>
@@ -2089,7 +2145,7 @@
                 </div>
 
                 <div class="note-date">
-                  {{ note.created_at }}
+                  {{ note.created_at_display }}
                 </div>
               </div>
             {% endfor %}

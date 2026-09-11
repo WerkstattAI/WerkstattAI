@@ -18,6 +18,9 @@ def _data_dir() -> str:
 
 
 def _db_path() -> str:
+    override = str(os.getenv("WERKSTATTAI_SQLITE_PATH") or "").strip()
+    if override:
+        return os.path.abspath(override)
     return os.path.join(_data_dir(), "werkstattai.db")
 
 
@@ -62,7 +65,7 @@ def get_conn() -> sqlite3.Connection | PostgresConnection:
     if settings.database_url:
         return PostgresConnection(settings.database_url)
 
-    os.makedirs(_data_dir(), exist_ok=True)
+    os.makedirs(os.path.dirname(_db_path()), exist_ok=True)
 
     conn = sqlite3.connect(_db_path())
     conn.row_factory = sqlite3.Row
@@ -102,7 +105,7 @@ def _add_column_if_missing(
 
 def init_db() -> None:
     if not is_postgres():
-        os.makedirs(_data_dir(), exist_ok=True)
+        os.makedirs(os.path.dirname(_db_path()), exist_ok=True)
 
     ticket_pk = "BIGSERIAL PRIMARY KEY" if is_postgres() else "INTEGER PRIMARY KEY AUTOINCREMENT"
 

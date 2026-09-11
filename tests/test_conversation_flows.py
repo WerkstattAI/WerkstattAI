@@ -3,8 +3,17 @@ from __future__ import annotations
 import unittest
 import asyncio
 import json
+import os
+import tempfile
 from datetime import datetime, timedelta, timezone
 from unittest.mock import patch
+
+_TEST_DATABASE_DIRECTORY = tempfile.TemporaryDirectory(prefix="werkstattai-tests-")
+os.environ["DATABASE_URL"] = ""
+os.environ["WERKSTATTAI_SQLITE_PATH"] = os.path.join(
+    _TEST_DATABASE_DIRECTORY.name,
+    "werkstattai-test.db",
+)
 
 from fastapi import HTTPException
 from fastapi.responses import RedirectResponse
@@ -80,6 +89,7 @@ from app.web import (
     dashboard_settings_save,
     home_page,
     ticket_add_note,
+    ticket_send_customer_message,
     dashboard_whatsapp_reply,
     dashboard_whatsapp_test,
     _whatsapp_readiness,
@@ -1003,10 +1013,14 @@ class WhatsAppWebhookTests(unittest.TestCase):
         finally:
             object.__setattr__(settings, "whatsapp_webhook_public_url", old_public_url)
 
-    def test_dashboard_whatsapp_reply_is_saved_as_local_outbound_message(self) -> None:
+    def test_dashboard_whatsapp_reply_requires_meta_configuration(self) -> None:
         init_db()
 
         with get_conn() as conn:
+            conn.execute(
+                "UPDATE workshops SET whatsapp_phone_number_id = NULL WHERE id = ?",
+                ("demo-werkstatt",),
+            )
             conn.execute(
                 """
                 DELETE FROM whatsapp_messages
@@ -1016,23 +1030,27 @@ class WhatsAppWebhookTests(unittest.TestCase):
             )
             conn.commit()
 
-        response = dashboard_whatsapp_reply(
-            _dashboard_request(),
-            customer_phone="4917622222222",
-            reply_text="Wir melden uns gleich mit einer Einschaetzung.",
-            workshop_id="ignored-by-authenticated-user",
-        )
+        old_token = settings.whatsapp_access_token
+        object.__setattr__(settings, "whatsapp_access_token", "")
+        try:
+            with patch("app.web.send_whatsapp_text_message") as send_mock:
+                response = dashboard_whatsapp_reply(
+                    _dashboard_request(),
+                    customer_phone="4917622222222",
+                    reply_text="Wir melden uns gleich mit einer Einschaetzung.",
+                    workshop_id="ignored-by-authenticated-user",
+                )
 
-        self.assertEqual(response.status_code, 303)
-        messages = list_whatsapp_messages(
-            workshop_id="demo-werkstatt",
-            customer_phone="4917622222222",
-        )
-
-        self.assertEqual(len(messages), 1)
-        self.assertEqual(messages[0]["direction"], "outbound")
-        self.assertEqual(messages[0]["status"], "sent_local")
-        self.assertEqual(messages[0]["text"], "Wir melden uns gleich mit einer Einschaetzung.")
+            self.assertEqual(response.status_code, 303)
+            self.assertIn("reply_status=failed", response.headers["location"])
+            send_mock.assert_not_called()
+            messages = list_whatsapp_messages(
+                workshop_id="demo-werkstatt",
+                customer_phone="4917622222222",
+            )
+            self.assertEqual(messages, [])
+        finally:
+            object.__setattr__(settings, "whatsapp_access_token", old_token)
 
     def test_dashboard_whatsapp_reply_sends_with_meta_when_configured(self) -> None:
         init_db()
@@ -1089,6 +1107,227 @@ class WhatsAppWebhookTests(unittest.TestCase):
             self.assertEqual(messages[0]["wa_message_id"], "wamid.outbound-1")
         finally:
             object.__setattr__(settings, "whatsapp_access_token", old_token)
+
+    def test_dashboard_whatsapp_reply_links_successful_reply_to_ticket(self) -> None:
+        init_db()
+        ticket_id = "WS-TEST-INBOX-LINKED-REPLY"
+        customer_phone = "4917688888888"
+
+        with get_conn() as conn:
+            conn.execute("DELETE FROM whatsapp_messages WHERE ticket_id = ?", (ticket_id,))
+            conn.execute("DELETE FROM tickets WHERE ticket_id = ?", (ticket_id,))
+            conn.execute(
+                "UPDATE workshops SET whatsapp_phone_number_id = ? WHERE id = ?",
+                ("wa-phone-inbox-linked", "demo-werkstatt"),
+            )
+            conn.commit()
+
+        save_ticket(
+            IntakeState(
+                ticket_id=ticket_id,
+                workshop_id="demo-werkstatt",
+                source="whatsapp",
+                step="fertig",
+                mode="new",
+                fahrzeug="Audi A4",
+                problem="Rückfrage beantworten",
+            ),
+            workshop_id="demo-werkstatt",
+        )
+        save_whatsapp_message(
+            workshop_id="demo-werkstatt",
+            phone_number_id="wa-phone-inbox-linked",
+            customer_phone=customer_phone,
+            direction="inbound",
+            text="Wann ist das Auto fertig?",
+            ticket_id=ticket_id,
+        )
+
+        old_token = settings.whatsapp_access_token
+        object.__setattr__(settings, "whatsapp_access_token", "test-access-token")
+        try:
+            with patch("app.web.send_whatsapp_text_message") as send_mock:
+                send_mock.return_value = WhatsAppSendResult(
+                    ok=True,
+                    status_code=200,
+                    wa_message_id="wamid.inbox-linked-reply",
+                    payload={"messages": [{"id": "wamid.inbox-linked-reply"}]},
+                )
+                response = dashboard_whatsapp_reply(
+                    _dashboard_request(),
+                    customer_phone=customer_phone,
+                    reply_text="Heute um 16 Uhr.",
+                    ticket_id=ticket_id,
+                    workshop_id=None,
+                )
+
+            self.assertEqual(response.status_code, 303)
+            self.assertIn("reply_status=sent", response.headers["location"])
+            ticket = find_ticket_by_id(ticket_id, workshop_id="demo-werkstatt")
+            replies = [note for note in ticket["notes"] if note["type"] == "customer_reply"]
+            self.assertEqual([note["text"] for note in replies], ["Heute um 16 Uhr."])
+            messages = list_whatsapp_messages(
+                workshop_id="demo-werkstatt",
+                ticket_id=ticket_id,
+            )
+            self.assertTrue(
+                any(message["wa_message_id"] == "wamid.inbox-linked-reply" for message in messages)
+            )
+        finally:
+            object.__setattr__(settings, "whatsapp_access_token", old_token)
+            with get_conn() as conn:
+                conn.execute("DELETE FROM whatsapp_messages WHERE ticket_id = ?", (ticket_id,))
+                conn.execute("DELETE FROM tickets WHERE ticket_id = ?", (ticket_id,))
+                conn.commit()
+
+    def test_active_ticket_message_sends_web_chat_ticket_phone_via_meta(self) -> None:
+        init_db()
+        ticket_id = "WS-TEST-ACTIVE-TICKET-MESSAGE"
+
+        with get_conn() as conn:
+            conn.execute("DELETE FROM whatsapp_messages WHERE ticket_id = ?", (ticket_id,))
+            conn.execute("DELETE FROM tickets WHERE ticket_id = ?", (ticket_id,))
+            conn.execute(
+                "UPDATE workshops SET whatsapp_phone_number_id = ? WHERE id = ?",
+                ("wa-phone-active-ticket", "demo-werkstatt"),
+            )
+            conn.commit()
+
+        save_ticket(
+            IntakeState(
+                ticket_id=ticket_id,
+                workshop_id="demo-werkstatt",
+                source="web_chat",
+                step="fertig",
+                mode="new",
+                fahrzeug="Mercedes C220",
+                problem="Kostenvoranschlag erbeten",
+                telefon="0151 17031175",
+            ),
+            workshop_id="demo-werkstatt",
+        )
+
+        old_token = settings.whatsapp_access_token
+        object.__setattr__(settings, "whatsapp_access_token", "test-access-token")
+        try:
+            with patch("app.web.send_whatsapp_text_message") as send_mock:
+                send_mock.return_value = WhatsAppSendResult(
+                    ok=True,
+                    status_code=200,
+                    wa_message_id="wamid.active-ticket-message",
+                    payload={"messages": [{"id": "wamid.active-ticket-message"}]},
+                )
+
+                response = ticket_send_customer_message(
+                    _dashboard_request(),
+                    ticket_id=ticket_id,
+                    message_text="Ihr Kostenvoranschlag ist vorbereitet.",
+                    workshop_id="ignored-by-authenticated-user",
+                )
+
+            self.assertEqual(response.status_code, 303)
+            self.assertIn("message_status=sent", response.headers["location"])
+            self.assertEqual(send_mock.call_args.kwargs["customer_phone"], "4915117031175")
+
+            ticket = find_ticket_by_id(ticket_id, workshop_id="demo-werkstatt")
+            replies = [note for note in ticket["notes"] if note["type"] == "customer_reply"]
+            self.assertEqual([note["text"] for note in replies], ["Ihr Kostenvoranschlag ist vorbereitet."])
+        finally:
+            object.__setattr__(settings, "whatsapp_access_token", old_token)
+            with get_conn() as conn:
+                conn.execute("DELETE FROM whatsapp_messages WHERE ticket_id = ?", (ticket_id,))
+                conn.execute("DELETE FROM tickets WHERE ticket_id = ?", (ticket_id,))
+                conn.commit()
+
+    def test_active_ticket_message_reports_missing_configuration_without_local_reply(self) -> None:
+        init_db()
+        ticket_id = "WS-TEST-ACTIVE-TICKET-NOT-CONFIGURED"
+
+        with get_conn() as conn:
+            conn.execute("DELETE FROM tickets WHERE ticket_id = ?", (ticket_id,))
+            conn.execute(
+                "UPDATE workshops SET whatsapp_phone_number_id = NULL WHERE id = ?",
+                ("demo-werkstatt",),
+            )
+            conn.commit()
+
+        save_ticket(
+            IntakeState(
+                ticket_id=ticket_id,
+                workshop_id="demo-werkstatt",
+                source="direktannahme",
+                step="fertig",
+                mode="new",
+                fahrzeug="VW Golf",
+                problem="Inspektion",
+                telefon="+49 176 12345678",
+            ),
+            workshop_id="demo-werkstatt",
+        )
+
+        old_token = settings.whatsapp_access_token
+        object.__setattr__(settings, "whatsapp_access_token", "")
+        try:
+            with patch("app.web.send_whatsapp_text_message") as send_mock:
+                response = ticket_send_customer_message(
+                    _dashboard_request(),
+                    ticket_id=ticket_id,
+                    message_text="Ihr Fahrzeug ist fertig.",
+                    workshop_id=None,
+                )
+
+            self.assertEqual(response.status_code, 303)
+            self.assertIn("message_status=failed", response.headers["location"])
+            send_mock.assert_not_called()
+            ticket = find_ticket_by_id(ticket_id, workshop_id="demo-werkstatt")
+            replies = [note for note in ticket["notes"] if note["type"] == "customer_reply"]
+            self.assertEqual(replies, [])
+        finally:
+            object.__setattr__(settings, "whatsapp_access_token", old_token)
+            with get_conn() as conn:
+                conn.execute("DELETE FROM tickets WHERE ticket_id = ?", (ticket_id,))
+                conn.commit()
+
+    def test_active_ticket_message_cannot_send_another_workshops_ticket(self) -> None:
+        init_db()
+        ticket_id = "WS-TEST-FOREIGN-TICKET-MESSAGE"
+
+        with get_conn() as conn:
+            conn.execute("DELETE FROM tickets WHERE ticket_id = ?", (ticket_id,))
+            conn.commit()
+
+        save_ticket(
+            IntakeState(
+                ticket_id=ticket_id,
+                workshop_id="tenant-b",
+                source="web_chat",
+                step="fertig",
+                mode="new",
+                fahrzeug="Fremdes Fahrzeug",
+                problem="Darf nicht versendet werden",
+                telefon="0151 99999999",
+            ),
+            workshop_id="tenant-b",
+        )
+
+        with patch("app.web.send_whatsapp_text_message") as send_mock:
+            response = ticket_send_customer_message(
+                _dashboard_request(workshop_id="demo-werkstatt"),
+                ticket_id=ticket_id,
+                message_text="Nicht senden",
+                workshop_id="tenant-b",
+            )
+
+        self.assertEqual(response.status_code, 303)
+        self.assertIn("message_status=failed", response.headers["location"])
+        send_mock.assert_not_called()
+        foreign_ticket = find_ticket_by_id(ticket_id, workshop_id="tenant-b")
+        replies = [note for note in foreign_ticket["notes"] if note["type"] == "customer_reply"]
+        self.assertEqual(replies, [])
+
+        with get_conn() as conn:
+            conn.execute("DELETE FROM tickets WHERE ticket_id = ?", (ticket_id,))
+            conn.commit()
 
     def test_ticket_customer_reply_sends_via_linked_whatsapp_conversation(self) -> None:
         init_db()
@@ -1171,6 +1410,48 @@ class WhatsAppWebhookTests(unittest.TestCase):
                 conn.execute("DELETE FROM whatsapp_messages WHERE ticket_id = ?", (ticket_id,))
                 conn.execute("DELETE FROM tickets WHERE ticket_id = ?", (ticket_id,))
                 conn.commit()
+
+    def test_web_chat_ticket_reply_remains_available_without_whatsapp(self) -> None:
+        init_db()
+        ticket_id = "WS-TEST-WEB-CHAT-LOCAL-REPLY"
+
+        with get_conn() as conn:
+            conn.execute("DELETE FROM whatsapp_messages WHERE ticket_id = ?", (ticket_id,))
+            conn.execute("DELETE FROM tickets WHERE ticket_id = ?", (ticket_id,))
+            conn.commit()
+
+        save_ticket(
+            IntakeState(
+                ticket_id=ticket_id,
+                workshop_id="demo-werkstatt",
+                source="web_chat",
+                step="fertig",
+                mode="new",
+                fahrzeug="Opel Astra",
+                problem="Kundenfrage im Web-Chat",
+            ),
+            workshop_id="demo-werkstatt",
+        )
+
+        with patch("app.web.send_whatsapp_text_message") as send_mock:
+            response = ticket_add_note(
+                _dashboard_request(),
+                ticket_id=ticket_id,
+                note_text="Antwort für die nächste Ticket-Abfrage.",
+                note_type="customer_reply",
+                workshop_id=None,
+            )
+
+        self.assertEqual(response.status_code, 303)
+        self.assertIn("reply_status=saved", response.headers["location"])
+        send_mock.assert_not_called()
+        ticket = find_ticket_by_id(ticket_id, workshop_id="demo-werkstatt")
+        replies = [note for note in ticket["notes"] if note["type"] == "customer_reply"]
+        self.assertEqual([note["text"] for note in replies], ["Antwort für die nächste Ticket-Abfrage."])
+
+        with get_conn() as conn:
+            conn.execute("DELETE FROM tickets WHERE ticket_id = ?", (ticket_id,))
+            conn.commit()
 
     def test_failed_ticket_whatsapp_reply_is_not_recorded_as_customer_reply(self) -> None:
         init_db()
