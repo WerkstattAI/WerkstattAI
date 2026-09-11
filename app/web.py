@@ -96,6 +96,19 @@ def _parse_iso(dt: str | None) -> datetime:
         return datetime.min.replace(tzinfo=timezone.utc)
 
 
+def _format_datetime_for_display(value: Any) -> str:
+    text = str(value or "").strip()
+    if not text:
+        return "-"
+
+    try:
+        parsed = datetime.fromisoformat(text.replace("Z", "+00:00"))
+    except (TypeError, ValueError):
+        return text
+
+    return parsed.strftime("%d.%m.%Y · %H:%M")
+
+
 def _ticket_id(t: dict) -> str:
     return str(
         t.get("_id")
@@ -443,6 +456,8 @@ def _prepare_tickets(limit: int, workshop_id: str | None = None) -> list[dict]:
         t["source_label"] = _source_label(t.get("source"))
         t["created_dt"] = _parse_iso(t.get("created_at"))
         t["updated_dt"] = _parse_iso(t.get("updated_at"))
+        t["created_at_display"] = _format_datetime_for_display(t.get("created_at"))
+        t["updated_at_display"] = _format_datetime_for_display(t.get("updated_at"))
         t["is_new"] = (t.get("created_at") == t.get("updated_at"))
         t["kunde_name"] = _extract_name(t)
 
@@ -472,6 +487,9 @@ def _prepare_tickets(limit: int, workshop_id: str | None = None) -> list[dict]:
             if latest_customer_question
             else ""
         )
+        t["latest_customer_question_created_at_display"] = _format_datetime_for_display(
+            t["latest_customer_question_created_at"]
+        )
 
         t["last_note_text"] = (
             str(last_note.get("text", "")).strip()
@@ -482,6 +500,9 @@ def _prepare_tickets(limit: int, workshop_id: str | None = None) -> list[dict]:
             str(last_note.get("created_at", "")).strip()
             if isinstance(last_note, dict)
             else ""
+        )
+        t["last_note_created_at_display"] = _format_datetime_for_display(
+            t["last_note_created_at"]
         )
 
         if t["has_customer_question"] and not t["customer_question_open"]:

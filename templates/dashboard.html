@@ -1982,9 +1982,17 @@
     .table-title{color:#1b2925;font-size:16px;font-weight:720}
     .table-sub{margin-top:4px;font-size:13px;line-height:1.45}
     .table-sub,.muted{color:var(--muted)}
-    table.ticket-table{border-spacing:0 5px;background:#ffffff}
+    table.ticket-table{min-width:1240px;border-spacing:0 5px;background:#ffffff;table-layout:fixed}
+    .ticket-table th:nth-child(1){width:142px}
+    .ticket-table th:nth-child(2){width:138px}
+    .ticket-table th:nth-child(3){width:190px}
+    .ticket-table th:nth-child(4){width:auto}
+    .ticket-table th:nth-child(5){width:132px}
+    .ticket-table th:nth-child(6){width:148px}
+    .ticket-table th:nth-child(7){width:250px}
     .ticket-table th{color:#687671;font-size:12px;font-weight:700;letter-spacing:.055em}
     .ticket-table td{font-size:13px}
+    .cell-label{display:none}
     .ticket-table tbody td{border-top-color:#e8edeb;border-bottom-color:#e8edeb;background:#f9fbfa}
     .ticket-table tbody tr:hover td{background:#f0f7f5}
     tbody tr.row-high td:first-child{box-shadow:inset 4px 0 0 #c44743}
@@ -2098,6 +2106,130 @@
 
     @media (max-width:430px){
       .cards{grid-template-columns:1fr}
+    }
+
+    @media (max-width:1540px){
+      .table-shell{overflow:visible}
+      .table-wrap{overflow:visible;padding:12px}
+
+      table.ticket-table{
+        display:block;
+        width:100%;
+        min-width:0;
+        padding:0;
+        border-spacing:0;
+        background:transparent;
+        table-layout:auto;
+      }
+
+      .ticket-table thead{display:none}
+      .ticket-table tbody{display:grid;gap:12px}
+
+      .ticket-table tbody tr{
+        display:grid;
+        grid-template-columns:minmax(135px,.72fr) minmax(165px,.9fr) minmax(240px,1.45fr);
+        grid-template-areas:
+          "status type vehicle"
+          "problem problem problem"
+          "contact date actions";
+        overflow:hidden;
+        border:1px solid var(--line);
+        border-left-width:4px;
+        border-radius:12px;
+        background:#ffffff;
+        box-shadow:0 4px 14px rgba(28,52,45,.055);
+      }
+
+      .ticket-table tbody tr:hover{
+        border-color:#b8cec8;
+        box-shadow:0 9px 22px rgba(28,52,45,.09);
+      }
+
+      .ticket-table tbody tr.row-customer-question{border-left-color:#397f78}
+      .ticket-table tbody tr.row-notfall{border-left-color:#d08a2d}
+      .ticket-table tbody tr.row-high{border-left-color:#c44743}
+
+      .ticket-table tbody td,
+      .ticket-table tbody tr:hover td{
+        min-width:0;
+        padding:14px 15px;
+        border:0;
+        border-radius:0;
+        background:transparent;
+        box-shadow:none;
+      }
+
+      .ticket-table tbody td:nth-child(1){grid-area:status}
+      .ticket-table tbody td:nth-child(2){grid-area:type}
+      .ticket-table tbody td:nth-child(3){grid-area:vehicle}
+      .ticket-table tbody td:nth-child(4){
+        grid-area:problem;
+        border-top:1px solid #e8edeb;
+        border-bottom:1px solid #e8edeb;
+        background:#fbfcfc;
+      }
+      .ticket-table tbody td:nth-child(5){grid-area:contact}
+      .ticket-table tbody td:nth-child(6){grid-area:date}
+      .ticket-table tbody td:nth-child(7){grid-area:actions}
+
+      .cell-label{
+        display:block;
+        margin-bottom:8px;
+        color:#687671;
+        font-size:11px;
+        font-weight:700;
+        letter-spacing:.055em;
+        line-height:1.3;
+        text-transform:uppercase;
+      }
+
+      .ticket-table .right{text-align:left}
+      .ticket-table .actions,
+      .ticket-table .quick{justify-content:flex-start}
+      .ticket-table .date-cell{white-space:normal}
+    }
+
+    @media (max-width:760px){
+      .ticket-table tbody tr{
+        grid-template-columns:minmax(0,1fr) minmax(0,1fr);
+        grid-template-areas:
+          "status type"
+          "vehicle vehicle"
+          "problem problem"
+          "contact date"
+          "actions actions";
+      }
+
+      .ticket-table tbody td:nth-child(3),
+      .ticket-table tbody td:nth-child(5),
+      .ticket-table tbody td:nth-child(6),
+      .ticket-table tbody td:nth-child(7){border-top:1px solid #e8edeb}
+    }
+
+    @media (max-width:520px){
+      .table-wrap{padding:8px}
+      .ticket-table tbody tr{
+        grid-template-columns:1fr;
+        grid-template-areas:
+          "status"
+          "type"
+          "vehicle"
+          "problem"
+          "contact"
+          "date"
+          "actions";
+      }
+
+      .ticket-table tbody td + td{border-top:1px solid #e8edeb}
+      .ticket-table .actions{align-items:stretch;flex-direction:column}
+      .ticket-table .open,
+      .ticket-table .details-btn,
+      .ticket-table .archive-form,
+      .ticket-table .archive-btn,
+      .ticket-table .quick{width:100%}
+      .ticket-table .quick{display:grid;grid-template-columns:1fr}
+      .ticket-table .quick select,
+      .ticket-table .quick button{width:100%}
     }
   </style>
 </head>
@@ -2316,7 +2448,7 @@
             <thead class="ticket-table-head">
               <tr>
                 <th>Status</th>
-                <th>Typ</th>
+                <th>Priorität / Typ</th>
                 <th>Fahrzeug / Kunde</th>
                 <th>Anliegen</th>
                 <th>Kontakt</th>
@@ -2334,6 +2466,7 @@
                 "
               >
                 <td>
+                  <span class="cell-label">Status</span>
                   <span class="status s-{{ t.status_ui }}">
                     <span class="dot"></span>
                     {{ t.status_label or "-" }}
@@ -2360,6 +2493,7 @@
                 </td>
 
                 <td>
+                  <span class="cell-label">Priorität / Typ</span>
                   <span class="priority p-{{ t.priority or 'normal' }}">
                     {{ t.priority_label or "Normal" }}
                   </span>
@@ -2372,6 +2506,7 @@
                 </td>
 
                 <td>
+                  <span class="cell-label">Fahrzeug / Kunde</span>
                   <div class="vehicle">
                     <div class="title">{{ t.fahrzeug or "-" }}</div>
                     <div class="muted">Kunde: {{ t.kunde_name or "-" }}</div>
@@ -2380,6 +2515,7 @@
                 </td>
 
                 <td class="problem">
+                  <span class="cell-label">Anliegen</span>
                   <div class="problem-text">{{ t.problem or "-" }}</div>
 
                   <div class="meta-row">
@@ -2402,7 +2538,7 @@
                       </div>
                       <div class="last-note-text">{{ t.latest_customer_question_text }}</div>
                       {% if t.latest_customer_question_created_at %}
-                        <div class="last-note-date">{{ t.latest_customer_question_created_at }}</div>
+                        <div class="last-note-date"><time datetime="{{ t.latest_customer_question_created_at }}">{{ t.latest_customer_question_created_at_display }}</time></div>
                       {% endif %}
                     </div>
                   {% elif t.last_note_text %}
@@ -2410,13 +2546,14 @@
                       <div class="last-note-label">Letzte Notiz</div>
                       <div class="last-note-text">{{ t.last_note_text }}</div>
                       {% if t.last_note_created_at %}
-                        <div class="last-note-date">{{ t.last_note_created_at }}</div>
+                        <div class="last-note-date"><time datetime="{{ t.last_note_created_at }}">{{ t.last_note_created_at_display }}</time></div>
                       {% endif %}
                     </div>
                   {% endif %}
                 </td>
 
                 <td class="tel">
+                  <span class="cell-label">Kontakt</span>
                   {% if t.telefon %}
                     <a href="tel:{{ t.telefon }}">{{ t.telefon }}</a>
                   {% else %}
@@ -2424,9 +2561,13 @@
                   {% endif %}
                 </td>
 
-                <td class="muted date-cell">{{ t.created_at }}</td>
+                <td class="muted date-cell">
+                  <span class="cell-label">Erstellt</span>
+                  <time datetime="{{ t.created_at }}">{{ t.created_at_display }}</time>
+                </td>
 
                 <td class="right">
+                  <span class="cell-label">Aktionen</span>
                   <div class="actions">
                     <a class="open" href="/dashboard/ticket/{{ t.ticket_view_id }}?workshop_id={{ workshop_id }}">Ticket öffnen</a>
 
@@ -2761,8 +2902,8 @@
         setText("dAbschleppdienst", prettyValue(data.abschleppdienst));
         setText("dKilometerstand", prettyValue(data.kilometerstand));
         setText("dInternalId", prettyValue(data.ticket_view_id || data._id || data.id || data.ticket_id || "-"));
-        setText("dCreatedAt", prettyValue(data.created_at || "-"));
-        setText("dUpdatedAt", prettyValue(data.updated_at || "-"));
+        setText("dCreatedAt", prettyValue(data.created_at_display || data.created_at));
+        setText("dUpdatedAt", prettyValue(data.updated_at_display || data.updated_at));
 
         renderList("dFollowupQuestions", data.followup_questions);
         renderList("dFollowupAnswers", data.followup_answers);
