@@ -1624,6 +1624,24 @@
       border:0;
     }
 
+    .skip-link{
+      position:fixed;
+      top:12px;
+      left:12px;
+      z-index:1000;
+      padding:10px 14px;
+      border-radius:9px;
+      background:#ffffff;
+      color:#17413c;
+      font-weight:750;
+      text-decoration:none;
+      box-shadow:0 10px 28px rgba(28,52,45,.2);
+      transform:translateY(-150%);
+      transition:transform .16s ease;
+    }
+
+    .skip-link:focus{transform:translateY(0)}
+
     .wrap{
       width:100%;
       max-width:none;
@@ -1844,6 +1862,70 @@
       gap:11px;
     }
 
+    .dashboard-summary{display:grid;gap:10px}
+
+    .secondary-stats{
+      overflow:hidden;
+      border:1px solid var(--line);
+      border-radius:11px;
+      background:rgba(255,255,255,.82);
+      box-shadow:0 4px 14px rgba(28,52,45,.04);
+    }
+
+    .secondary-stats > summary{
+      display:flex;
+      align-items:center;
+      justify-content:space-between;
+      gap:18px;
+      min-height:46px;
+      padding:11px 14px;
+      color:#45544f;
+      cursor:pointer;
+      font-size:13px;
+      font-weight:700;
+      list-style:none;
+    }
+
+    .secondary-stats > summary::-webkit-details-marker{display:none}
+    .secondary-stats > summary:hover{background:#f7faf9;color:#17413c}
+
+    .secondary-stats > summary::after{
+      content:"+";
+      display:grid;
+      place-items:center;
+      flex:0 0 auto;
+      width:25px;
+      height:25px;
+      border-radius:50%;
+      background:#e5f0ed;
+      color:var(--petrol);
+      font-size:18px;
+      font-weight:600;
+      line-height:1;
+    }
+
+    .secondary-stats[open] > summary::after{content:"–"}
+
+    .secondary-summary-note{
+      color:#6a7874;
+      font-size:12px;
+      font-weight:500;
+    }
+
+    .cards-secondary{
+      grid-template-columns:repeat(5,minmax(0,1fr));
+      padding:11px;
+      border-top:1px solid var(--line);
+      background:#f8faf9;
+    }
+
+    .cards-secondary .kpi{
+      grid-column:auto;
+      min-height:91px;
+      padding:13px 14px;
+      order:initial;
+    }
+
     .card{
       border:1px solid var(--line);
       border-radius:12px;
@@ -1898,7 +1980,7 @@
 
     .kpi .hint{
       margin-top:7px;
-      color:#7b8985;
+      color:#5f6d69;
       font-size:12px;
       line-height:1.4;
     }
@@ -1925,7 +2007,7 @@
       font-size:13px;
     }
 
-    input::placeholder{color:#8b9894}
+    input::placeholder{color:#667570}
     input:focus,select:focus,button:focus{border-color:#5b9e94;box-shadow:0 0 0 3px rgba(15,111,102,.11)}
     button{background:#e8f2ef;color:#195149;font-weight:700}
     button:hover{transform:none;background:#dcebe7}
@@ -1948,7 +2030,7 @@
     }
 
     .attention-head{padding:15px 17px;border-bottom:1px solid #eee3cf;background:transparent}
-    .attention-title{color:#493a22;font-size:12px;font-weight:750;letter-spacing:.055em}
+    .attention-title{margin:0;color:#493a22;font-size:12px;font-weight:750;letter-spacing:.055em}
     .attention-sub,.attention-empty{color:#7a6c55}
 
     .attention-card{
@@ -2237,6 +2319,10 @@
       .kpi-primary{grid-column:span 3}
       .kpi-compact{grid-column:span 2}
       .kpi-wide{grid-column:span 4}
+      .cards-primary{grid-template-columns:repeat(12,minmax(0,1fr))}
+      .cards-primary .kpi-primary{grid-column:span 3}
+      .cards-secondary{grid-template-columns:repeat(5,minmax(0,1fr))}
+      .cards-secondary .kpi-compact{grid-column:auto}
     }
 
     @media (max-width:980px){
@@ -2257,7 +2343,10 @@
       .workspace-head h2{font-size:26px}
       .primary-action{width:100%}
       .cards{grid-template-columns:repeat(2,minmax(0,1fr))}
+      .cards-primary,.cards-secondary{grid-template-columns:repeat(2,minmax(0,1fr))}
       .kpi-primary,.kpi-compact,.kpi-wide{grid-column:span 1}
+      .secondary-stats > summary{align-items:flex-start}
+      .secondary-summary-note{display:block;margin-top:2px}
       .kpi{min-height:110px}
       .toolbar-left,.toolbar-right{display:grid;grid-template-columns:1fr}
       .toolbar input,.toolbar select,.toolbar button,.toolbar .btn-secondary{width:100%;min-width:0 !important}
@@ -2265,7 +2354,7 @@
     }
 
     @media (max-width:430px){
-      .cards{grid-template-columns:1fr}
+      .cards,.cards-primary,.cards-secondary{grid-template-columns:1fr}
     }
 
     @media (max-width:1540px){
@@ -2419,6 +2508,7 @@
   </style>
 </head>
 <body>
+  <a class="skip-link" href="#main-content">Direkt zu den Tickets</a>
   <div class="wrap">
     <aside class="topbar">
       <div class="brand">
@@ -2447,13 +2537,13 @@
       </nav>
     </aside>
 
-    <div class="grid">
+    <main class="grid" id="main-content">
       <header class="workspace-head">
         <div>
           <div class="workspace-overline">
             {% if archive_mode %}Historie{% else %}Tagesübersicht{% endif %}
           </div>
-          <h2>{% if archive_mode %}Archiv{% else %}Auftragsübersicht{% endif %}</h2>
+          <h2>{% if archive_mode %}Archiv{% else %}Aktive Tickets{% endif %}</h2>
           <p>
             {% if archive_mode %}
               Abgeschlossene und archivierte Vorgänge übersichtlich durchsuchen.
@@ -2467,7 +2557,8 @@
         {% endif %}
       </header>
 
-      <div class="cards">
+      <section class="dashboard-summary" aria-label="Ticket-Kennzahlen">
+      <div class="cards cards-primary">
         <a class="card kpi kpi-primary kpi-order-1" href="{% if archive_mode %}/dashboard/archive?workshop_id={{ workshop_id }}&status=offen&source={{ filters.source }}&question_state={{ filters.question_state }}&sort={{ filters.sort }}{% else %}/dashboard?workshop_id={{ workshop_id }}&status=offen&source={{ filters.source }}&question_state={{ filters.question_state }}&sort={{ filters.sort }}{% endif %}">
           <div class="label">Offen</div>
           <div class="value">{{ stats.offen or 0 }}</div>
@@ -2480,10 +2571,10 @@
           <div class="hint">Mechaniker oder Team arbeitet bereits daran</div>
         </a>
 
-        <a class="card kpi kpi-compact kpi-order-5" href="{% if archive_mode %}/dashboard/archive?workshop_id={{ workshop_id }}&status=erledigt&source={{ filters.source }}&question_state={{ filters.question_state }}&sort={{ filters.sort }}{% else %}/dashboard?workshop_id={{ workshop_id }}&status=erledigt&source={{ filters.source }}&question_state={{ filters.question_state }}&sort={{ filters.sort }}{% endif %}">
-          <div class="label">Erledigt</div>
-          <div class="value">{{ stats.erledigt or 0 }}</div>
-          <div class="hint">Abgeschlossene oder fertige Fälle</div>
+        <a class="card kpi kpi-customer kpi-primary kpi-order-3" href="{% if archive_mode %}/dashboard/archive?workshop_id={{ workshop_id }}&status={{ filters.status }}&source={{ filters.source }}&question_state=open&sort=updated{% else %}/dashboard?workshop_id={{ workshop_id }}&status={{ filters.status }}&source={{ filters.source }}&question_state=open&sort=updated{% endif %}">
+          <div class="label">Offene Fragen</div>
+          <div class="value">{{ stats.kundenfragen_offen or 0 }}</div>
+          <div class="hint">Kundenfragen ohne Antwort vom Team</div>
         </a>
 
         <a class="card kpi kpi-hot kpi-primary kpi-order-4" href="{% if archive_mode %}/dashboard/archive?workshop_id={{ workshop_id }}&status={{ filters.status }}&source={{ filters.source }}&question_state={{ filters.question_state }}&q=hoch&sort=priority{% else %}/dashboard?workshop_id={{ workshop_id }}&status={{ filters.status }}&source={{ filters.source }}&question_state={{ filters.question_state }}&q=hoch&sort=priority{% endif %}">
@@ -2491,37 +2582,45 @@
           <div class="value">{{ stats.hoch or 0 }}</div>
           <div class="hint">Sofort prüfen oder zuerst bearbeiten</div>
         </a>
-
-        <a class="card kpi kpi-warn kpi-compact kpi-order-6" href="{% if archive_mode %}/dashboard/archive?workshop_id={{ workshop_id }}&status={{ filters.status }}&source={{ filters.source }}&question_state={{ filters.question_state }}&q=notfall&sort=priority{% else %}/dashboard?workshop_id={{ workshop_id }}&status={{ filters.status }}&source={{ filters.source }}&question_state={{ filters.question_state }}&q=notfall&sort=priority{% endif %}">
-          <div class="label">Notfall-Typ</div>
-          <div class="value">{{ stats.notfall or 0 }}</div>
-          <div class="hint">Kritische Anfragen mit erhöhter Dringlichkeit</div>
-        </a>
-
-        <a class="card kpi kpi-customer kpi-compact kpi-order-7" href="{% if archive_mode %}/dashboard/archive?workshop_id={{ workshop_id }}&status={{ filters.status }}&source={{ filters.source }}&question_state={{ filters.question_state }}&q=kundenfrage&sort=updated{% else %}/dashboard?workshop_id={{ workshop_id }}&status={{ filters.status }}&source={{ filters.source }}&question_state={{ filters.question_state }}&q=kundenfrage&sort=updated{% endif %}">
-          <div class="label">Kundenfragen</div>
-          <div class="value">{{ stats.kundenfragen or 0 }}</div>
-          <div class="hint">Neue Rückfragen aus dem Chat</div>
-        </a>
-
-        <a class="card kpi kpi-customer kpi-primary kpi-order-3" href="{% if archive_mode %}/dashboard/archive?workshop_id={{ workshop_id }}&status={{ filters.status }}&source={{ filters.source }}&question_state=open&sort=updated{% else %}/dashboard?workshop_id={{ workshop_id }}&status={{ filters.status }}&source={{ filters.source }}&question_state=open&sort=updated{% endif %}">
-          <div class="label">Offene Fragen</div>
-          <div class="value">{{ stats.kundenfragen_offen or 0 }}</div>
-          <div class="hint">Kundenfragen ohne Antwort vom Team</div>
-        </a>
-
-        <a class="card kpi kpi-quote kpi-compact kpi-order-8" href="{% if archive_mode %}/dashboard/archive?workshop_id={{ workshop_id }}&status={{ filters.status }}&source={{ filters.source }}&question_state={{ filters.question_state }}&q=kostenvoranschlag&sort=updated{% else %}/dashboard?workshop_id={{ workshop_id }}&status={{ filters.status }}&source={{ filters.source }}&question_state={{ filters.question_state }}&q=kostenvoranschlag&sort=updated{% endif %}">
-          <div class="label">Kostenvoranschläge</div>
-          <div class="value">{{ stats.kostenvoranschlag or 0 }}</div>
-          <div class="hint">Preis- und Angebotsanfragen</div>
-        </a>
-
-        <a class="card kpi kpi-compact kpi-wide kpi-order-9" href="{% if archive_mode %}/dashboard/archive?workshop_id={{ workshop_id }}{% else %}/dashboard?workshop_id={{ workshop_id }}{% endif %}">
-          <div class="label">Alle</div>
-          <div class="value">{{ stats.all or 0 }}</div>
-          <div class="hint">Gesamtanzahl in der aktuellen Ansicht</div>
-        </a>
       </div>
+
+      <details class="secondary-stats">
+        <summary>
+          <span>Weitere Kennzahlen <span class="secondary-summary-note">Erledigt, Notfälle, Kundenfragen, Kostenvoranschläge und Gesamt</span></span>
+        </summary>
+        <div class="cards cards-secondary">
+          <a class="card kpi kpi-compact kpi-wide kpi-order-9" href="{% if archive_mode %}/dashboard/archive?workshop_id={{ workshop_id }}{% else %}/dashboard?workshop_id={{ workshop_id }}{% endif %}">
+            <div class="label">Alle Tickets</div>
+            <div class="value">{{ stats.all or 0 }}</div>
+            <div class="hint">Gesamtanzahl in der aktuellen Ansicht</div>
+          </a>
+
+          <a class="card kpi kpi-compact kpi-order-5" href="{% if archive_mode %}/dashboard/archive?workshop_id={{ workshop_id }}&status=erledigt&source={{ filters.source }}&question_state={{ filters.question_state }}&sort={{ filters.sort }}{% else %}/dashboard?workshop_id={{ workshop_id }}&status=erledigt&source={{ filters.source }}&question_state={{ filters.question_state }}&sort={{ filters.sort }}{% endif %}">
+            <div class="label">Erledigt</div>
+            <div class="value">{{ stats.erledigt or 0 }}</div>
+            <div class="hint">Abgeschlossene oder fertige Fälle</div>
+          </a>
+
+          <a class="card kpi kpi-warn kpi-compact kpi-order-6" href="{% if archive_mode %}/dashboard/archive?workshop_id={{ workshop_id }}&status={{ filters.status }}&source={{ filters.source }}&question_state={{ filters.question_state }}&q=notfall&sort=priority{% else %}/dashboard?workshop_id={{ workshop_id }}&status={{ filters.status }}&source={{ filters.source }}&question_state={{ filters.question_state }}&q=notfall&sort=priority{% endif %}">
+            <div class="label">Notfall-Typ</div>
+            <div class="value">{{ stats.notfall or 0 }}</div>
+            <div class="hint">Kritische Anfragen mit erhöhter Dringlichkeit</div>
+          </a>
+
+          <a class="card kpi kpi-customer kpi-compact kpi-order-7" href="{% if archive_mode %}/dashboard/archive?workshop_id={{ workshop_id }}&status={{ filters.status }}&source={{ filters.source }}&question_state={{ filters.question_state }}&q=kundenfrage&sort=updated{% else %}/dashboard?workshop_id={{ workshop_id }}&status={{ filters.status }}&source={{ filters.source }}&question_state={{ filters.question_state }}&q=kundenfrage&sort=updated{% endif %}">
+            <div class="label">Kundenfragen</div>
+            <div class="value">{{ stats.kundenfragen or 0 }}</div>
+            <div class="hint">Neue Rückfragen aus dem Chat</div>
+          </a>
+
+          <a class="card kpi kpi-quote kpi-compact kpi-order-8" href="{% if archive_mode %}/dashboard/archive?workshop_id={{ workshop_id }}&status={{ filters.status }}&source={{ filters.source }}&question_state={{ filters.question_state }}&q=kostenvoranschlag&sort=updated{% else %}/dashboard?workshop_id={{ workshop_id }}&status={{ filters.status }}&source={{ filters.source }}&question_state={{ filters.question_state }}&q=kostenvoranschlag&sort=updated{% endif %}">
+            <div class="label">Kostenvoranschläge</div>
+            <div class="value">{{ stats.kostenvoranschlag or 0 }}</div>
+            <div class="hint">Preis- und Angebotsanfragen</div>
+          </a>
+        </div>
+      </details>
+      </section>
 
       <div class="toolbar">
         <form method="get" action="{% if archive_mode %}/dashboard/archive{% else %}/dashboard{% endif %}">
@@ -2571,48 +2670,42 @@
         </form>
       </div>
 
-      {% if not archive_mode %}
+      {% if not archive_mode and attention_tickets %}
       <section class="attention">
         <div class="attention-head">
           <div>
-            <div class="attention-title">Braucht Aufmerksamkeit</div>
+            <h3 class="attention-title">Braucht Aufmerksamkeit</h3>
             <div class="attention-sub">Kundenfragen, Notfälle, hohe Priorität und neue Kostenvoranschläge</div>
           </div>
         </div>
 
-        {% if attention_tickets %}
-          <div class="attention-list">
-            {% for t in attention_tickets %}
-              <a class="attention-card" href="/dashboard/ticket/{{ t.ticket_view_id }}?workshop_id={{ workshop_id }}">
-                <div class="attention-reason">{{ t.attention_reason }}</div>
-                <div class="attention-main">
-                  <div class="attention-car">{{ t.fahrzeug or "-" }}</div>
-                  <div class="attention-problem">
-                    {% if t.latest_customer_question_text %}
-                      {{ t.latest_customer_question_text }}
-                    {% else %}
-                      {{ t.problem or "-" }}
-                    {% endif %}
-                  </div>
+        <div class="attention-list">
+          {% for t in attention_tickets %}
+            <a class="attention-card" href="/dashboard/ticket/{{ t.ticket_view_id }}?workshop_id={{ workshop_id }}">
+              <div class="attention-reason">{{ t.attention_reason }}</div>
+              <div class="attention-main">
+                <div class="attention-car">{{ t.fahrzeug or "-" }}</div>
+                <div class="attention-problem">
+                  {% if t.latest_customer_question_text %}
+                    {{ t.latest_customer_question_text }}
+                  {% else %}
+                    {{ t.problem or "-" }}
+                  {% endif %}
                 </div>
-                <div class="attention-meta">
-                  <span>{{ t.ticket_view_id }}</span>
-                  <span>{{ t.status_label or "-" }}</span>
-                  <span class="attention-source {{ t.source or 'web_chat' }}">{{ t.source_label or "-" }}</span>
-                </div>
-              </a>
-            {% endfor %}
-          </div>
-        {% else %}
-          <div class="attention-empty">
-            Aktuell gibt es keine dringenden Kundenfragen oder priorisierten Vorgänge.
-          </div>
-        {% endif %}
+              </div>
+              <div class="attention-meta">
+                <span>{{ t.ticket_view_id }}</span>
+                <span>{{ t.status_label or "-" }}</span>
+                <span class="attention-source {{ t.source or 'web_chat' }}">{{ t.source_label or "-" }}</span>
+              </div>
+            </a>
+          {% endfor %}
+        </div>
       </section>
       {% endif %}
 
       {% if message_detail and not archive_mode %}
-      <div class="message-feedback {% if message_status in ['failed', 'unknown'] %}failed{% endif %}" role="{% if message_status in ['failed', 'unknown'] %}alert{% else %}status{% endif %}">
+      <div class="message-feedback {% if message_status in ['failed', 'unknown'] %}failed{% endif %}" role="{% if message_status in ['failed', 'unknown'] %}alert{% else %}status{% endif %}" aria-live="polite" aria-atomic="true">
         <span class="message-feedback-dot" aria-hidden="true"></span>
         <div>
           <strong>{% if message_status == 'failed' %}Nachricht nicht gesendet{% elif message_status == 'unknown' %}Versandstatus unklar{% elif message_status == 'template_sent' %}Startvorlage an Meta übergeben{% else %}An Meta übergeben{% endif %}</strong>
@@ -2625,13 +2718,13 @@
       <div class="table-shell">
         <div class="table-head">
           <div>
-            <div class="table-title">
+            <h3 class="table-title">
               {% if archive_mode %}
                 Archivierte Tickets
               {% else %}
                 Aktive Tickets
               {% endif %}
-            </div>
+            </h3>
             <div class="table-sub">
               Übersicht aller Vorgänge mit Status, Priorität und Schnellaktionen
             </div>
@@ -2796,7 +2889,7 @@
                     {% if not archive_mode %}
                     <form class="quick" method="post" action="/dashboard/ticket/{{ t.ticket_view_id }}/status_quick">
                       <input type="hidden" name="workshop_id" value="{{ workshop_id }}" />
-                      <select name="status">
+                      <select name="status" aria-label="Status für Ticket {{ t.ticket_view_id }} ändern">
                         <option value="offen" {% if t.status_ui=="offen" %}selected{% endif %}>Offen</option>
                         <option value="in_bearbeitung" {% if t.status_ui=="in_bearbeitung" %}selected{% endif %}>In Bearbeitung</option>
                         <option value="erledigt" {% if t.status_ui=="erledigt" %}selected{% endif %}>Erledigt</option>
@@ -2834,7 +2927,7 @@
           </div>
         {% endif %}
       </div>
-    </div>
+    </main>
   </div>
 
   <div id="modalBackdrop" class="modal-backdrop" aria-hidden="true">
@@ -3036,7 +3129,7 @@
     </div>
   </div>
 
-  <div id="toast" class="toast">✅ Kopiert!</div>
+  <div id="toast" class="toast" role="status" aria-live="polite" aria-atomic="true">Kopiert</div>
 
   <script>
     const backdrop = document.getElementById("modalBackdrop");

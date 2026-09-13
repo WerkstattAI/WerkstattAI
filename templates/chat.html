@@ -3,20 +3,28 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width,initial-scale=1" />
-  <title>WerkstattAI - Demo</title>
+  <meta name="description" content="Digitale Fahrzeugannahme mit WerkstattAI – Anliegen schnell und vollständig an die Werkstatt übermitteln." />
+  <title>WerkstattAI – Digitale Fahrzeugannahme</title>
   <style>
     :root{
-      --bg:#0b1220;
-      --panel:#0f1a2e;
-      --panel-2:#13213d;
-      --line:rgba(255,255,255,.08);
-      --text:#e6eaf0;
-      --muted:#9aa4b2;
-      --accent:#60a5fa;
-      --accent-soft:rgba(96,165,250,.14);
-      --user:#1d4ed8;
-      --bot:#18253f;
-      --shadow:0 10px 30px rgba(0,0,0,.35);
+      --bg:#edf2f0;
+      --bg-soft:#f3f6f5;
+      --panel:#ffffff;
+      --panel-2:#f8faf9;
+      --line:#dfe7e4;
+      --line-strong:#cbd8d4;
+      --text:#182522;
+      --text-soft:#43534e;
+      --muted:#687772;
+      --accent:#0f6f66;
+      --accent-dark:#0c625a;
+      --accent-soft:#e4f2ef;
+      --user:#0f6f66;
+      --bot:#ffffff;
+      --graphite:#172a26;
+      --success:#23815d;
+      --shadow:0 8px 24px rgba(25,47,41,.08);
+      --shadow-raised:0 22px 58px rgba(22,43,37,.13);
       --r:20px;
     }
 
@@ -24,17 +32,34 @@
 
     body{
       margin:0;
-      font-family:system-ui,-apple-system,Segoe UI,Roboto,Arial,sans-serif;
+      font-family:"Segoe UI Variable","Segoe UI",Inter,system-ui,-apple-system,sans-serif;
       background:
-        radial-gradient(1200px 600px at 20% -10%, #1d3a8a33, transparent 60%),
-        radial-gradient(1000px 500px at 90% 0%, #0ea5e933, transparent 60%),
+        radial-gradient(900px 460px at 12% -8%, rgba(15,111,102,.13), transparent 66%),
+        radial-gradient(760px 420px at 96% 4%, rgba(35,129,93,.09), transparent 64%),
         var(--bg);
       color:var(--text);
       min-height:100vh;
     }
 
+    .skip-link{
+      position:fixed;
+      top:12px;
+      left:12px;
+      z-index:100;
+      padding:10px 14px;
+      border-radius:10px;
+      background:var(--graphite);
+      color:#fff;
+      font-weight:850;
+      text-decoration:none;
+      transform:translateY(-160%);
+      transition:transform .16s ease;
+    }
+
+    .skip-link:focus{transform:translateY(0)}
+
     .wrap{
-      max-width:1100px;
+      max-width:1180px;
       margin:0 auto;
       padding:24px;
     }
@@ -50,7 +75,7 @@
 
     .brand h1{
       margin:0;
-      font-size:22px;
+      font-size:24px;
       letter-spacing:.2px;
     }
 
@@ -58,6 +83,15 @@
       margin-top:6px;
       color:var(--muted);
       font-size:13px;
+    }
+
+    .brand-kicker{
+      margin-bottom:4px;
+      color:var(--accent);
+      font-size:11px;
+      font-weight:900;
+      letter-spacing:.09em;
+      text-transform:uppercase;
     }
 
     .top-actions{
@@ -74,40 +108,46 @@
       padding:10px 12px;
       border-radius:14px;
       border:1px solid var(--line);
-      background:rgba(255,255,255,.06);
+      background:var(--panel);
       color:var(--text);
       text-decoration:none;
       font-weight:800;
+      transition:background .16s ease,border-color .16s ease,transform .16s ease;
     }
+
+    .link-btn:hover{background:var(--panel-2);border-color:var(--line-strong);transform:translateY(-1px)}
 
     .shell{
       display:grid;
-      grid-template-columns: 320px 1fr;
-      gap:16px;
+      grid-template-columns:300px minmax(0,1fr);
+      gap:18px;
       align-items:start;
     }
 
     .card{
-      background:linear-gradient(180deg, rgba(255,255,255,.06), rgba(255,255,255,.03));
+      background:var(--panel);
       border:1px solid var(--line);
       border-radius:var(--r);
       box-shadow:var(--shadow);
     }
 
     .side{
-      padding:16px;
+      padding:18px;
+      position:sticky;
+      top:20px;
     }
 
     .side h2{
       margin:0 0 12px 0;
-      font-size:15px;
+      font-size:16px;
+      color:var(--text);
     }
 
     .hint-box{
-      padding:12px;
+      padding:14px;
       border-radius:16px;
-      background:#13213d;
-      border:1px solid rgba(255,255,255,.08);
+      background:var(--panel-2);
+      border:1px solid var(--line);
       margin-bottom:12px;
     }
 
@@ -116,28 +156,45 @@
       font-weight:900;
       text-transform:uppercase;
       letter-spacing:.08em;
-      color:#9fb3cc;
+      color:var(--accent);
       margin-bottom:8px;
     }
 
     .hint-text{
       font-size:13px;
-      color:#d7deea;
+      color:var(--text-soft);
       line-height:1.5;
     }
+
+    .hint-list{
+      margin:0;
+      padding-left:18px;
+      display:grid;
+      gap:6px;
+    }
+
+    .example-list{
+      margin:0;
+      padding:0;
+      list-style:none;
+      display:grid;
+      gap:7px;
+    }
+
+    .example-list li::before{content:"› ";color:var(--accent);font-weight:900}
 
     .session-box{
       display:none;
       margin-top:14px;
       padding:12px;
       border-radius:16px;
-      background:#0f1b33;
-      border:1px solid rgba(255,255,255,.08);
+      background:var(--panel-2);
+      border:1px solid var(--line);
     }
 
     .session-label{
       font-size:12px;
-      color:#9fb3cc;
+      color:var(--muted);
       font-weight:800;
       text-transform:uppercase;
       letter-spacing:.08em;
@@ -149,11 +206,11 @@
       font-size:12px;
       line-height:1.5;
       word-break:break-word;
-      color:#e5edf8;
+      color:var(--text-soft);
     }
 
     .chat-card{
-      min-height:720px;
+      min-height:clamp(620px,calc(100vh - 112px),760px);
       display:flex;
       flex-direction:column;
       overflow:hidden;
@@ -166,12 +223,12 @@
       gap:12px;
       padding:16px 18px;
       border-bottom:1px solid var(--line);
-      background:#101d36;
+      background:var(--panel);
     }
 
     .chat-header h2{
       margin:0;
-      font-size:15px;
+      font-size:17px;
     }
 
     .chat-header .muted{
@@ -186,17 +243,18 @@
       padding:8px 12px;
       border-radius:999px;
       border:1px solid var(--line);
-      background:rgba(255,255,255,.05);
+      background:#eef8f3;
       font-size:12px;
       font-weight:800;
-      color:#dbe6f5;
+      color:#246047;
     }
 
     .chat-status .dot{
       width:8px;
       height:8px;
       border-radius:999px;
-      background:#22c55e;
+      background:var(--success);
+      box-shadow:0 0 0 4px rgba(35,129,93,.12);
     }
 
     .messages{
@@ -206,7 +264,10 @@
       display:flex;
       flex-direction:column;
       gap:12px;
-      background:rgba(0,0,0,.08);
+      background:
+        radial-gradient(circle at 18px 18px,rgba(15,111,102,.035) 1.5px,transparent 1.5px),
+        var(--bg-soft);
+      background-size:28px 28px;
     }
 
     .message-row{
@@ -230,26 +291,27 @@
       font-size:14px;
       white-space:pre-wrap;
       word-break:break-word;
-      box-shadow:0 8px 22px rgba(0,0,0,.18);
-      border:1px solid rgba(255,255,255,.06);
+      box-shadow:0 5px 16px rgba(25,47,41,.08);
+      border:1px solid var(--line);
     }
 
     .message-row.bot .bubble{
       background:var(--bot);
-      color:#e8eef9;
+      color:var(--text);
       border-top-left-radius:8px;
     }
 
     .message-row.user .bubble{
-      background:linear-gradient(180deg, rgba(37,99,235,.95), rgba(29,78,216,.9));
+      background:linear-gradient(180deg,var(--accent),var(--accent-dark));
       color:white;
+      border-color:var(--accent);
       border-top-right-radius:8px;
     }
 
     .meta{
       margin-top:6px;
       font-size:11px;
-      color:#97a6bb;
+      color:var(--muted);
     }
 
     .quick-actions{
@@ -263,9 +325,9 @@
     .quick-btn{
       padding:10px 14px;
       border-radius:14px;
-      border:1px solid rgba(255,255,255,.10);
-      background:rgba(255,255,255,.06);
-      color:var(--text);
+      border:1px solid #bcd8d1;
+      background:var(--panel);
+      color:var(--accent-dark);
       cursor:pointer;
       font-weight:800;
       font-size:13px;
@@ -273,15 +335,15 @@
     }
 
     .quick-btn:hover{
-      background:rgba(96,165,250,.14);
-      border-color:rgba(96,165,250,.28);
+      background:var(--accent-soft);
+      border-color:#86b9ad;
       transform:translateY(-1px);
     }
 
     .composer{
       border-top:1px solid var(--line);
-      background:#101d36;
-      padding:14px;
+      background:var(--panel);
+      padding:16px;
     }
 
     .composer-form{
@@ -305,14 +367,14 @@
       padding:14px 14px;
       border-radius:16px;
       border:1px solid var(--line);
-      background:#0f1a2e;
+      background:var(--panel-2);
       color:var(--text);
       font:inherit;
       outline:none;
     }
 
     textarea::placeholder{
-      color:#7f8aa0;
+      color:#82908c;
     }
 
     .helper{
@@ -331,24 +393,40 @@
       font-weight:800;
       cursor:pointer;
       color:var(--text);
+      transition:background .16s ease,border-color .16s ease,transform .16s ease,box-shadow .16s ease;
     }
 
     .send-btn{
-      background:linear-gradient(180deg, rgba(96,165,250,.25), rgba(96,165,250,.12));
+      border-color:var(--accent);
+      background:linear-gradient(180deg,var(--accent),var(--accent-dark));
+      color:#fff;
       min-width:110px;
     }
 
     .ghost-btn{
-      background:rgba(255,255,255,.06);
+      background:var(--panel-2);
+    }
+
+    .send-btn:hover:not(:disabled){transform:translateY(-1px);box-shadow:0 8px 18px rgba(15,111,102,.20)}
+    .ghost-btn:hover:not(:disabled){background:#edf2f0;border-color:var(--line-strong)}
+    button:disabled,textarea:disabled{cursor:not-allowed;opacity:.62}
+
+    .link-btn:focus-visible,
+    .quick-btn:focus-visible,
+    .send-btn:focus-visible,
+    .ghost-btn:focus-visible,
+    textarea:focus-visible{
+      outline:3px solid #0f6f66;
+      outline-offset:3px;
     }
 
     .done-box{
       margin-top:10px;
       padding:12px 14px;
       border-radius:16px;
-      border:1px solid rgba(34,197,94,.22);
-      background:rgba(34,197,94,.12);
-      color:#d9ffe7;
+      border:1px solid #b9dfcb;
+      background:#eef8f3;
+      color:#205d43;
       font-size:13px;
       line-height:1.6;
       display:none;
@@ -359,10 +437,10 @@
       display:none;
       align-items:center;
       gap:10px;
-      color:#a8b5c7;
+      color:var(--muted);
       font-size:12px;
       padding:0 18px 10px 18px;
-      background:rgba(0,0,0,.08);
+      background:var(--bg-soft);
     }
 
     .typing-dots{
@@ -374,7 +452,7 @@
       width:7px;
       height:7px;
       border-radius:999px;
-      background:#8ea4bf;
+      background:var(--accent);
       opacity:.55;
       animation:blink 1.2s infinite ease-in-out;
     }
@@ -395,6 +473,8 @@
       .chat-card{
         min-height:680px;
       }
+
+      .side{position:static}
     }
 
     @media (max-width: 640px){
@@ -423,57 +503,69 @@
         width:100%;
       }
     }
+
+    @media (max-width:420px){
+      .wrap{padding:10px}
+      .top{padding:6px 4px}
+      .card{border-radius:16px}
+      .chat-header{align-items:flex-start}
+      .chat-status{padding:7px 10px}
+      .messages{min-height:360px}
+    }
+
+    @media (prefers-reduced-motion:reduce){
+      *,*::before,*::after{animation-duration:.01ms!important;animation-iteration-count:1!important;transition:none!important}
+    }
   </style>
 </head>
 <body>
+  <a class="skip-link" href="#main-content">Zum Kundenchat springen</a>
   <div class="wrap">
-    <div class="top">
+    <header class="top">
       <div class="brand">
         <div class="sub" id="workshop-name">Anfrage an {{ workshop.name }}</div>
-        <h1>WerkstattAI - Demo</h1>
-        <div class="sub">Digitale Annahme fuer Werkstattkunden</div>
+        <div class="brand-kicker">Digitale Fahrzeugannahme</div>
+        <h1>WerkstattAI Kundenservice</h1>
+        <div class="sub">Ihr Anliegen kommt vollständig und übersichtlich bei der Werkstatt an.</div>
       </div>
 
       <div class="top-actions">
         <a class="link-btn" href="/">Startseite</a>
         <a class="link-btn" href="/login">Werkstatt Login</a>
       </div>
-    </div>
+    </header>
 
-    <div class="shell">
-      <div class="card side">
-        <h2>Demo fuer Kundenanfragen</h2>
+    <main class="shell" id="main-content">
+      <aside class="card side" aria-labelledby="chat-help-title">
+        <h2 id="chat-help-title">So funktioniert die Anfrage</h2>
 
         <div class="hint-box">
           <div class="hint-title">Kundenanfrage</div>
           <div class="hint-text">
-            Probieren Sie eine typische Werkstatt-Anfrage aus. Der Assistent fragt die wichtigsten Informationen ab.
+            Beschreiben Sie kurz Ihr Anliegen. Der Assistent fragt anschließend nur die Informationen ab, die der Werkstatt noch fehlen.
           </div>
         </div>
 
         <div class="hint-box">
-          <div class="hint-title">Geeignet fuer</div>
+          <div class="hint-title">Geeignet für</div>
           <div class="hint-text">
-            Der Assistent hilft bei:
-            <br><br>
-            - Problemen am Fahrzeug
-            <br>
-            - Rueckrufwuenschen
-            <br>
-            - allgemeinen Fragen
-            <br>
-            - Kostenvoranschlaegen
+            <ul class="hint-list">
+              <li>Problemen am Fahrzeug</li>
+              <li>Rückrufwünschen</li>
+              <li>allgemeinen Fragen</li>
+              <li>Kostenvoranschlägen</li>
+            </ul>
           </div>
         </div>
 
         <div class="hint-box">
           <div class="hint-title">Beispiele</div>
           <div class="hint-text">
-            "Mein Auto springt nicht an"
-            <br>
-            "Ich brauche einen Rueckruf"
-            <br>
-            "Was sind eure Oeffnungszeiten?"
+            <ul class="example-list">
+              <li>Mein Auto springt nicht an</li>
+              <li>Ich brauche einen Rückruf</li>
+              <li>Was sind Ihre Öffnungszeiten?</li>
+            </ul>
           </div>
         </div>
 
@@ -481,26 +573,26 @@
           <div class="session-label">Session-ID</div>
           <div class="session-id" id="sessionIdBox">-</div>
         </div>
-      </div>
+      </aside>
 
-      <div class="card chat-card">
+      <section class="card chat-card" aria-labelledby="customer-chat-title">
         <div class="chat-header">
           <div>
-            <h2>Kundenchat</h2>
-            <div class="muted">WerkstattAI nimmt die Anfrage auf und erstellt daraus ein uebersichtliches Ticket.</div>
+            <h2 id="customer-chat-title">Kundenchat</h2>
+            <div class="muted">WerkstattAI nimmt Ihre Anfrage auf und erstellt daraus ein übersichtliches Ticket.</div>
           </div>
 
           <div class="chat-status">
             <span class="dot"></span>
-            Online
+            Assistent bereit
           </div>
         </div>
 
-        <div class="messages" id="messages"></div>
+        <div class="messages" id="messages" role="log" aria-live="polite" aria-relevant="additions text"></div>
 
-        <div class="typing" id="typing">
+        <div class="typing" id="typing" role="status" aria-live="polite">
           <span>WerkstattAI schreibt</span>
-          <span class="typing-dots">
+          <span class="typing-dots" aria-hidden="true">
             <span></span><span></span><span></span>
           </span>
         </div>
@@ -510,12 +602,13 @@
             <div class="input-wrap">
               <textarea
                 id="messageInput"
-                placeholder="Nachricht eingeben..."
+                aria-label="Nachricht an WerkstattAI"
+                placeholder="Beschreiben Sie kurz Ihr Anliegen …"
                 required
               ></textarea>
 
               <div class="helper">
-                <span>Enter = senden / Shift+Enter = neue Zeile</span>
+                <span>Enter sendet · Shift + Enter fügt eine neue Zeile ein</span>
                 <span id="charCount">0 Zeichen</span>
               </div>
             </div>
@@ -524,10 +617,10 @@
             <button class="send-btn" type="submit" id="sendBtn">Senden</button>
           </form>
 
-          <div class="done-box" id="doneBox"></div>
+          <div class="done-box" id="doneBox" role="status" aria-live="polite"></div>
         </div>
-      </div>
-    </div>
+      </section>
+    </main>
   </div>
 
   <script>
@@ -547,16 +640,16 @@
 
 Wie kann ich Ihnen helfen?
 
-Waehlen Sie einen Bereich aus oder schreiben Sie direkt Ihr Anliegen.`;
+Wählen Sie einen Bereich aus oder schreiben Sie direkt Ihr Anliegen.`;
 
     const QUICK_ACTIONS = [
       {
         label: "Problem melden",
-        message: "Ich moechte ein Problem melden."
+        message: "Ich möchte ein Problem melden."
       },
       {
         label: "Kostenvoranschlag anfragen",
-        message: "Ich moechte einen Kostenvoranschlag anfragen."
+        message: "Ich möchte einen Kostenvoranschlag anfragen."
       },
       {
         label: "Anfrage zu einem bestehenden Ticket",
@@ -592,7 +685,7 @@ Waehlen Sie einen Bereich aus oder schreiben Sie direkt Ihr Anliegen.`;
 
       const metaEl = document.createElement("div");
       metaEl.className = "meta";
-      metaEl.textContent = meta || (role === "user" ? "Du" : "WerkstattAI");
+      metaEl.textContent = meta || (role === "user" ? "Sie" : "WerkstattAI");
 
       inner.appendChild(bubble);
       inner.appendChild(metaEl);
@@ -623,7 +716,7 @@ Waehlen Sie einen Bereich aus oder schreiben Sie direkt Ihr Anliegen.`;
 
         btn.addEventListener("click", async () => {
           removeQuickActions();
-          addMessage("user", action.message, "Du");
+          addMessage("user", action.message, "Sie");
           await sendMessage(action.message);
         });
 
@@ -638,6 +731,8 @@ Waehlen Sie einen Bereich aus oder schreiben Sie direkt Ihr Anliegen.`;
       sendBtn.disabled = isLoading;
       inputEl.disabled = isLoading;
       resetBtn.disabled = isLoading;
+      sendBtn.textContent = isLoading ? "Wird gesendet …" : "Senden";
+      formEl.setAttribute("aria-busy", String(isLoading));
       typingEl.style.display = isLoading ? "flex" : "none";
       if (!isLoading) {
         inputEl.focus();
@@ -678,7 +773,7 @@ Waehlen Sie einen Bereich aus oder schreiben Sie direkt Ihr Anliegen.`;
         "Die Anfrage wurde aufgenommen.\n" +
         `Ticket-ID: ${ticketId}\n` +
         `Typ: ${requestType}\n` +
-        `Prioritaet: ${priority}\n\n` +
+        `Priorität: ${priority}\n\n` +
         "Das Ticket ist im Werkstatt-Dashboard gespeichert.";
     }
 
@@ -732,7 +827,7 @@ Waehlen Sie einen Bereich aus oder schreiben Sie direkt Ihr Anliegen.`;
       if (!message) return;
 
       removeQuickActions();
-      addMessage("user", message, "Du");
+      addMessage("user", message, "Sie");
       inputEl.value = "";
       updateCount();
 
