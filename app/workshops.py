@@ -51,6 +51,16 @@ def _row_to_workshop(row: Any) -> dict[str, Any]:
     }
 
 
+def get_workshop_identity(workshop_id: str) -> dict[str, str] | None:
+    """Return only the public identity of an existing workshop, without fallback."""
+    with get_conn() as conn:
+        row = conn.execute(
+            "SELECT id, name FROM workshops WHERE id = ? LIMIT 1",
+            (workshop_id,),
+        ).fetchone()
+    return {"id": row["id"], "name": row["name"]} if row else None
+
+
 def get_workshop(workshop_id: str | None = None) -> dict[str, Any]:
     wid = _normalize_workshop_id(workshop_id)
 

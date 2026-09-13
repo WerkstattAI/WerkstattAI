@@ -944,6 +944,7 @@
                     <a class="table-link" href="/dashboard/whatsapp?workshop_id={{ w.id }}">WhatsApp</a>
                     <a class="table-link" href="/dashboard/billing?workshop_id={{ w.id }}">Abo</a>
                     <a class="table-link" href="/dashboard/admin/workshops/{{ w.id }}">Bearbeiten</a>
+                    <a class="table-link" href="/assistant?workshop_id={{ w.id|urlencode }}">Kundenchat</a>
                   </td>
                 </tr>
               {% endfor %}

@@ -218,23 +218,46 @@ def _row_to_ticket_dict(row: Any) -> dict[str, Any]:
 
 
 def _next_sequence_for_today(today: str) -> int:
+    """Reserve a number atomically across threads and application processes.
+
+    Seed a new day's counter from existing tickets for backwards compatibility.
+    Committing the reservation before inserting the ticket allows harmless gaps,
+    but prevents two requests from receiving the same number.
+    """
     with get_conn() as conn:
-        rows = conn.execute(
+        existing = conn.execute(
             """
-            SELECT ticket_id
-            FROM tickets
-            WHERE ticket_id LIKE ?
+            SELECT last_value FROM ticket_sequences WHERE ticket_date = ?
             """,
-            (f"WS-{today}-%",),
-        ).fetchall()
+            (today,),
+        ).fetchone()
+        initial_value = 1
+        if existing is None:
+            prefix = f"WS-{today}-"
+            rows = conn.execute(
+                "SELECT ticket_id FROM tickets WHERE ticket_id LIKE ?",
+                (prefix + "%",),
+            ).fetchall()
+            numbers = [
+                int(str(row["ticket_id"])[len(prefix):])
+                for row in rows
+                if str(row["ticket_id"])[len(prefix):].isascii()
+                and str(row["ticket_id"])[len(prefix):].isdigit()
+            ]
+            initial_value = max(numbers, default=0) + 1
 
-    count = 0
-    for row in rows:
-        ticket_id = str(row["ticket_id"] or "")
-        if ticket_id.startswith(f"WS-{today}-"):
-            count += 1
-
-    return count + 1
+        row = conn.execute(
+            """
+            INSERT INTO ticket_sequences (ticket_date, last_value)
+            VALUES (?, ?)
+            ON CONFLICT(ticket_date) DO UPDATE SET
+                last_value = ticket_sequences.last_value + 1
+            RETURNING last_value
+            """,
+            (today, initial_value),
+        ).fetchone()
+        conn.commit()
+    return int(row["last_value"])
 
 
 def generate_ticket_id(workshop_id: str | None = None) -> str:
@@ -243,9 +266,8 @@ def generate_ticket_id(workshop_id: str | None = None) -> str:
     """
     today = datetime.now().strftime("%Y%m%d")
 
-    with _LOCK:
-        seq = _next_sequence_for_today(today)
-        return f"WS-{today}-{seq:04d}"
+    seq = _next_sequence_for_today(today)
+    return f"WS-{today}-{seq:04d}"
 
 
 def save_ticket(state: IntakeState, workshop_id: str | None = None) -> str:

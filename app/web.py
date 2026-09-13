@@ -42,7 +42,7 @@ from app.whatsapp import (
     send_whatsapp_text_message,
     whatsapp_customer_service_window_for_phone,
 )
-from app.workshops import get_workshop, update_workshop
+from app.workshops import get_workshop, get_workshop_identity, update_workshop
 
 router = APIRouter()
 templates = Jinja2Templates(directory="templates")
@@ -1148,12 +1148,18 @@ def datenschutz_page(request: Request):
 
 
 @router.get("/assistant", response_class=HTMLResponse)
-def assistant_page(request: Request):
+def assistant_page(request: Request, workshop_id: str | None = None):
+    # An explicit invalid ID must never send a customer to the default workshop.
+    wid = _normalize_workshop_id() if workshop_id is None else workshop_id.strip()
+    workshop = get_workshop_identity(wid)
+    if not workshop:
+        return HTMLResponse("Werkstatt wurde nicht gefunden.", status_code=404)
     return templates.TemplateResponse(
         request,
         "chat.html",
         {
             "request": request,
+            "workshop": workshop,
         },
     )
 

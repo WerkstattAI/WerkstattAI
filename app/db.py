@@ -390,6 +390,15 @@ def init_db() -> None:
 
         conn.execute(
             """
+            CREATE TABLE IF NOT EXISTS ticket_sequences (
+                ticket_date TEXT PRIMARY KEY,
+                last_value BIGINT NOT NULL
+            )
+            """
+        )
+
+        conn.execute(
+            """
             CREATE TABLE IF NOT EXISTS conversation_sessions (
                 session_id TEXT PRIMARY KEY,
                 workshop_id TEXT NOT NULL DEFAULT 'demo-werkstatt',

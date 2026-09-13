@@ -3829,5 +3829,128 @@ class WhatsAppConversationControlTests(unittest.TestCase):
         self.assertEqual(outbound[0]["status"], "unknown")
 
 
+class MultiWorkshopReadinessTests(unittest.TestCase):
+    @classmethod
+    def setUpClass(cls) -> None:
+        init_db()
+        for suffix in ("a", "b"):
+            create_workshop_account(
+                workshop_id="readiness-" + suffix,
+                workshop_name="Testwerkstatt " + suffix.upper(),
+                admin_email=suffix + "@readiness.example.invalid",
+                admin_password="OnlyForLocalTests123!",
+                opening_hours="Montag 08:00-12:00" if suffix == "a" else "Dienstag 14:00-18:00",
+                subscription_status="active",
+            )
+
+    def test_simultaneous_new_tickets_are_saved_for_both_workshops(self) -> None:
+        from concurrent.futures import ThreadPoolExecutor
+        from threading import Barrier
+        from app.tickets import generate_ticket_id
+
+        barrier = Barrier(2)
+
+        def reserve_then_wait(workshop_id=None):
+            ticket_id = generate_ticket_id(workshop_id)
+            # Force both requests to reserve their IDs before either saves.
+            barrier.wait(timeout=15)
+            return ticket_id
+
+        def save(suffix):
+            return save_ticket(IntakeState(fahrzeug="Parallel " + suffix),
+                               workshop_id="readiness-" + suffix)
+
+        with patch("app.tickets.generate_ticket_id", reserve_then_wait):
+            with ThreadPoolExecutor(max_workers=2) as pool:
+                ids = list(pool.map(save, ("a", "b")))
+        self.assertEqual(len(set(ids)), 2)
+        for index, suffix in enumerate(("a", "b")):
+            self.assertIsNotNone(find_ticket_by_id(ids[index], "readiness-" + suffix))
+            self.assertIsNone(find_ticket_by_id(ids[1 - index], "readiness-" + suffix))
+
+    def test_counter_migrates_existing_numbers_and_does_not_reuse_reservations(self) -> None:
+        from app.tickets import _next_sequence_for_today
+
+        day = "20410102"
+        with get_conn() as conn:
+            conn.execute("DELETE FROM ticket_sequences WHERE ticket_date = ?", (day,))
+            conn.execute("DELETE FROM tickets WHERE ticket_id LIKE ?", (f"WS-{day}-%",))
+            conn.commit()
+        for suffix in ("0001", "0008", "legacy"):
+            save_ticket(IntakeState(ticket_id=f"WS-{day}-{suffix}"), workshop_id="readiness-a")
+        self.assertEqual(_next_sequence_for_today(day), 9)
+        self.assertEqual(_next_sequence_for_today(day), 10)
+        with get_conn() as conn:
+            conn.execute("DELETE FROM tickets WHERE ticket_id LIKE ?", (f"WS-{day}-%",))
+            conn.commit()
+        self.assertEqual(_next_sequence_for_today(day), 11)
+
+    def test_ticket_counter_is_shared_across_application_processes(self) -> None:
+        import subprocess
+        import sys
+
+        day = "20410103"
+        with get_conn() as conn:
+            conn.execute("DELETE FROM ticket_sequences WHERE ticket_date = ?", (day,))
+            conn.commit()
+        worker = (
+            "import json, sys; from app.tickets import _next_sequence_for_today; "
+            "sys.stdin.readline(); "
+            f"print(json.dumps([_next_sequence_for_today('{day}') for _ in range(12)]))"
+        )
+        processes = [subprocess.Popen([sys.executable, "-c", worker],
+                     stdin=subprocess.PIPE, stdout=subprocess.PIPE, stderr=subprocess.PIPE,
+                     text=True) for _ in range(4)]
+        try:
+            for process in processes:
+                process.stdin.write("start\n")
+                process.stdin.flush()
+            numbers = []
+            for process in processes:
+                output, error = process.communicate(timeout=30)
+                self.assertEqual(process.returncode, 0, error)
+                numbers.extend(json.loads(output))
+            self.assertEqual(sorted(numbers), list(range(1, 49)))
+        finally:
+            for process in processes:
+                if process.poll() is None:
+                    process.kill()
+                    process.communicate()
+
+    def test_customer_chat_uses_selected_workshop_and_rejects_invalid_links(self) -> None:
+        from fastapi.testclient import TestClient
+        from app.main import app
+
+        with TestClient(app) as client:
+            for suffix in ("a", "b"):
+                response = client.get("/assistant", params={"workshop_id": "readiness-" + suffix})
+                self.assertEqual(response.status_code, 200)
+                self.assertEqual(response.context["workshop"], {
+                    "id": "readiness-" + suffix, "name": "Testwerkstatt " + suffix.upper(),
+                })
+                self.assertIn("workshop_id: WORKSHOP.id", response.text)
+                self.assertIn('"werkstattai_session_id:" + WORKSHOP.id', response.text)
+            for invalid in ("", " ", "does-not-exist"):
+                self.assertEqual(client.get("/assistant", params={"workshop_id": invalid}).status_code, 404)
+            response = client.get("/assistant")
+            self.assertEqual(response.status_code, 200)
+            self.assertEqual(response.context["workshop"]["id"], settings.default_workshop_id)
+
+    def test_shared_browser_session_keeps_workshop_answers_separate(self) -> None:
+        from fastapi.testclient import TestClient
+        from app.main import app
+
+        with TestClient(app) as client:
+            for suffix, expected, other in (("a", "Montag", "Dienstag"), ("b", "Dienstag", "Montag")):
+                response = client.post("/chat", json={
+                    "workshop_id": "readiness-" + suffix,
+                    "session_id": "readiness-shared-browser",
+                    "message": "Wie sind eure Öffnungszeiten?",
+                })
+                self.assertEqual(response.status_code, 200)
+                self.assertIn(expected, response.json()["reply"])
+                self.assertNotIn(other, response.json()["reply"])
+
+
 if __name__ == "__main__":
     unittest.main()
