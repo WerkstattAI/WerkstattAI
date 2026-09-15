@@ -47,6 +47,7 @@ from app.web import router as web_router
 from app.workshops import find_workshop_id_by_whatsapp_phone_number_id
 from app.http_security import secure_application
 from app.security_config import MAX_MESSAGE_LENGTH, is_production, validate_security_settings
+from app.privacy_routes import router as privacy_router
 
 logger = logging.getLogger(__name__)
 
@@ -91,6 +92,7 @@ async def dashboard_auth_middleware(request, call_next):
 
 
 app.include_router(web_router)
+app.include_router(privacy_router)
 
 
 def _dump_state(state: IntakeState) -> dict:

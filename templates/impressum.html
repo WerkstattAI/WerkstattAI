@@ -1,0 +1,17 @@
+{% extends "legal_base.html" %}
+{% block title %}Impressum{% endblock %}
+{% block content %}
+<p class="lead">Anbieterinformationen</p><h1>Impressum</h1>
+<p class="notice"><strong>Entwurf – Anbieterangaben noch vervollständigen.</strong> Die bisher hinterlegten Angaben sind übernommen. Anschrift, Rechtsform und gegebenenfalls Register- oder Umsatzsteuerangaben müssen vor der endgültigen Veröffentlichung bestätigt werden.</p>
+<section><h2>Angaben nach § 5 DDG</h2><address><strong>{{ provider.business_name }}</strong>
+{{ provider.name }}
+{{ provider.legal_form }}
+{{ provider.address }}</address>
+{% if provider.representative %}<p>Vertreten durch: {{ provider.representative }}</p>{% endif %}
+<h3>Kontakt</h3><p>E-Mail: <a href="mailto:{{ provider.email }}">{{ provider.email }}</a><br />Telefon: {{ provider.phone }}</p>
+{% if provider.register %}<h3>Register</h3><p>{{ provider.register }}</p>{% endif %}
+{% if provider.vat_id %}<h3>Umsatzsteuer-Identifikationsnummer</h3><p>{{ provider.vat_id }}</p>{% endif %}
+{% if provider.business_id %}<h3>Wirtschafts-Identifikationsnummer</h3><p>{{ provider.business_id }}</p>{% endif %}
+</section>
+<section><h2>Noch zu prüfen</h2><ul><li>Vollständiger rechtlicher Name, Rechtsform, ladungsfähige Anschrift und gegebenenfalls Vertretungsberechtigte.</li><li>Register und Registernummer sowie USt-IdNr. beziehungsweise Wirtschafts-Identifikationsnummer, sofern vorhanden und anzugeben. Eine persönliche Steuernummer gehört nicht hierher.</li><li>Ob erlaubnisbezogene oder berufsrechtliche Angaben erforderlich sind.</li><li>Ob und welche Informationen zur Verbraucherschlichtung nach § 36 VSBG erforderlich sind; Teilnahmebereitschaft und etwaige Pflicht bestätigen.</li></ul><p class="muted">Grundlage: <a href="https://www.gesetze-im-internet.de/ddg/__5.html">§ 5 DDG</a> und <a href="https://www.gesetze-im-internet.de/vsbg/__36.html">§ 36 VSBG</a>. Dieser Entwurf ist keine Bestätigung der Vollständigkeit oder rechtlichen Prüfung.</p></section>
+{% endblock %}

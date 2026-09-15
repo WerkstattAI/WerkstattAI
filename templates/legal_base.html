@@ -1,0 +1,24 @@
+<!doctype html>
+<html lang="de">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <meta name="robots" content="noindex,follow" />
+  <title>{% block title %}Rechtliches{% endblock %} · WerkstattAI</title>
+  <style>
+    :root{--ink:#183b35;--muted:#5c706b;--accent:#10766c;--line:#d9e5e1;--bg:#f1f6f4}
+    *{box-sizing:border-box}body{margin:0;background:var(--bg);color:var(--ink);font:16px/1.65 system-ui,-apple-system,"Segoe UI",sans-serif;overflow-y:scroll}
+    header{background:#173b34;color:#fff}header>div,main,footer{width:min(960px,calc(100% - 40px));margin:auto}
+    header>div{padding:26px 0;display:flex;justify-content:space-between;align-items:center;gap:20px;flex-wrap:wrap}header a{color:#c1ebe2}a{color:var(--accent);text-underline-offset:3px}
+    .brand{font-weight:800;font-size:21px;text-decoration:none}nav{display:flex;gap:20px;flex-wrap:wrap}main{padding:42px 0 60px}h1{font-size:clamp(28px,5vw,42px);line-height:1.2;margin:0 0 12px}h2{font-size:23px;line-height:1.35;margin:0 0 14px}h3{font-size:18px;margin:24px 0 8px}p{margin:0 0 16px}.lead,.muted{color:var(--muted)}
+    section,.card{margin:22px 0;padding:28px;border:1px solid var(--line);border-radius:18px;background:#fff;box-shadow:0 8px 25px #193b3305}.notice{padding:18px 22px;border:1px solid #e6cca2;border-radius:14px;background:#fff7e9;color:#73501e;margin:24px 0}.success{background:#e3f4e9;border-color:#a6d9b9;color:#215635}.error{background:#fff0ef;border-color:#edb5af;color:#8d2822}.placeholder{color:#8d5a16;font-weight:650}address{font-style:normal;white-space:pre-line}
+    label{display:block;font-weight:650;margin:18px 0 7px}input,select{display:block;width:100%;padding:13px 14px;border:1px solid #b9ccc5;border-radius:10px;font:inherit;background:#fff;color:var(--ink)}input[type=checkbox]{display:inline;width:auto;margin-right:8px}input:focus,select:focus{outline:3px solid #a8d8ce;outline-offset:2px}.check{font-weight:400}.grid{display:grid;grid-template-columns:1fr 2fr;gap:18px}.actions{display:flex;gap:12px;align-items:center;flex-wrap:wrap;margin-top:22px}button,.button{display:inline-block;border:1px solid var(--line);border-radius:10px;padding:12px 18px;background:#edf5f2;color:var(--ink);font:600 15px/1.4 system-ui;text-decoration:none;cursor:pointer}button.primary{background:var(--accent);color:#fff;border-color:var(--accent)}button.danger{background:#a63831;color:#fff;border-color:#a63831}button:disabled{opacity:.5;cursor:not-allowed}table{width:100%;border-collapse:collapse}th,td{text-align:left;padding:12px 8px;border-bottom:1px solid var(--line);overflow-wrap:anywhere}th:last-child,td:last-child{text-align:right}.table-wrap{overflow:auto}ul{padding-left:22px}li{margin:8px 0}code{overflow-wrap:anywhere}footer{padding:24px 0 35px;border-top:1px solid var(--line);color:var(--muted);font-size:14px}small{font-size:14px}
+    @media(max-width:600px){header>div,main,footer{width:calc(100% - 28px)}main{padding-top:28px}section,.card{padding:20px}.grid{grid-template-columns:1fr;gap:0}.actions>*{width:100%;text-align:center}}
+  </style>
+</head>
+<body>
+  <header><div><a class="brand" href="/">WerkstattAI</a><nav aria-label="Rechtliche Informationen"><a href="/impressum">Impressum</a><a href="/datenschutz">Datenschutz</a><a href="/datenschutz/rechte">Auskunft &amp; Löschung</a></nav></div></header>
+  <main>{% block content %}{% endblock %}</main>
+  <footer>Stand der Vorbereitung: 15. September 2026 · <a href="/">Startseite</a> · <a href="/login">Werkstatt-Zugang</a></footer>
+</body>
+</html>

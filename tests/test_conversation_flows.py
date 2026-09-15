@@ -448,7 +448,8 @@ class WhatsAppWebhookTests(unittest.TestCase):
         response = datenschutz_page(_get_request("/datenschutz"))
 
         self.assertEqual(response.status_code, 200)
-        self.assertEqual(response.template.name, "datenschutz.html")
+        self.assertEqual(response.template.name, "privacy_notice.html")
+        self.assertIn("Datenschutzinformation", response.body.decode("utf-8"))
 
     META_PAYLOAD = {
         "object": "whatsapp_business_account",
@@ -3951,6 +3952,7 @@ class MultiWorkshopReadinessTests(unittest.TestCase):
                     "is_demo": False,
                 })
                 self.assertIn("workshop_id: WORKSHOP.id", response.text)
+                self.assertIn(f'/datenschutz?workshop_id=readiness-{suffix}', response.text)
                 self.assertIn('"werkstattai_session_id:" + WORKSHOP.id', response.text)
             for invalid in ("", " ", "does-not-exist"):
                 self.assertEqual(client.get("/assistant", params={"workshop_id": invalid}).status_code, 404)

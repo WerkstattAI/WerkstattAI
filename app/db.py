@@ -530,6 +530,19 @@ def init_db() -> None:
             """
         )
 
+        conn.execute(
+            """
+            CREATE TABLE IF NOT EXISTS privacy_operations (
+                id TEXT PRIMARY KEY,
+                workshop_id TEXT NOT NULL,
+                actor_hash TEXT NOT NULL,
+                action TEXT NOT NULL,
+                counts_json TEXT NOT NULL,
+                created_at TEXT NOT NULL
+            )
+            """
+        )
+        conn.execute("CREATE INDEX IF NOT EXISTS idx_privacy_operations_created ON privacy_operations(created_at)")
         conn.commit()
 
 

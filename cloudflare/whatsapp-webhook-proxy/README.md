@@ -10,8 +10,12 @@ Cloudflare Worker proxy for Meta WhatsApp webhooks.
 
 Use this Worker URL as the Meta callback URL instead of the Railway URL.
 
-The Worker also serves the public privacy policy at `/datenschutz`, avoiding
-application-host rate limits when Meta validates the URL.
+The Worker redirects `/impressum`, `/datenschutz` and `/datenschutz/rechte` to
+the app on the configured upstream origin. This keeps one version of the legal
+texts and working navigation links. Deploy the app routes before updating the
+Worker. Redirects are not cached and preserve only the optional workshop ID on
+the privacy page. App availability and rate limits apply to the destination.
+Use the app's `/datenschutz` URL in Meta and verify it after deployment.
 
 Set the same Worker URL in the app environment as `WHATSAPP_WEBHOOK_PUBLIC_URL`
 so the dashboard shows the public callback URL.

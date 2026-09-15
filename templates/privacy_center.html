@@ -1,0 +1,54 @@
+{% extends "legal_base.html" %}
+{% block title %}Datenverwaltung{% endblock %}
+{% block content %}
+<p class="lead">Verwaltung · {{ workshop.name }}</p>
+<h1>Datenschutz &amp; Datenverwaltung</h1>
+<p>Exportieren Sie Ihren Datenbestand oder prüfen Sie eine konkrete Kundenanfrage auf Auskunft und Löschung.</p>
+<a href="/dashboard/settings?workshop_id={{ workshop_id|urlencode }}">← Zurück zu den Einstellungen</a>
+{% if error %}<p class="notice error" role="alert">{{ error }}</p>{% endif %}
+{% if deleted %}<div class="notice success" role="status"><strong>Löschung durchgeführt.</strong> Die bestätigten Datensätze wurden aus der aktiven WerkstattAI-Datenbank entfernt. Backups, Hosting-Protokolle, WhatsApp und bereits heruntergeladene Dateien müssen gesondert bearbeitet werden.</div>{% endif %}
+<section>
+  <h2>Werkstattdaten exportieren</h2>
+  <p>Sie erhalten eine JSON-Datei mit Betriebsdaten, Benutzerstammdaten, Tickets, Notizen, Gesprächsständen und WhatsApp-Daten Ihrer Werkstatt. Passwörter und Zugangsschlüssel sind ausgeschlossen.</p>
+  <p class="muted">Der Gesamtexport enthält Daten aller Kunden dieser Werkstatt. Für eine einzelne Auskunft verwenden Sie die Auswahl weiter unten. Downloads sicher aufbewahren und nach ihrem Zweck löschen.</p>
+  <form method="post" action="/dashboard/privacy/export">
+    <input type="hidden" name="workshop_id" value="{{ workshop_id }}" /><input type="hidden" name="token" value="{{ form_token }}" />
+    <button class="primary" type="submit">Werkstattdaten als JSON herunterladen</button>
+  </form>
+</section>
+<section>
+  <h2>Kundendaten auswählen</h2>
+  <p>Eine Telefonnummer findet zugeordnete Tickets und Unterhaltungen. Mit einer Ticket-ID wählen Sie einen einzelnen Vorgang und die direkt damit verknüpften Daten.</p>
+  <form method="post" action="/dashboard/privacy/preview">
+    <input type="hidden" name="workshop_id" value="{{ workshop_id }}" /><input type="hidden" name="token" value="{{ form_token }}" />
+    <div class="grid"><div><label for="kind">Suchen nach</label><select id="kind" name="kind"><option value="phone" {% if selection and selection.kind == 'phone' %}selected{% endif %}>Telefonnummer</option><option value="ticket" {% if selection and selection.kind == 'ticket' %}selected{% endif %}>Ticket-ID</option></select></div>
+    <div><label for="value">Telefonnummer oder Ticket-ID</label><input id="value" name="value" value="{{ selection.value if selection else '' }}" maxlength="128" required autocomplete="off" placeholder="z. B. +49 170 1234567" /></div></div>
+    <div class="actions"><button type="submit">Datenvorschau anzeigen</button></div>
+  </form>
+  <p class="muted" style="margin-top:18px">Keine Suche nach Namen oder Teilnummern. Abweichende Kontaktdaten und Erwähnungen in fremden Freitexten müssen zusätzlich geprüft werden. Deutsche Nummern können mit 0 eingegeben werden; andere Nummern bitte mit Ländervorwahl.</p>
+</section>
+{% if quantities is defined %}
+<section id="preview">
+  <h2>Vorschau für {{ selection.value }}</h2>
+  <p>Diese Auswahl umfasst <strong>{{ total }} Datensätze</strong> in Ihrer Werkstatt. Die Vorschau ist zehn Minuten gültig. Bei Änderungen ist eine neue Prüfung nötig.</p>
+  <table><thead><tr><th>Datenart</th><th>Anzahl</th></tr></thead><tbody>{% for table, amount in quantities.items() %}<tr><td>{{ labels[table] }}</td><td>{{ amount }}</td></tr>{% endfor %}</tbody></table>
+  {% if matching_tickets %}<h3>Zugeordnete Tickets</h3><ul>{% for ticket in matching_tickets %}<li>{{ ticket.ticket_id }} · {{ ticket.name or 'Kein Name hinterlegt' }} · {{ ticket.status }}</li>{% endfor %}</ul>{% endif %}
+  {% if total %}
+  <h3>Auskunft vorbereiten</h3>
+  <p>Der Download ist eine Arbeitskopie für die Werkstatt. Prüfen Sie vor Weitergabe die Identität des Empfängers, interne Notizen und Angaben über andere Personen.</p>
+  <form method="post" action="/dashboard/privacy/export"><input type="hidden" name="workshop_id" value="{{ workshop_id }}" /><input type="hidden" name="token" value="{{ preview_token }}" /><input type="hidden" name="scope" value="customer" /><button type="submit">Ausgewählte Daten herunterladen</button></form>
+  <h3>Ausgewählte Daten endgültig löschen</h3>
+  <p>Auch offene Tickets, Notizen und Nachrichten dieser Auswahl werden entfernt. Archivieren allein löscht keine Daten. Ihr Werkstattkonto und andere Kundendaten bleiben bestehen.</p>
+  <p>Vorher die Identität, die Berechtigung zur Löschung und mögliche Aufbewahrungspflichten prüfen. Sichern Sie keine unnötigen zusätzlichen Kopien. Eine neue Nachricht kann anschließend wieder einen Datensatz anlegen.</p>
+  <form method="post" action="/dashboard/privacy/delete">
+    <input type="hidden" name="workshop_id" value="{{ workshop_id }}" /><input type="hidden" name="token" value="{{ preview_token }}" />
+    <label class="check"><input type="checkbox" name="authorized" value="true" required /> Ich habe die Auswahl und die Berechtigung geprüft. Für diese Datensätze besteht keine entgegenstehende Aufbewahrungspflicht.</label>
+    <label for="delete-password">Ihr Anmeldepasswort</label><input id="delete-password" type="password" name="password" maxlength="128" autocomplete="current-password" required />
+    <label for="delete-confirmation">Zur Bestätigung LÖSCHEN eingeben</label><input id="delete-confirmation" name="confirmation" maxlength="32" autocomplete="off" required pattern="LÖSCHEN" />
+    <div class="actions"><button class="danger" type="submit">Ausgewählte Daten endgültig löschen</button></div>
+  </form>
+  {% else %}<p class="notice">Keine Treffer. Prüfen Sie weitere Telefonnummern oder eine bekannte Ticket-ID. Dies ist kein Nachweis, dass keine weiteren Daten über diese Person vorliegen.</p>{% endif %}
+</section>
+{% endif %}
+<section><h2>Vereinbarung zur Auftragsverarbeitung</h2><p>Die AVV-Grundlage beschreibt Rollen, Weisungen, Dienstleister, technische Maßnahmen und die Rückgabe oder Löschung von Daten. Sie ist ein Entwurf; Anbieterangaben, Anlagen und die tatsächlichen Betriebsbedingungen müssen vor dem Abschluss ergänzt und geprüft werden.</p><a class="button" href="/dashboard/privacy/avv?workshop_id={{ workshop_id|urlencode }}">AVV-Entwurf herunterladen (.md)</a></section>
+{% endblock %}

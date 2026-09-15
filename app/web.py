@@ -19,6 +19,7 @@ from app.admin import (
 )
 from app.auth import authenticate_user, clear_session_cookie, get_current_user, set_session_cookie
 from app.config import settings
+from app.legal import provider_details
 from app.db import (
     default_workshop_id,
     demo_workshop_id,
@@ -1137,13 +1138,31 @@ def home_page(request: Request):
     )
 
 
+@router.get("/impressum", response_class=HTMLResponse)
+def impressum_page(request: Request):
+    return templates.TemplateResponse(request, "impressum.html", {"request": request, "provider": provider_details()})
+
+
+@router.get("/datenschutz/rechte", response_class=HTMLResponse)
+def privacy_rights_page(request: Request):
+    return templates.TemplateResponse(request, "privacy_rights.html", {"request": request, "provider": provider_details()})
+
+
 @router.get("/datenschutz", response_class=HTMLResponse)
-def datenschutz_page(request: Request):
+def datenschutz_page(request: Request, workshop_id: str | None = None):
+    workshop = None
+    if workshop_id:
+        identity = get_workshop_identity(workshop_id)
+        if not identity:
+            return HTMLResponse("Werkstatt nicht gefunden", status_code=404)
+        workshop = get_workshop(workshop_id)
     return templates.TemplateResponse(
         request,
-        "datenschutz.html",
+        "privacy_notice.html",
         {
             "request": request,
+            "provider": provider_details(),
+            "workshop": workshop,
         },
     )
 

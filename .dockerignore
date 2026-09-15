@@ -1,0 +1,16 @@
+.git
+.agents
+.codex
+.venv
+venv
+node_modules
+.vscode
+.idea
+.env
+.env.*
+data
+**/__pycache__
+**/*.pyc
+**/*.pyo
+**/*.log
+.DS_Store
