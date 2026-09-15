@@ -6,24 +6,21 @@ from app.db import default_workshop_id, get_conn
 
 
 DEFAULT_WORKSHOP = {
-    "id": "demo-werkstatt",
-    "name": "Meier Werkstatt Family",
-    "address": "Arnstorfer Str. 5",
-    "phone": "123456789",
-    "email": "Meierfamily@hjh.de",
-    "opening_hours": "Montag bis Freitag: 09:00-17:00; Samstag: 09:00-14:00; Sonntag: geschlossen",
-    "services": "Autoreparaturen, Reifenwechsel, Polieren",
-    "pricing_info": (
-        "Aktuell gibt es noch keine festen Preisangaben. "
-        "Die Werkstatt prueft Anfragen individuell und meldet sich mit einer Einschaetzung."
-    ),
-    "towing_info": "Unsere Werkstatt kooperiert mit dem Abschleppdienst Mueller.",
+    "name": "Werkstatt",
+    "address": "",
+    "phone": "",
+    "email": "",
+    "opening_hours": "",
+    "services": "",
+    "pricing_info": "",
+    "towing_info": "",
     "subscription_plan": "starter",
-    "subscription_status": "trialing",
+    "subscription_status": "inactive",
     "trial_ends_at": None,
     "subscription_ends_at": None,
     "whatsapp_phone_number_id": None,
     "whatsapp_display_phone_number": None,
+    "is_demo": False,
 }
 
 
@@ -48,17 +45,18 @@ def _row_to_workshop(row: Any) -> dict[str, Any]:
         "subscription_ends_at": row["subscription_ends_at"],
         "whatsapp_phone_number_id": row["whatsapp_phone_number_id"],
         "whatsapp_display_phone_number": row["whatsapp_display_phone_number"],
+        "is_demo": bool(row["is_demo"]),
     }
 
 
-def get_workshop_identity(workshop_id: str) -> dict[str, str] | None:
+def get_workshop_identity(workshop_id: str) -> dict[str, Any] | None:
     """Return only the public identity of an existing workshop, without fallback."""
     with get_conn() as conn:
         row = conn.execute(
-            "SELECT id, name FROM workshops WHERE id = ? LIMIT 1",
+            "SELECT id, name, is_demo FROM workshops WHERE id = ? LIMIT 1",
             (workshop_id,),
         ).fetchone()
-    return {"id": row["id"], "name": row["name"]} if row else None
+    return {"id": row["id"], "name": row["name"], "is_demo": bool(row["is_demo"])} if row else None
 
 
 def get_workshop(workshop_id: str | None = None) -> dict[str, Any]:
@@ -82,7 +80,8 @@ def get_workshop(workshop_id: str | None = None) -> dict[str, Any]:
                 trial_ends_at,
                 subscription_ends_at,
                 whatsapp_phone_number_id,
-                whatsapp_display_phone_number
+                whatsapp_display_phone_number,
+                is_demo
             FROM workshops
             WHERE id = ?
             LIMIT 1
@@ -93,12 +92,7 @@ def get_workshop(workshop_id: str | None = None) -> dict[str, Any]:
     if not row:
         return {**DEFAULT_WORKSHOP, "id": wid}
 
-    workshop = _row_to_workshop(row)
-    for key, value in DEFAULT_WORKSHOP.items():
-        if not workshop.get(key):
-            workshop[key] = value
-
-    return workshop
+    return _row_to_workshop(row)
 
 
 def find_workshop_id_by_whatsapp_phone_number_id(phone_number_id: str | None) -> str | None:
@@ -136,6 +130,9 @@ def update_workshop(
     whatsapp_display_phone_number: str = "",
 ) -> dict[str, Any]:
     wid = _normalize_workshop_id(workshop_id)
+    identity = get_workshop_identity(wid)
+    if identity and identity["is_demo"]:
+        raise ValueError("Die öffentliche Demo kann nicht als Produktivkonto bearbeitet werden.")
     values = {
         "name": name.strip(),
         "address": address.strip(),

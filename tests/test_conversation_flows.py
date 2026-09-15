@@ -2290,38 +2290,56 @@ class ExistingTicketTests(unittest.TestCase):
                 conn.commit()
 
 
+def _seed_test_workshop_profile(workshop_id: str) -> None:
+    """Conversation fixtures must not rely on production startup example data."""
+    init_db()
+    update_workshop(workshop_id, name="Testwerkstatt Nord", address="Teststraße 7",
+        phone="0123456789", email="fixture@example.invalid",
+        opening_hours="Montag bis Freitag: 09:00-17:00; Samstag: 09:00-14:00",
+        services="Inspektion, Reifenwechsel", pricing_info="Aktuell keine festen Preisangaben.",
+        towing_info="Abschlepppartner auf Anfrage")
+    with get_conn() as conn:
+        conn.execute("UPDATE workshops SET subscription_status = 'active' WHERE id = ?", (workshop_id,))
+        conn.commit()
+
+
 class GeneralQuestionTests(unittest.TestCase):
+    WORKSHOP_ID = "general-question-fixture"
+
+    def setUp(self) -> None:
+        _seed_test_workshop_profile(self.WORKSHOP_ID)
+
     def test_opening_hours_use_workshop_profile(self) -> None:
         init_db()
 
-        state = IntakeState(workshop_id="demo-werkstatt")
+        state = IntakeState(workshop_id=self.WORKSHOP_ID)
         _, reply, done = handle_general_question(
             state,
             "Welche Öffnungszeiten habt ihr?",
         )
 
         self.assertFalse(done)
-        self.assertIn("Meier Werkstatt Family", reply)
+        self.assertIn("Testwerkstatt Nord", reply)
         self.assertIn("09:00-17:00", reply)
 
     def test_informal_saturday_opening_hours_question_uses_workshop_profile(self) -> None:
         init_db()
 
-        state = IntakeState(workshop_id="demo-werkstatt")
+        state = IntakeState(workshop_id=self.WORKSHOP_ID)
         _, reply, done = handle_general_question(
             state,
             "habt ihr samstags offen?",
         )
 
         self.assertFalse(done)
-        self.assertIn("Meier Werkstatt Family", reply)
+        self.assertIn("Testwerkstatt Nord", reply)
         self.assertIn("Samstag", reply)
 
 
     def test_price_overview_uses_workshop_profile(self) -> None:
         init_db()
 
-        state = IntakeState(workshop_id="demo-werkstatt")
+        state = IntakeState(workshop_id=self.WORKSHOP_ID)
         _, reply, done = handle_general_question(
             state,
             "Habt ihr eine Preisliste?",
@@ -2333,27 +2351,27 @@ class GeneralQuestionTests(unittest.TestCase):
     def test_contact_question_uses_workshop_profile(self) -> None:
         init_db()
 
-        state = IntakeState(workshop_id="demo-werkstatt")
+        state = IntakeState(workshop_id=self.WORKSHOP_ID)
         _, reply, done = handle_general_question(
             state,
             "Wie kann ich euch telefonisch erreichen?",
         )
 
         self.assertFalse(done)
-        self.assertIn("Meier Werkstatt Family", reply)
+        self.assertIn("Testwerkstatt Nord", reply)
         self.assertIn("Telefon", reply)
 
     def test_service_question_uses_workshop_profile(self) -> None:
         init_db()
 
-        state = IntakeState(workshop_id="demo-werkstatt")
+        state = IntakeState(workshop_id=self.WORKSHOP_ID)
         _, reply, done = handle_general_question(
             state,
             "Welche Leistungen macht ihr?",
         )
 
         self.assertFalse(done)
-        self.assertIn("Meier Werkstatt Family", reply)
+        self.assertIn("Testwerkstatt Nord", reply)
         self.assertIn("Beschreiben Sie einfach Ihr Anliegen", reply)
 
 
@@ -2571,7 +2589,10 @@ class QuoteRequestTests(unittest.TestCase):
 
 
 class EndToEndConversationTests(unittest.TestCase):
-    WORKSHOP_ID = "demo-werkstatt"
+    WORKSHOP_ID = "e2e-workshop-fixture"
+
+    def setUp(self) -> None:
+        _seed_test_workshop_profile(self.WORKSHOP_ID)
 
     def _send(self, session_id: str, message: str):
         return process_chat_message(
@@ -2747,7 +2768,7 @@ class EndToEndConversationTests(unittest.TestCase):
             general = self._send(session_id, "Wann habt ihr offen?")
             self.assertFalse(general.done)
             self.assertEqual(general.data.get("mode"), "general")
-            self.assertIn("Meier Werkstatt Family", general.reply)
+            self.assertIn("Testwerkstatt Nord", general.reply)
 
             self._send(session_id, "Ich moechte ein Problem melden.")
             self._send(session_id, "Mercedes C180")
@@ -3927,6 +3948,7 @@ class MultiWorkshopReadinessTests(unittest.TestCase):
                 self.assertEqual(response.status_code, 200)
                 self.assertEqual(response.context["workshop"], {
                     "id": "readiness-" + suffix, "name": "Testwerkstatt " + suffix.upper(),
+                    "is_demo": False,
                 })
                 self.assertIn("workshop_id: WORKSHOP.id", response.text)
                 self.assertIn('"werkstattai_session_id:" + WORKSHOP.id', response.text)
@@ -3934,7 +3956,7 @@ class MultiWorkshopReadinessTests(unittest.TestCase):
                 self.assertEqual(client.get("/assistant", params={"workshop_id": invalid}).status_code, 404)
             response = client.get("/assistant")
             self.assertEqual(response.status_code, 200)
-            self.assertEqual(response.context["workshop"]["id"], settings.default_workshop_id)
+            self.assertEqual(response.context["workshop"]["id"], settings.demo_workshop_id)
 
     def test_shared_browser_session_keeps_workshop_answers_separate(self) -> None:
         from fastapi.testclient import TestClient
@@ -3950,6 +3972,157 @@ class MultiWorkshopReadinessTests(unittest.TestCase):
                 self.assertEqual(response.status_code, 200)
                 self.assertIn(expected, response.json()["reply"])
                 self.assertNotIn(other, response.json()["reply"])
+
+
+class StartupDataIsolationTests(unittest.TestCase):
+    def setUp(self) -> None:
+        self.directory = tempfile.TemporaryDirectory(prefix="werkstattai-bootstrap-")
+        self.environment = patch.dict(os.environ, {
+            "WERKSTATTAI_SQLITE_PATH": os.path.join(self.directory.name, "bootstrap.db"),
+        })
+        self.environment.start()
+        init_db()
+
+    def tearDown(self) -> None:
+        import gc
+        gc.collect()
+        self.environment.stop()
+        self.directory.cleanup()
+
+    def _rows(self, table: str) -> list[dict]:
+        with get_conn() as conn:
+            return [dict(row) for row in conn.execute(f"SELECT * FROM {table}").fetchall()]
+
+    def test_restart_preserves_profiles_credentials_subscription_and_cleared_fields(self) -> None:
+        from app.security import hash_password
+
+        wid = settings.default_workshop_id
+        update_workshop(wid, name="Echte Werkstatt", address="Kundenstraße 42", phone="",
+            email="owner@example.invalid", opening_hours="", services="Inspektion",
+            pricing_info="", towing_info="", whatsapp_phone_number_id="",
+            whatsapp_display_phone_number="")
+        with get_conn() as conn:
+            conn.execute("UPDATE workshops SET subscription_status = 'inactive', trial_ends_at = NULL, subscription_ends_at = ? WHERE id = ?",
+                         ("2025-01-01T00:00:00+00:00", wid))
+            conn.execute("UPDATE users SET password_hash = ?, role = 'owner' WHERE email = ?",
+                         (hash_password("ChangedLocally123!"), settings.dashboard_admin_email))
+            conn.commit()
+        before = {table: self._rows(table) for table in ("workshops", "users")}
+        with patch.dict(os.environ, {"WHATSAPP_DEFAULT_PHONE_NUMBER_ID": "must-not-reconnect"}):
+            old_phone = settings.whatsapp_default_phone_number_id
+            object.__setattr__(settings, "whatsapp_default_phone_number_id", "must-not-reconnect")
+            try:
+                init_db()
+                init_db()
+            finally:
+                object.__setattr__(settings, "whatsapp_default_phone_number_id", old_phone)
+        self.assertEqual(before, {table: self._rows(table) for table in before})
+        self.assertIsNotNone(authenticate_user(settings.dashboard_admin_email, "ChangedLocally123!"))
+        self.assertEqual(get_workshop(wid)["opening_hours"], "")
+        self.assertEqual(get_workshop(wid)["whatsapp_phone_number_id"], "")
+        self.assertFalse(is_subscription_active(wid))
+
+    def test_existing_user_workshop_assignment_survives_restart(self) -> None:
+        _seed_test_workshop_profile("account-target")
+        with get_conn() as conn:
+            conn.execute("UPDATE users SET workshop_id = ? WHERE email = ?",
+                         ("account-target", settings.dashboard_admin_email))
+            conn.commit()
+        init_db()
+        user = authenticate_user(settings.dashboard_admin_email, settings.dashboard_admin_password)
+        self.assertEqual(user["workshop_id"], "account-target")
+
+    def test_empty_and_unknown_profiles_never_inherit_demo_examples(self) -> None:
+        for wid in (settings.default_workshop_id, "unknown-workshop"):
+            profile = get_workshop(wid)
+            for field in ("address", "phone", "email", "opening_hours", "services", "pricing_info", "towing_info"):
+                self.assertFalse(profile[field], field)
+            _, reply, _ = handle_general_question(IntakeState(workshop_id=wid), "Wann habt ihr offen?")
+            self.assertIn("noch nicht hinterlegt", reply)
+        self.assertEqual(get_workshop(settings.default_workshop_id)["name"], "Meine Werkstatt")
+        self.assertTrue(get_workshop(settings.demo_workshop_id)["is_demo"])
+        self.assertFalse(get_workshop(settings.default_workshop_id)["is_demo"])
+
+    def test_legacy_rows_and_whatsapp_mapping_survive_new_demo_marker_migration(self) -> None:
+        from app.conversation_sessions import save_session_state, load_session_state
+
+        wid = settings.default_workshop_id
+        with get_conn() as conn:
+            conn.execute("DELETE FROM workshops WHERE id = ?", (settings.demo_workshop_id,))
+            conn.execute("ALTER TABLE workshops DROP COLUMN is_demo")
+            conn.execute("UPDATE workshops SET name = ?, whatsapp_phone_number_id = ? WHERE id = ?",
+                         ("Bestehendes Produktivkonto", "real-wa-number", wid))
+            conn.commit()
+        ticket = save_ticket(IntakeState(name="Bestandskunde", telefon="0123456789"), workshop_id=wid)
+        save_session_state("legacy-session", IntakeState(name="Bestandskunde"), workshop_id=wid, channel="web_chat")
+        init_db()
+        self.assertEqual(get_workshop(wid)["name"], "Bestehendes Produktivkonto")
+        self.assertEqual(find_workshop_id_by_whatsapp_phone_number_id("real-wa-number"), wid)
+        self.assertIsNotNone(find_ticket_by_id(ticket, wid))
+        self.assertIsNone(find_ticket_by_id(ticket, settings.demo_workshop_id))
+        self.assertEqual(load_session_state("legacy-session", wid).name, "Bestandskunde")
+        self.assertIsNone(load_session_state("legacy-session", settings.demo_workshop_id).name)
+        self.assertFalse(get_workshop(settings.demo_workshop_id)["whatsapp_phone_number_id"])
+
+    def test_public_demo_and_customer_chat_create_tickets_in_separate_accounts(self) -> None:
+        from fastapi.testclient import TestClient
+        from app.main import app
+        from app.auth import SESSION_COOKIE
+
+        with TestClient(app) as client:
+            demo = client.get("/assistant")
+            customer = client.get("/assistant", params={"workshop_id": settings.default_workshop_id})
+            self.assertIn('id="demo-notice"', demo.text)
+            self.assertNotIn('id="demo-notice"', customer.text)
+            self.assertEqual(demo.context["workshop"]["id"], settings.demo_workshop_id)
+            self.assertEqual(customer.context["workshop"]["id"], settings.default_workshop_id)
+            created = {}
+            for wid in (settings.demo_workshop_id, settings.default_workshop_id):
+                for message in ("Audi A4 2019 120000 km", "Inspektion und Ölwechsel", "0176 44411122", "Testkunde"):
+                    body = {"session_id": "shared-session", "message": message}
+                    if wid != settings.demo_workshop_id:
+                        body["workshop_id"] = wid
+                    response = client.post("/chat", json=body)
+                    self.assertEqual(response.status_code, 200)
+                self.assertTrue(response.json()["done"])
+                created[wid] = response.json()["data"]["ticket_id"]
+            self.assertNotEqual(*created.values())
+            self.assertIsNone(find_ticket_by_id(created[settings.demo_workshop_id], settings.default_workshop_id))
+            self.assertIsNone(find_ticket_by_id(created[settings.default_workshop_id], settings.demo_workshop_id))
+            client.cookies.set(SESSION_COOKIE, create_session_token({
+                "email": settings.dashboard_admin_email, "workshop_id": settings.default_workshop_id, "role": "owner",
+            }))
+            dashboard = client.get("/dashboard")
+            self.assertIn(created[settings.default_workshop_id], dashboard.text)
+            self.assertNotIn(created[settings.demo_workshop_id], dashboard.text)
+            self.assertNotIn(created[settings.demo_workshop_id], client.get("/tickets").text)
+            for wid in ("", " "):
+                self.assertEqual(client.post("/chat", json={"workshop_id": wid, "session_id": "invalid"}).status_code, 404)
+
+    def test_demo_cannot_become_a_managed_production_account(self) -> None:
+        demo_id = settings.demo_workshop_id
+        self.assertNotIn(demo_id, [account["id"] for account in list_workshop_accounts()])
+        self.assertIsNone(get_workshop_account(demo_id))
+        with self.assertRaises(ValueError):
+            update_workshop(demo_id, name="Real", address="", phone="", email="",
+                            opening_hours="", services="", pricing_info="", towing_info="")
+        with self.assertRaises(ValueError):
+            update_workshop_account(workshop_id=demo_id, workshop_name="Real", whatsapp_phone_number_id="real-wa")
+        self.assertFalse(get_workshop(demo_id)["whatsapp_phone_number_id"])
+
+    def test_demo_config_rejects_production_id_collisions_without_changing_profiles(self) -> None:
+        old_demo_id = settings.demo_workshop_id
+        for collision in (settings.default_workshop_id, "another-real-workshop"):
+            if collision != settings.default_workshop_id:
+                _seed_test_workshop_profile(collision)
+            before = self._rows("workshops")
+            object.__setattr__(settings, "demo_workshop_id", collision)
+            try:
+                with self.assertRaises(ValueError):
+                    init_db()
+            finally:
+                object.__setattr__(settings, "demo_workshop_id", old_demo_id)
+            self.assertEqual(before, self._rows("workshops"))
 
 
 if __name__ == "__main__":

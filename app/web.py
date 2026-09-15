@@ -21,6 +21,7 @@ from app.auth import authenticate_user, clear_session_cookie, get_current_user, 
 from app.config import settings
 from app.db import (
     default_workshop_id,
+    demo_workshop_id,
     get_whatsapp_conversation_control,
     set_whatsapp_conversation_control,
 )
@@ -1149,8 +1150,8 @@ def datenschutz_page(request: Request):
 
 @router.get("/assistant", response_class=HTMLResponse)
 def assistant_page(request: Request, workshop_id: str | None = None):
-    # An explicit invalid ID must never send a customer to the default workshop.
-    wid = _normalize_workshop_id() if workshop_id is None else workshop_id.strip()
+    # The public demo must never use the production default workshop.
+    wid = demo_workshop_id() if workshop_id is None else workshop_id.strip()
     workshop = get_workshop_identity(wid)
     if not workshop:
         return HTMLResponse("Werkstatt wurde nicht gefunden.", status_code=404)

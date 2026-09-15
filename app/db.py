@@ -80,6 +80,10 @@ def default_workshop_id() -> str:
     return settings.default_workshop_id
 
 
+def demo_workshop_id() -> str:
+    return settings.demo_workshop_id.strip()
+
+
 def _column_exists(conn: sqlite3.Connection | PostgresConnection, table: str, column: str) -> bool:
     if is_postgres():
         row = conn.execute(
@@ -108,6 +112,8 @@ def _add_column_if_missing(
 
 
 def init_db() -> None:
+    if not demo_workshop_id() or demo_workshop_id() == default_workshop_id().strip():
+        raise ValueError("DEMO_WORKSHOP_ID muss sich von DEFAULT_WORKSHOP_ID unterscheiden.")
     if not is_postgres():
         os.makedirs(os.path.dirname(_db_path()), exist_ok=True)
 
@@ -147,6 +153,7 @@ def init_db() -> None:
         _add_column_if_missing(conn, "workshops", "subscription_ends_at", "TEXT")
         _add_column_if_missing(conn, "workshops", "whatsapp_phone_number_id", "TEXT")
         _add_column_if_missing(conn, "workshops", "whatsapp_display_phone_number", "TEXT")
+        _add_column_if_missing(conn, "workshops", "is_demo", "INTEGER NOT NULL DEFAULT 0")
 
         conn.execute(
             """
@@ -170,11 +177,7 @@ def init_db() -> None:
                 role
             )
             VALUES (?, ?, ?, ?)
-            ON CONFLICT(email) DO UPDATE SET
-                password_hash = excluded.password_hash,
-                workshop_id = excluded.workshop_id,
-                role = excluded.role,
-                updated_at = CURRENT_TIMESTAMP
+            ON CONFLICT(email) DO NOTHING
             """,
             (
                 settings.dashboard_admin_email.strip().lower(),
@@ -189,13 +192,6 @@ def init_db() -> None:
             INSERT INTO workshops (
                 id,
                 name,
-                address,
-                phone,
-                email,
-                opening_hours,
-                services,
-                pricing_info,
-                towing_info,
                 subscription_plan,
                 subscription_status,
                 trial_ends_at,
@@ -203,14 +199,7 @@ def init_db() -> None:
             )
             VALUES (
                 ?,
-                'Meier Werkstatt Family',
-                'Arnstorfer Str. 5',
-                '123456789',
-                'Meierfamily@hjh.de',
-                'Montag bis Freitag: 09:00-17:00; Samstag: 09:00-14:00; Sonntag: geschlossen',
-                'Autoreparaturen, Reifenwechsel, Polieren',
-                'Aktuell gibt es noch keine festen Preisangaben. Die Werkstatt prueft Anfragen individuell und meldet sich mit einer Einschaetzung.',
-                'Unsere Werkstatt kooperiert mit dem Abschleppdienst Mueller.',
+                'Meine Werkstatt',
                 'starter',
                 'trialing',
                 ?,
@@ -225,41 +214,35 @@ def init_db() -> None:
             ),
         )
 
+        # The legacy default ID may contain real customer data. Keep it intact
+        # and create a separate tenant for the public demo without login or WhatsApp.
         conn.execute(
             """
-            UPDATE workshops
-            SET
-                name = ?,
-                address = ?,
-                phone = ?,
-                email = ?,
-                opening_hours = ?,
-                services = ?,
-                pricing_info = ?,
-                towing_info = ?,
-                updated_at = CURRENT_TIMESTAMP
-            WHERE id = ?
+            INSERT INTO workshops (
+                id, name, address, email, opening_hours, services,
+                pricing_info, towing_info, subscription_status, is_demo
+            )
+            VALUES (?, 'WerkstattAI Demo', 'Musterstraße 1, 12345 Musterstadt',
+                'kontakt@example.invalid',
+                'Montag bis Freitag: 09:00-17:00; Samstag: 09:00-14:00; Sonntag: geschlossen',
+                'Inspektion, Reifenwechsel, Autoreparaturen',
+                'Beispieldaten: Preise werden in dieser Demo nicht verbindlich angeboten.',
+                'Beispieldaten: In dieser Demo wird kein Abschleppdienst beauftragt.',
+                'active', 1)
+            ON CONFLICT(id) DO NOTHING
             """,
-            (
-                "Meier Werkstatt Family",
-                "Arnstorfer Str. 5",
-                "123456789",
-                "Meierfamily@hjh.de",
-                "Montag bis Freitag: 09:00-17:00; Samstag: 09:00-14:00; Sonntag: geschlossen",
-                "Autoreparaturen, Reifenwechsel, Polieren",
-                "Aktuell gibt es noch keine festen Preisangaben. Die Werkstatt prueft Anfragen individuell und meldet sich mit einer Einschaetzung.",
-                "Unsere Werkstatt kooperiert mit dem Abschleppdienst Mueller.",
-                default_workshop_id(),
-            ),
+            (demo_workshop_id(),),
         )
-        conn.execute(
-            """
-            UPDATE workshops
-            SET trial_ends_at = ?
-            WHERE trial_ends_at IS NULL OR trial_ends_at = ''
-            """,
-            (_trial_ends_at(),),
-        )
+        demo = conn.execute(
+            "SELECT is_demo, whatsapp_phone_number_id FROM workshops WHERE id = ?",
+            (demo_workshop_id(),),
+        ).fetchone()
+        demo_user = conn.execute(
+            "SELECT email FROM users WHERE workshop_id = ? LIMIT 1",
+            (demo_workshop_id(),),
+        ).fetchone()
+        if not demo["is_demo"] or demo["whatsapp_phone_number_id"] or demo_user:
+            raise ValueError("DEMO_WORKSHOP_ID ist bereits mit einem Produktivkonto verknüpft.")
 
         conn.execute(
             """
@@ -329,22 +312,6 @@ def init_db() -> None:
             """
         )
 
-        default_whatsapp_phone_number_id = str(
-            settings.whatsapp_default_phone_number_id or ""
-        ).strip()
-        if default_whatsapp_phone_number_id:
-            conn.execute(
-                """
-                UPDATE workshops
-                SET whatsapp_phone_number_id = ?
-                WHERE id = ?
-                  AND (whatsapp_phone_number_id IS NULL OR whatsapp_phone_number_id = '')
-                """,
-                (
-                    default_whatsapp_phone_number_id,
-                    default_workshop_id(),
-                ),
-            )
         conn.execute(
             """
             UPDATE tickets

@@ -526,7 +526,7 @@
         <div class="sub" id="workshop-name">Anfrage an {{ workshop.name }}</div>
         <div class="brand-kicker">Digitale Fahrzeugannahme</div>
         <h1>WerkstattAI Kundenservice</h1>
-        <div class="sub">Ihr Anliegen kommt vollständig und übersichtlich bei der Werkstatt an.</div>
+        <div class="sub">{% if workshop.is_demo %}Demo mit Beispieldaten – es wird kein echter Werkstattauftrag erstellt.{% else %}Ihr Anliegen kommt vollständig und übersichtlich bei der Werkstatt an.{% endif %}</div>
       </div>
 
       <div class="top-actions">
@@ -538,6 +538,13 @@
     <main class="shell" id="main-content">
       <aside class="card side" aria-labelledby="chat-help-title">
         <h2 id="chat-help-title">So funktioniert die Anfrage</h2>
+
+        {% if workshop.is_demo %}
+        <div class="hint-box" id="demo-notice">
+          <div class="hint-title">Demo ausprobieren</div>
+          <div class="hint-text">Nutzen Sie erfundene Namen und Kontaktdaten. Testanfragen bleiben im Demobereich und gehen an keine echte Werkstatt.</div>
+        </div>
+        {% endif %}
 
         <div class="hint-box">
           <div class="hint-title">Kundenanfrage</div>
@@ -774,7 +781,7 @@ Wählen Sie einen Bereich aus oder schreiben Sie direkt Ihr Anliegen.`;
         `Ticket-ID: ${ticketId}\n` +
         `Typ: ${requestType}\n` +
         `Priorität: ${priority}\n\n` +
-        "Das Ticket ist im Werkstatt-Dashboard gespeichert.";
+        (WORKSHOP.is_demo ? "Das Testticket wurde ausschließlich im Demobereich gespeichert." : "Das Ticket ist im Werkstatt-Dashboard gespeichert.");
     }
 
     function renderWelcome() {

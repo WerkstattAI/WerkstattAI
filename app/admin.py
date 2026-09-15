@@ -40,6 +40,7 @@ def list_workshop_accounts() -> list[dict[str, Any]]:
                 MIN(u.email) AS first_user_email
             FROM workshops w
             LEFT JOIN users u ON u.workshop_id = w.id
+            WHERE w.is_demo = 0
             GROUP BY
                 w.id,
                 w.name,
@@ -84,7 +85,7 @@ def get_workshop_account(workshop_id: str) -> dict[str, Any] | None:
                 created_at,
                 updated_at
             FROM workshops
-            WHERE id = ?
+            WHERE id = ? AND is_demo = 0
             LIMIT 1
             """,
             (wid,),
@@ -152,7 +153,7 @@ def update_workshop_account(
 
     with get_conn() as conn:
         existing = conn.execute(
-            "SELECT id FROM workshops WHERE id = ? LIMIT 1",
+            "SELECT id FROM workshops WHERE id = ? AND is_demo = 0 LIMIT 1",
             (wid,),
         ).fetchone()
         if not existing:

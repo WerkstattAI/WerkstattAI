@@ -12,6 +12,7 @@ from app.auth import decode_session_token, is_dashboard_path, login_redirect_url
 from app.config import settings
 from app.db import (
     default_workshop_id,
+    demo_workshop_id,
     get_whatsapp_conversation_control,
     init_db,
     set_whatsapp_conversation_control,
@@ -630,7 +631,11 @@ def patch_ticket_status(
 
 @app.post("/chat", response_model=ChatResponse)
 def chat(payload: ChatRequest) -> ChatResponse:
-    workshop_id = _normalize_workshop_id(payload.workshop_id)
+    # Anonymous /assistant traffic is always demo traffic unless a workshop
+    # was explicitly selected through its customer-chat link.
+    workshop_id = demo_workshop_id() if payload.workshop_id is None else payload.workshop_id.strip()
+    if not workshop_id:
+        raise HTTPException(status_code=404, detail="Werkstatt wurde nicht gefunden.")
     return process_chat_message(
         workshop_id=workshop_id,
         session_id=payload.session_id,
