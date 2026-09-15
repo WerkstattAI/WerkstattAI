@@ -1519,7 +1519,7 @@
     </main>
   </div>
 
-  <script>
+  <script nonce="{{ request.state.csp_nonce }}">
     const whatsappWorkspace = document.querySelector(".workspace");
     const whatsappDiagnostics = document.querySelector(".diagnostics");
     if (whatsappWorkspace && whatsappDiagnostics) {

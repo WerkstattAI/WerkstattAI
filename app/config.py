@@ -15,6 +15,14 @@ class Settings:
 
     app_name: str = _env("APP_NAME", "WerkstattAI Intake API") or "WerkstattAI Intake API"
     log_level: str = _env("LOG_LEVEL", "INFO") or "INFO"
+    app_env: str = _env("APP_ENV", _env("RAILWAY_ENVIRONMENT_NAME", "development")) or "development"
+    railway_environment: str = _env("RAILWAY_ENVIRONMENT_NAME", "") or ""
+    cors_allowed_origins: str = _env("CORS_ALLOWED_ORIGINS", "") or ""
+    trusted_proxy_cidrs: str = _env("TRUSTED_PROXY_CIDRS", "100.64.0.0/10" if _env("RAILWAY_ENVIRONMENT_NAME") else "") or ""
+    rate_limit_requests_per_minute: int = int(_env("RATE_LIMIT_REQUESTS_PER_MINUTE", "300") or "300")
+    rate_limit_chat_per_minute: int = int(_env("RATE_LIMIT_CHAT_PER_MINUTE", "30") or "30")
+    rate_limit_login_per_minute: int = int(_env("RATE_LIMIT_LOGIN_PER_MINUTE", "5") or "5")
+    rate_limit_webhook_per_minute: int = int(_env("RATE_LIMIT_WEBHOOK_PER_MINUTE", "600") or "600")
     default_workshop_id: str = _env("DEFAULT_WORKSHOP_ID", "demo-werkstatt") or "demo-werkstatt"
     demo_workshop_id: str = _env("DEMO_WORKSHOP_ID", "werkstattai-demo") or "werkstattai-demo"
     database_url: str | None = _env("DATABASE_URL", None)

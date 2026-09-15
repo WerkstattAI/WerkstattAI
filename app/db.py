@@ -7,6 +7,7 @@ from typing import Any
 
 from app.config import settings
 from app.security import hash_password
+from app.security_config import validate_new_admin_password
 
 
 WHATSAPP_CONVERSATION_MODES = frozenset({"assistant", "manual"})
@@ -59,6 +60,9 @@ class PostgresConnection:
 
     def rollback(self) -> None:
         self._conn.rollback()
+
+    def close(self) -> None:
+        self._conn.close()
 
 
 def is_postgres() -> bool:
@@ -167,6 +171,12 @@ def init_db() -> None:
             )
             """
         )
+
+        existing_admin = conn.execute(
+            "SELECT email FROM users WHERE email = ?", (settings.dashboard_admin_email.strip().lower(),)
+        ).fetchone()
+        if not existing_admin:
+            validate_new_admin_password(settings)
 
         conn.execute(
             """
@@ -354,6 +364,17 @@ def init_db() -> None:
             ON tickets(priority)
             """
         )
+
+        conn.execute(
+            """
+            CREATE TABLE IF NOT EXISTS rate_limit_buckets (
+                bucket_key TEXT PRIMARY KEY,
+                hits INTEGER NOT NULL,
+                expires_at BIGINT NOT NULL
+            )
+            """
+        )
+        conn.execute("CREATE INDEX IF NOT EXISTS idx_rate_limit_expiry ON rate_limit_buckets(expires_at)")
 
         conn.execute(
             """

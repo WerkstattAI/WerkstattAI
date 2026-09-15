@@ -1,16 +1,18 @@
 from __future__ import annotations
 
-from typing import Optional, Dict, Any, List
-from pydantic import BaseModel, Field
+from typing import Optional, Dict, Any, List, Literal
+from pydantic import BaseModel, Field, ConfigDict
+from app.security_config import MAX_MESSAGE_LENGTH, MAX_ID_LENGTH, MAX_PHONE_LENGTH
 
 
 class ChatRequest(BaseModel):
     """Eingabemodell für den /chat Endpoint."""
-    workshop_id: Optional[str] = Field(None, description="Werkstatt-ID fuer Multi-Tenant-Betrieb")
-    session_id: str = Field(..., description="Eindeutige Session-ID (z.B. vom Frontend)")
-    message: Optional[str] = Field(None, description="Nachricht des Nutzers; None = Gespräch starten")
-    channel: str = Field("web_chat", description="Kanal der Unterhaltung, z.B. web_chat oder whatsapp")
-    phone: Optional[str] = Field(None, description="Telefonnummer des Nutzers, relevant für WhatsApp")
+    model_config = ConfigDict(extra="forbid")
+    workshop_id: Optional[str] = Field(None, max_length=MAX_ID_LENGTH, description="Werkstatt-ID fuer Multi-Tenant-Betrieb")
+    session_id: str = Field(..., min_length=1, max_length=MAX_ID_LENGTH, pattern=r"\S", description="Eindeutige Session-ID")
+    message: Optional[str] = Field(None, max_length=MAX_MESSAGE_LENGTH, description="Nachricht; None startet das Gespräch")
+    channel: Literal["web_chat"] = "web_chat"
+    phone: Optional[str] = Field(None, max_length=MAX_PHONE_LENGTH)
 
 
 class ChatResponse(BaseModel):
@@ -22,9 +24,9 @@ class ChatResponse(BaseModel):
 
 class WhatsAppWebhookRequest(BaseModel):
     """Testformat fuer eingehende WhatsApp-Nachrichten."""
-    workshop_id: Optional[str] = Field(None, description="Werkstatt-ID fuer Multi-Tenant-Betrieb")
-    from_phone: str = Field(..., alias="from", description="Telefonnummer des WhatsApp-Nutzers")
-    text: Optional[str] = Field(None, description="Text der eingehenden Nachricht")
+    workshop_id: Optional[str] = Field(None, max_length=MAX_ID_LENGTH, description="Werkstatt-ID fuer Multi-Tenant-Betrieb")
+    from_phone: str = Field(..., alias="from", min_length=1, max_length=MAX_PHONE_LENGTH, description="Telefonnummer des WhatsApp-Nutzers")
+    text: Optional[str] = Field(None, max_length=MAX_MESSAGE_LENGTH, description="Text der eingehenden Nachricht")
 
 
 class WhatsAppWebhookResponse(BaseModel):

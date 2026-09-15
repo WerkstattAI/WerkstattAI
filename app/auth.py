@@ -14,6 +14,7 @@ from fastapi.responses import RedirectResponse, Response
 from app.config import settings
 from app.db import get_conn
 from app.security import verify_password
+from app.security_config import is_production
 
 
 SESSION_COOKIE = "werkstattai_session"
@@ -81,19 +82,17 @@ def create_session_token(user: dict[str, Any]) -> str:
 
 
 def decode_session_token(token: str | None) -> dict[str, Any] | None:
-    if not token or "." not in token:
-        return None
-
-    encoded_payload, signature = token.rsplit(".", 1)
-    if not hmac.compare_digest(_sign(encoded_payload), signature):
+    if not token or len(token) > 4096 or "." not in token:
         return None
 
     try:
+        encoded_payload, signature = token.rsplit(".", 1)
+        if not hmac.compare_digest(_sign(encoded_payload), signature):
+            return None
         payload = json.loads(_b64decode(encoded_payload).decode("utf-8"))
+        if not isinstance(payload, dict) or int(payload.get("exp") or 0) < int(time.time()):
+            return None
     except Exception:
-        return None
-
-    if int(payload.get("exp") or 0) < int(time.time()):
         return None
 
     email = str(payload.get("email") or "").strip().lower()
@@ -128,6 +127,8 @@ def _request_uses_https(request: Request | None) -> bool:
 
 
 def should_secure_session_cookie(request: Request | None = None) -> bool:
+    if is_production(settings):
+        return True
     mode = str(settings.session_cookie_secure or "auto").strip().lower()
 
     if mode in {"1", "true", "yes", "on"}:

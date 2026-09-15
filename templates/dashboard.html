@@ -2902,7 +2902,7 @@
                       class="archive-form"
                       method="post"
                       action="/dashboard/ticket/{{ t.ticket_view_id }}/archive"
-                      onsubmit="return confirm('Dieses Ticket wirklich archivieren?');"
+                      data-confirm="Dieses Ticket wirklich archivieren?"
                     >
                       <input type="hidden" name="workshop_id" value="{{ workshop_id }}" />
                       <button class="archive-btn" type="submit">Archivieren</button>
@@ -3131,7 +3131,12 @@
 
   <div id="toast" class="toast" role="status" aria-live="polite" aria-atomic="true">Kopiert</div>
 
-  <script>
+  <script nonce="{{ request.state.csp_nonce }}">
+    document.querySelectorAll('form[data-confirm]').forEach(form => {
+      form.addEventListener('submit', event => {
+        if (!confirm(form.dataset.confirm)) event.preventDefault();
+      });
+    });
     const backdrop = document.getElementById("modalBackdrop");
     const closeBtn = document.getElementById("modalClose");
     const messageBackdrop = document.getElementById("messageModalBackdrop");

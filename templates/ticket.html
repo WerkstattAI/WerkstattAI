@@ -1948,7 +1948,7 @@
           <form
             method="post"
             action="/dashboard/ticket/{{ ticket.ticket_view_id }}/archive"
-            onsubmit="return confirm('Dieses Ticket wirklich archivieren?');"
+            data-confirm="Dieses Ticket wirklich archivieren?"
           >
             <input type="hidden" name="workshop_id" value="{{ workshop_id }}" />
             <button class="archive-btn" type="submit">Archivieren</button>
@@ -2316,7 +2316,12 @@
 
   <div id="toast" class="toast">✅ Kopiert!</div>
 
-  <script>
+  <script nonce="{{ request.state.csp_nonce }}">
+    document.querySelectorAll('form[data-confirm]').forEach(form => {
+      form.addEventListener('submit', event => {
+        if (!confirm(form.dataset.confirm)) event.preventDefault();
+      });
+    });
     const ticketCustomerReplyText = document.getElementById("ticketCustomerReplyText");
     const ticketHasWhatsappRecipient = {{ (ticket.whatsapp_phone | length > 0) | tojson }};
     const ticketReplyUsesWhatsapp = {{ (ticket.has_whatsapp_conversation or ticket.source == "whatsapp") | tojson }};

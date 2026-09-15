@@ -1185,9 +1185,9 @@ def login_page(
 @router.post("/login")
 def login_submit(
     request: Request,
-    email: str = Form(...),
-    password: str = Form(...),
-    next: str = Form("/dashboard"),
+    email: str = Form(..., max_length=254),
+    password: str = Form(..., max_length=128),
+    next: str = Form("/dashboard", max_length=1024),
 ):
     user = authenticate_user(email, password)
     if not user:
@@ -1344,21 +1344,21 @@ def dashboard_admin_workshops(
 @router.post("/dashboard/admin/workshops")
 def dashboard_admin_workshops_create(
     request: Request,
-    workshop_id: str = Form(""),
-    workshop_name: str = Form(...),
-    admin_email: str = Form(...),
-    admin_password: str = Form(...),
-    address: str = Form(""),
-    phone: str = Form(""),
-    email: str = Form(""),
-    opening_hours: str = Form(""),
-    services: str = Form(""),
-    pricing_info: str = Form(""),
-    towing_info: str = Form(""),
-    subscription_plan: str = Form("starter"),
-    subscription_status: str = Form("trialing"),
-    whatsapp_phone_number_id: str = Form(""),
-    whatsapp_display_phone_number: str = Form(""),
+    workshop_id: str = Form("", max_length=128),
+    workshop_name: str = Form(..., max_length=200),
+    admin_email: str = Form(..., max_length=254),
+    admin_password: str = Form(..., max_length=128),
+    address: str = Form("", max_length=500),
+    phone: str = Form("", max_length=32),
+    email: str = Form("", max_length=254),
+    opening_hours: str = Form("", max_length=2048),
+    services: str = Form("", max_length=4096),
+    pricing_info: str = Form("", max_length=4096),
+    towing_info: str = Form("", max_length=4096),
+    subscription_plan: str = Form("starter", max_length=128),
+    subscription_status: str = Form("trialing", max_length=128),
+    whatsapp_phone_number_id: str = Form("", max_length=128),
+    whatsapp_display_phone_number: str = Form("", max_length=32),
 ):
     if not _is_admin_user(request):
         return HTMLResponse("Nur Admins duerfen Werkstattkonten verwalten.", status_code=403)
@@ -1431,20 +1431,20 @@ def dashboard_admin_workshop_edit(
 def dashboard_admin_workshop_update(
     request: Request,
     admin_workshop_id: str,
-    workshop_name: str = Form(...),
-    address: str = Form(""),
-    phone: str = Form(""),
-    email: str = Form(""),
-    opening_hours: str = Form(""),
-    services: str = Form(""),
-    pricing_info: str = Form(""),
-    towing_info: str = Form(""),
-    subscription_plan: str = Form("starter"),
-    subscription_status: str = Form("trialing"),
-    trial_ends_at: str = Form(""),
-    subscription_ends_at: str = Form(""),
-    whatsapp_phone_number_id: str = Form(""),
-    whatsapp_display_phone_number: str = Form(""),
+    workshop_name: str = Form(..., max_length=200),
+    address: str = Form("", max_length=500),
+    phone: str = Form("", max_length=32),
+    email: str = Form("", max_length=254),
+    opening_hours: str = Form("", max_length=2048),
+    services: str = Form("", max_length=4096),
+    pricing_info: str = Form("", max_length=4096),
+    towing_info: str = Form("", max_length=4096),
+    subscription_plan: str = Form("starter", max_length=128),
+    subscription_status: str = Form("trialing", max_length=128),
+    trial_ends_at: str = Form("", max_length=128),
+    subscription_ends_at: str = Form("", max_length=128),
+    whatsapp_phone_number_id: str = Form("", max_length=128),
+    whatsapp_display_phone_number: str = Form("", max_length=32),
 ):
     if not _is_admin_user(request):
         return HTMLResponse("Nur Admins duerfen Werkstattkonten verwalten.", status_code=403)
@@ -1489,8 +1489,8 @@ def dashboard_admin_workshop_update(
 def dashboard_admin_workshop_reset_password(
     request: Request,
     admin_workshop_id: str,
-    owner_email: str = Form(...),
-    new_password: str = Form(...),
+    owner_email: str = Form(..., max_length=254),
+    new_password: str = Form(..., max_length=128),
 ):
     if not _is_admin_user(request):
         return HTMLResponse("Nur Admins duerfen Werkstattkonten verwalten.", status_code=403)
@@ -1603,10 +1603,10 @@ def dashboard_whatsapp(
 @router.post("/dashboard/whatsapp/test")
 def dashboard_whatsapp_test(
     request: Request,
-    test_phone: str | None = Form(None),
-    customer_phone: str | None = Form(None),
-    test_text: str = Form("WerkstattAI Testnachricht. WhatsApp Verbindung funktioniert."),
-    workshop_id: str | None = Form(None),
+    test_phone: str | None = Form(None, max_length=32),
+    customer_phone: str | None = Form(None, max_length=32),
+    test_text: str = Form("WerkstattAI Testnachricht. WhatsApp Verbindung funktioniert.", max_length=4096),
+    workshop_id: str | None = Form(None, max_length=128),
 ):
     wid = _workshop_id_for_request(request, workshop_id)
     submitted_customer_phone = customer_phone if isinstance(customer_phone, str) else ""
@@ -1701,10 +1701,10 @@ def dashboard_whatsapp_test(
 @router.post("/dashboard/whatsapp/reply")
 def dashboard_whatsapp_reply(
     request: Request,
-    customer_phone: str = Form(...),
-    reply_text: str = Form(...),
-    ticket_id: str | None = Form(None),
-    workshop_id: str | None = Form(None),
+    customer_phone: str = Form(..., max_length=32),
+    reply_text: str = Form(..., max_length=4096),
+    ticket_id: str | None = Form(None, max_length=128),
+    workshop_id: str | None = Form(None, max_length=128),
 ):
     wid = _workshop_id_for_request(request, workshop_id)
     phone = _normalize_whatsapp_recipient(customer_phone)
@@ -1909,10 +1909,10 @@ def _whatsapp_action_redirect(
 @router.post("/dashboard/whatsapp/start-template")
 def dashboard_whatsapp_start_template(
     request: Request,
-    customer_phone: str = Form(...),
-    workshop_id: str | None = Form(None),
-    ticket_id: str | None = Form(None),
-    context: str = Form("inbox"),
+    customer_phone: str = Form(..., max_length=32),
+    workshop_id: str | None = Form(None, max_length=128),
+    ticket_id: str | None = Form(None, max_length=128),
+    context: str = Form("inbox", max_length=128),
 ):
     """Start a customer conversation with the server-configured approved template."""
     wid = _workshop_id_for_request(request, workshop_id)
@@ -2065,11 +2065,11 @@ def dashboard_whatsapp_start_template(
 @router.post("/dashboard/whatsapp/control")
 def dashboard_whatsapp_control(
     request: Request,
-    customer_phone: str = Form(...),
-    mode: str = Form(...),
-    workshop_id: str | None = Form(None),
-    ticket_id: str | None = Form(None),
-    context: str = Form("inbox"),
+    customer_phone: str = Form(..., max_length=32),
+    mode: str = Form(..., max_length=128),
+    workshop_id: str | None = Form(None, max_length=128),
+    ticket_id: str | None = Form(None, max_length=128),
+    context: str = Form("inbox", max_length=128),
 ):
     """Switch one tenant-scoped conversation between assistant and workshop control."""
     wid = _workshop_id_for_request(request, workshop_id)
@@ -2150,12 +2150,12 @@ def dashboard_whatsapp_control(
 @router.post("/dashboard/whatsapp/open-manual")
 def dashboard_whatsapp_open_manual(
     request: Request,
-    customer_phone: str = Form(...),
-    workshop_id: str | None = Form(None),
-    ticket_id: str | None = Form(None),
-    context: str = Form("inbox"),
-    reply_text: str | None = Form(None),
-    message_text: str | None = Form(None),
+    customer_phone: str = Form(..., max_length=32),
+    workshop_id: str | None = Form(None, max_length=128),
+    ticket_id: str | None = Form(None, max_length=128),
+    context: str = Form("inbox", max_length=128),
+    reply_text: str | None = Form(None, max_length=4096),
+    message_text: str | None = Form(None, max_length=4096),
 ):
     """Pause the assistant before opening the employee's WhatsApp client."""
     wid = _workshop_id_for_request(request, workshop_id)
@@ -2215,17 +2215,17 @@ def dashboard_whatsapp_open_manual(
 @router.post("/dashboard/settings")
 def dashboard_settings_save(
     request: Request,
-    workshop_id: str | None = Form(None),
-    name: str = Form(...),
-    address: str = Form(""),
-    phone: str = Form(""),
-    email: str = Form(""),
-    opening_hours: str = Form(""),
-    services: str = Form(""),
-    pricing_info: str = Form(""),
-    towing_info: str = Form(""),
-    whatsapp_phone_number_id: str = Form(""),
-    whatsapp_display_phone_number: str = Form(""),
+    workshop_id: str | None = Form(None, max_length=128),
+    name: str = Form(..., max_length=200),
+    address: str = Form("", max_length=500),
+    phone: str = Form("", max_length=32),
+    email: str = Form("", max_length=254),
+    opening_hours: str = Form("", max_length=2048),
+    services: str = Form("", max_length=4096),
+    pricing_info: str = Form("", max_length=4096),
+    towing_info: str = Form("", max_length=4096),
+    whatsapp_phone_number_id: str = Form("", max_length=128),
+    whatsapp_display_phone_number: str = Form("", max_length=32),
 ):
     wid = _workshop_id_for_request(request, workshop_id)
     try:
@@ -2274,17 +2274,17 @@ def dashboard_intake(
 @router.post("/dashboard/intake")
 def dashboard_intake_save(
     request: Request,
-    workshop_id: str | None = Form(None),
-    fahrzeug: str = Form(...),
-    baujahr: str = Form(""),
-    kilometerstand: str = Form(""),
-    problem: str = Form(...),
-    telefon: str = Form(""),
-    name: str = Form(""),
-    request_type: str = Form("diagnose"),
-    priority: str = Form("normal"),
-    fahrbereit: str = Form(""),
-    abschleppdienst: str = Form(""),
+    workshop_id: str | None = Form(None, max_length=128),
+    fahrzeug: str = Form(..., max_length=200),
+    baujahr: str = Form("", max_length=128),
+    kilometerstand: str = Form("", max_length=128),
+    problem: str = Form(..., max_length=4096),
+    telefon: str = Form("", max_length=32),
+    name: str = Form("", max_length=200),
+    request_type: str = Form("diagnose", max_length=128),
+    priority: str = Form("normal", max_length=128),
+    fahrbereit: str = Form("", max_length=128),
+    abschleppdienst: str = Form("", max_length=128),
 ):
     wid = _workshop_id_for_request(request, workshop_id)
     fahrzeug_text = (fahrzeug or "").strip()
@@ -2436,8 +2436,8 @@ def ticket_detail(
 def ticket_set_status(
     request: Request,
     ticket_id: str,
-    status: str = Form(...),
-    workshop_id: str | None = Form(None),
+    status: str = Form(..., max_length=128),
+    workshop_id: str | None = Form(None, max_length=128),
 ):
     wid = _workshop_id_for_request(request, workshop_id)
     try:
@@ -2453,8 +2453,8 @@ def ticket_set_status(
 def ticket_set_status_quick(
     request: Request,
     ticket_id: str,
-    status: str = Form(...),
-    workshop_id: str | None = Form(None),
+    status: str = Form(..., max_length=128),
+    workshop_id: str | None = Form(None, max_length=128),
 ):
     wid = _workshop_id_for_request(request, workshop_id)
     try:
@@ -2470,8 +2470,8 @@ def ticket_set_status_quick(
 def ticket_send_customer_message(
     request: Request,
     ticket_id: str,
-    message_text: str = Form(...),
-    workshop_id: str | None = Form(None),
+    message_text: str = Form(..., max_length=4096),
+    workshop_id: str | None = Form(None, max_length=128),
 ):
     wid = _workshop_id_for_request(request, workshop_id)
     text = (message_text or "").strip()
@@ -2518,9 +2518,9 @@ def ticket_send_customer_message(
 def ticket_add_note(
     request: Request,
     ticket_id: str,
-    note_text: str = Form(...),
-    note_type: str = Form("internal_note"),
-    workshop_id: str | None = Form(None),
+    note_text: str = Form(..., max_length=4096),
+    note_type: str = Form("internal_note", max_length=128),
+    workshop_id: str | None = Form(None, max_length=128),
 ):
     wid = _workshop_id_for_request(request, workshop_id)
 
@@ -2588,7 +2588,7 @@ def ticket_add_note(
 
 
 @router.post("/dashboard/ticket/{ticket_id}/archive")
-def ticket_archive(request: Request, ticket_id: str, workshop_id: str | None = Form(None)):
+def ticket_archive(request: Request, ticket_id: str, workshop_id: str | None = Form(None, max_length=128)):
     wid = _workshop_id_for_request(request, workshop_id)
     try:
         archive_ticket(ticket_id, workshop_id=wid)

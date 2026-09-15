@@ -139,7 +139,7 @@ footer{border-top:1px solid var(--line);padding:32px 0}.footer-inner{display:fle
 <section class="wrap final-cta" aria-labelledby="cta-heading"><div><h2 id="cta-heading">Die nächste Anfrage?<br>Schon besser vorbereitet.</h2><p>Erleben Sie die digitale Kundenannahme aus Sicht Ihrer Kunden.</p></div><a class="btn primary" href="/assistant">Jetzt Demo ausprobieren <svg class="icon" aria-hidden="true"><use href="#i-arrow"/></svg></a></section>
 </main>
 <footer><div class="wrap footer-inner"><div><a class="brand" href="https://werkstattai.de/">Werkstatt<em>AI</em></a><p class="footer-copy">Digitale Kundenannahme · Pfarrkirchen &amp; Rottal-Inn</p></div><div class="footer-links"><a href="#preise">Preise</a><a href="https://werkstattai.de/datenschutz">Datenschutz</a><a href="/assistant">Demo</a><a href="https://werkstattai.de/login">Login</a><a href="mailto:kontakt.werkstattai.de@outlook.com">Kontakt</a></div></div></footer>
-<script>
+<script nonce="{{ request.state.csp_nonce }}">
 (() => {
   const samples = {
     panne: {id:'WS-2026-0019 · WhatsApp',priority:'Hohe Priorität',title:'Auto springt nicht an',car:'VW Golf',state:'Nicht fahrbereit',contact:'Rückruf gewünscht',next:'Kunden zurückrufen',message:'„Mein Golf springt seit heute Morgen nicht an. Können Sie mich bitte zurückrufen?“'},

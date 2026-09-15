@@ -609,6 +609,7 @@
             <div class="input-wrap">
               <textarea
                 id="messageInput"
+                maxlength="4096"
                 aria-label="Nachricht an WerkstattAI"
                 placeholder="Beschreiben Sie kurz Ihr Anliegen …"
                 required
@@ -630,7 +631,7 @@
     </main>
   </div>
 
-  <script>
+  <script nonce="{{ request.state.csp_nonce }}">
     const messagesEl = document.getElementById("messages");
     const formEl = document.getElementById("chatForm");
     const inputEl = document.getElementById("messageInput");
@@ -747,7 +748,7 @@ Wählen Sie einen Bereich aus oder schreiben Sie direkt Ihr Anliegen.`;
     }
 
     function updateCount() {
-      charCountEl.textContent = `${inputEl.value.length} Zeichen`;
+      charCountEl.textContent = `${inputEl.value.length} / 4096 Zeichen`;
     }
 
     async function sendToBackend(message) {
@@ -764,6 +765,13 @@ Wählen Sie einen Bereich aus oder schreiben Sie direkt Ihr Anliegen.`;
       });
 
       if (!response.ok) {
+        if (response.status === 429) {
+          const seconds = Number(response.headers.get("Retry-After")) || 60;
+          throw new Error(`Bitte warten Sie ${seconds} Sekunden und senden Sie Ihre Nachricht dann erneut.`);
+        }
+        if (response.status === 413 || response.status === 422) {
+          throw new Error("Die Nachricht konnte nicht verarbeitet werden. Bitte auf höchstens 4096 Zeichen kürzen und erneut senden.");
+        }
         throw new Error("Serverfehler beim Senden der Nachricht.");
       }
 
@@ -808,9 +816,11 @@ Wählen Sie einen Bereich aus oder schreiben Sie direkt Ihr Anliegen.`;
       } catch (error) {
         addMessage(
           "bot",
-          "Es ist ein Fehler aufgetreten. Bitte versuche es erneut.",
+          error.message || "Es ist ein Fehler aufgetreten. Bitte versuchen Sie es erneut.",
           "System"
         );
+        inputEl.value = message;
+        updateCount();
       } finally {
         setLoading(false);
       }

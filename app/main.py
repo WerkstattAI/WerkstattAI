@@ -1,11 +1,12 @@
 from __future__ import annotations
 
 import logging
+from typing import Annotated
 
 from fastapi import FastAPI, HTTPException, Query, Request
-from fastapi.middleware.cors import CORSMiddleware
+from fastapi.exceptions import RequestValidationError
 from fastapi.responses import JSONResponse, PlainTextResponse, RedirectResponse
-from pydantic import BaseModel
+from pydantic import BaseModel, Field, ValidationError
 
 from app.ai_service import polish_reply_de
 from app.auth import decode_session_token, is_dashboard_path, login_redirect_url
@@ -44,6 +45,8 @@ from app.whatsapp import (
 )
 from app.web import router as web_router
 from app.workshops import find_workshop_id_by_whatsapp_phone_number_id
+from app.http_security import secure_application
+from app.security_config import MAX_MESSAGE_LENGTH, is_production, validate_security_settings
 
 logger = logging.getLogger(__name__)
 
@@ -55,20 +58,25 @@ class UTF8JSONResponse(JSONResponse):
 app = FastAPI(
     title=settings.app_name,
     default_response_class=UTF8JSONResponse,
+    docs_url=None if is_production(settings) else "/docs",
+    redoc_url=None if is_production(settings) else "/redoc",
+    openapi_url=None if is_production(settings) else "/openapi.json",
 )
 
 # ✅ NOWE — inicjalizacja bazy SQLite
 @app.on_event("startup")
 def on_startup():
+    validate_security_settings(settings)
     init_db()
 
-app.add_middleware(
-    CORSMiddleware,
-    allow_origins=["*"],  # In Produktion einschränken
-    allow_credentials=True,
-    allow_methods=["*"],
-    allow_headers=["*"],
-)
+
+@app.exception_handler(RequestValidationError)
+async def invalid_request(request: Request, error: RequestValidationError):
+    # Validation responses must not echo passwords or oversized user input.
+    return UTF8JSONResponse(status_code=422, content={"detail": [
+        {"loc": item["loc"], "msg": item["msg"], "type": item["type"]}
+        for item in error.errors()
+    ]})
 
 
 @app.middleware("http")
@@ -373,6 +381,8 @@ def _save_or_send_whatsapp_reply(
 
 @app.post("/webhooks/whatsapp")
 async def whatsapp_webhook(request: Request):
+    if is_production(settings) and not settings.whatsapp_app_secret:
+        raise HTTPException(status_code=403, detail="WhatsApp webhook is not configured")
     body = await request.body()
     if not verify_signature(
         body,
@@ -390,7 +400,19 @@ async def whatsapp_webhook(request: Request):
         raise HTTPException(status_code=400, detail="Invalid WhatsApp payload")
 
     if "entry" not in payload:
-        return _process_test_whatsapp_webhook(WhatsAppWebhookRequest.model_validate(payload))
+        try:
+            test_payload = WhatsAppWebhookRequest.model_validate(payload)
+        except ValidationError:
+            raise HTTPException(status_code=422, detail="Invalid WhatsApp test payload")
+        return _process_test_whatsapp_webhook(test_payload)
+
+    try:
+        messages = parse_meta_messages(payload)
+        statuses = parse_meta_statuses(payload)
+    except (TypeError, ValueError, AttributeError):
+        raise HTTPException(status_code=422, detail="Invalid WhatsApp payload structure")
+    if len(messages) + len(statuses) > 100 or any(len(message.text or "") > MAX_MESSAGE_LENGTH for message in messages):
+        raise HTTPException(status_code=413, detail="WhatsApp payload exceeds the input limits")
 
     processed = 0
     ignored = 0
@@ -399,7 +421,7 @@ async def whatsapp_webhook(request: Request):
     replies: list[dict] = []
     manual_messages: list[dict] = []
 
-    for status_event in parse_meta_statuses(payload):
+    for status_event in statuses:
         workshop_id = find_workshop_id_by_whatsapp_phone_number_id(status_event.phone_number_id)
         if not workshop_id:
             ignored += 1
@@ -427,7 +449,7 @@ async def whatsapp_webhook(request: Request):
         else:
             ignored += 1
 
-    for message in parse_meta_messages(payload):
+    for message in messages:
         workshop_id = find_workshop_id_by_whatsapp_phone_number_id(message.phone_number_id)
         if not workshop_id:
             ignored += 1
@@ -565,7 +587,7 @@ async def whatsapp_webhook_alt(request: Request):
 
 
 class StatusUpdate(BaseModel):
-    status: str
+    status: str = Field(..., max_length=32)
 
 
 @app.get("/")
@@ -591,7 +613,7 @@ def subscription(request: Request, workshop_id: str | None = None):
 
 
 @app.get("/tickets")
-def tickets(request: Request, limit: int = 50, workshop_id: str | None = None):
+def tickets(request: Request, limit: Annotated[int, Query(ge=1, le=200)] = 50, workshop_id: str | None = None):
     wid = _workshop_id_for_api_request(request, workshop_id)
     return {
         "items": list_latest_tickets(limit=limit, workshop_id=wid),
@@ -643,3 +665,8 @@ def chat(payload: ChatRequest) -> ChatResponse:
         channel=payload.channel,
         phone=payload.phone,
     )
+
+
+# Wrap the complete ASGI application so headers also cover errors and CORS responses.
+api = app
+app = secure_application(api, settings)
