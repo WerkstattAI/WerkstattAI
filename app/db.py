@@ -1,7 +1,9 @@
 from __future__ import annotations
 
 import os
+import json
 import sqlite3
+import uuid
 from contextlib import contextmanager
 from contextvars import ContextVar
 from datetime import datetime, timedelta, timezone
@@ -14,6 +16,7 @@ from app.security_config import validate_new_admin_password
 
 WHATSAPP_CONVERSATION_MODES = frozenset({"assistant", "manual"})
 _UNSET_ACTIVE_TICKET = object()
+_UNSET_PENDING_QUESTION = object()
 _TRANSACTION_CONNECTION: ContextVar[Any] = ContextVar("werkstattai_transaction", default=None)
 
 
@@ -148,6 +151,12 @@ def get_conn() -> sqlite3.Connection | PostgresConnection:
 
 def default_workshop_id() -> str:
     return settings.default_workshop_id
+
+
+def lock_communication_scope(conn, workshop_id: str) -> None:
+    """Use one short transaction lock before ticket/control row locks on PostgreSQL."""
+    if is_postgres():
+        conn.execute("SELECT pg_advisory_xact_lock(hashtext(?))", ("communication:" + workshop_id,))
 
 
 def demo_workshop_id() -> str:
@@ -626,6 +635,7 @@ def init_db() -> None:
             """
         )
         _add_column_if_missing(conn, "whatsapp_conversation_controls", "revision", "INTEGER NOT NULL DEFAULT 0")
+        _migrate_customer_communication(conn)
 
         conn.execute(
             """
@@ -641,6 +651,57 @@ def init_db() -> None:
         )
         conn.execute("CREATE INDEX IF NOT EXISTS idx_privacy_operations_created ON privacy_operations(created_at)")
         conn.commit()
+
+
+def _migrate_customer_communication(conn) -> None:
+    """Portable, additive migration; semantic history remains in ticket notes."""
+    from app.communication import conversation_mode, normalize_ticket_notes, open_customer_questions
+
+    ticket_state_added = not _column_exists(conn, "tickets", "conversation_state")
+    _add_column_if_missing(conn, "tickets", "conversation_state", "TEXT NOT NULL DEFAULT 'assistant_active'")
+    control_state_added = not _column_exists(conn, "whatsapp_conversation_controls", "conversation_state")
+    _add_column_if_missing(conn, "whatsapp_conversation_controls", "conversation_state", "TEXT NOT NULL DEFAULT 'assistant_active'")
+    _add_column_if_missing(conn, "whatsapp_conversation_controls", "pending_workshop_question_id", "TEXT")
+    _add_column_if_missing(conn, "whatsapp_messages", "message_id", "TEXT")
+    if control_state_added:
+        conn.execute("""UPDATE whatsapp_conversation_controls SET conversation_state =
+                        CASE WHEN mode = 'manual' THEN 'workshop_active' ELSE 'assistant_active' END""")
+    for row in conn.execute("SELECT workshop_id, ticket_id, notes_json, customer_question_open, conversation_state FROM tickets").fetchall():
+        try:
+            old_notes = json.loads(row["notes_json"] or "[]")
+        except (ValueError, TypeError):
+            # Preserve malformed historical content rather than silently erase it.
+            continue
+        if not isinstance(old_notes, list) or any(not isinstance(note, dict) for note in old_notes):
+            # Do not discard opaque/malformed historical entries during upgrade.
+            continue
+        notes = normalize_ticket_notes(old_notes, workshop_id=row["workshop_id"], ticket_id=row["ticket_id"],
+                                       legacy_question_open=bool(row["customer_question_open"]))
+        questions_open = int(bool(open_customer_questions({"notes": notes})))
+        state = row["conversation_state"]
+        if ticket_state_added:
+            manual = conn.execute("""SELECT 1 FROM whatsapp_conversation_controls
+                                     WHERE workshop_id = ? AND active_ticket_id = ? AND mode = 'manual' LIMIT 1""",
+                                  (row["workshop_id"], row["ticket_id"])).fetchone()
+            state = "waiting_for_workshop" if questions_open else "workshop_active" if manual else "assistant_active"
+        if old_notes != notes or questions_open != row["customer_question_open"] or state != row["conversation_state"]:
+            conn.execute("""UPDATE tickets SET notes_json = ?, customer_question_open = ?, conversation_state = ?
+                            WHERE workshop_id = ? AND ticket_id = ?""",
+                         (json.dumps(notes, ensure_ascii=False), questions_open, state, row["workshop_id"], row["ticket_id"]))
+    # Controls only own the state for conversations without a linked ticket.
+    for row in conn.execute("""SELECT c.workshop_id, c.customer_phone, t.conversation_state
+                               FROM whatsapp_conversation_controls c JOIN tickets t
+                               ON t.workshop_id = c.workshop_id AND t.ticket_id = c.active_ticket_id""").fetchall():
+        conn.execute("""UPDATE whatsapp_conversation_controls SET conversation_state = ?, mode = ?
+                        WHERE workshop_id = ? AND customer_phone = ?""",
+                     (row["conversation_state"], conversation_mode(row["conversation_state"]),
+                      row["workshop_id"], row["customer_phone"]))
+    for row in conn.execute("SELECT id, workshop_id, direction FROM whatsapp_messages WHERE message_id IS NULL OR message_id = ''").fetchall():
+        identity = json.dumps([row["workshop_id"], row["direction"], row["id"]], separators=(",", ":"))
+        conn.execute("UPDATE whatsapp_messages SET message_id = ? WHERE workshop_id = ? AND id = ?",
+                     ("legacy-wa-" + uuid.uuid5(uuid.NAMESPACE_URL, identity).hex, row["workshop_id"], row["id"]))
+    conn.execute("""CREATE UNIQUE INDEX IF NOT EXISTS idx_whatsapp_messages_message_id
+                    ON whatsapp_messages(workshop_id, message_id) WHERE message_id IS NOT NULL""")
 
 
 def _normalize_whatsapp_control_phone(customer_phone: str) -> str:
@@ -670,120 +731,91 @@ def get_whatsapp_conversation_control(
     workshop_id: str,
     customer_phone: str,
 ) -> dict[str, Any]:
-    """Return the tenant-scoped WhatsApp mode, defaulting to assistant mode."""
-    wid, phone = _normalize_whatsapp_conversation_scope(
-        workshop_id=workshop_id,
-        customer_phone=customer_phone,
-    )
+    """Read the canonical ticket state or the unassigned conversation state."""
+    from app.communication import conversation_mode, pending_workshop_question
+    from app.tickets import _row_to_ticket_dict
 
+    wid, phone = _normalize_whatsapp_conversation_scope(workshop_id=workshop_id, customer_phone=customer_phone)
     with get_conn() as conn:
-        row = conn.execute(
-            """
-            SELECT
-                workshop_id,
-                customer_phone,
-                mode,
-                active_ticket_id,
-                revision,
-                created_at,
-                updated_at
-            FROM whatsapp_conversation_controls
-            WHERE workshop_id = ? AND customer_phone = ?
-            LIMIT 1
-            """,
-            (wid, phone),
-        ).fetchone()
-
-    if row:
-        return dict(row)
-
-    return {
-        "workshop_id": wid,
-        "customer_phone": phone,
-        "mode": "assistant",
-        "active_ticket_id": None,
-        "revision": 0,
-        "created_at": None,
-        "updated_at": None,
-    }
+        row = conn.execute("SELECT * FROM whatsapp_conversation_controls WHERE workshop_id = ? AND customer_phone = ?",
+                           (wid, phone)).fetchone()
+        result = dict(row) if row else {
+            "workshop_id": wid, "customer_phone": phone, "mode": "assistant",
+            "conversation_state": "assistant_active", "active_ticket_id": None,
+            "pending_workshop_question_id": None, "revision": 0, "created_at": None, "updated_at": None,
+        }
+        if result.get("active_ticket_id"):
+            ticket_row = conn.execute("SELECT * FROM tickets WHERE workshop_id = ? AND ticket_id = ?",
+                                      (wid, result["active_ticket_id"])).fetchone()
+            if ticket_row:
+                ticket = _row_to_ticket_dict(ticket_row)
+                result["conversation_state"] = ticket["conversation_state"]
+                pending = pending_workshop_question(ticket)
+                result["pending_workshop_question_id"] = pending["message_id"] if pending else None
+    result["mode"] = conversation_mode(result["conversation_state"])
+    return result
 
 
 def set_whatsapp_conversation_control(
     *,
     workshop_id: str,
     customer_phone: str,
-    mode: str,
+    mode: str | None = None,
+    conversation_state: str | None = None,
     active_ticket_id: str | None | object = _UNSET_ACTIVE_TICKET,
+    pending_workshop_question_id: str | None | object = _UNSET_PENDING_QUESTION,
 ) -> dict[str, Any]:
-    """Persist a tenant-scoped WhatsApp mode and optionally change its ticket link.
+    """Change canonical ownership; legacy mode is a compatibility projection.
 
-    Omitting ``active_ticket_id`` preserves an existing ticket link. Passing
-    ``None`` explicitly clears it.
+    An explicit state is preferred. Old callers passing assistant/manual retain
+    their meaning, but only the explicit assistant action may resume automation.
     """
-    wid, phone = _normalize_whatsapp_conversation_scope(
-        workshop_id=workshop_id,
-        customer_phone=customer_phone,
-    )
-    normalized_mode = str(mode or "").strip().lower()
-    if normalized_mode not in WHATSAPP_CONVERSATION_MODES:
+    from app.communication import CONVERSATION_STATES, conversation_mode
+    from app.tickets import _set_ticket_state_in_transaction
+
+    wid, phone = _normalize_whatsapp_conversation_scope(workshop_id=workshop_id, customer_phone=customer_phone)
+    if mode is not None and mode not in WHATSAPP_CONVERSATION_MODES:
         raise ValueError("mode must be 'assistant' or 'manual'")
-
-    ticket_was_provided = active_ticket_id is not _UNSET_ACTIVE_TICKET
-    normalized_ticket_id: str | None = None
-    if ticket_was_provided:
-        normalized_ticket_id = str(active_ticket_id or "").strip() or None
-
-    with get_conn() as conn:
-        if normalized_ticket_id:
-            ticket = conn.execute(
-                """
-                SELECT 1
-                FROM tickets
-                WHERE workshop_id = ? AND ticket_id = ?
-                LIMIT 1
-                """,
-                (wid, normalized_ticket_id),
-            ).fetchone()
+    if conversation_state is not None and conversation_state not in CONVERSATION_STATES:
+        raise ValueError("Invalid conversation_state")
+    if conversation_state is not None and mode is not None and conversation_mode(conversation_state) != mode:
+        raise ValueError("mode and conversation_state disagree")
+    if conversation_state is None and mode is None:
+        raise ValueError("mode or conversation_state is required")
+    state = conversation_state or ("assistant_active" if mode == "assistant" else "workshop_active")
+    projected_mode = conversation_mode(state)
+    with atomic_database() as conn:
+        lock_communication_scope(conn, wid)
+        if state == "assistant_active":
+            sending = conn.execute("""SELECT 1 FROM whatsapp_messages
+                                      WHERE workshop_id = ? AND customer_phone = ? AND direction = 'outbound'
+                                        AND dispatch_state = 'sending' LIMIT 1""", (wid, phone)).fetchone()
+            if sending:
+                raise ValueError("Eine Nachricht wird gerade versendet. Bitte danach den Assistenten aktivieren.")
+        previous = conn.execute("SELECT * FROM whatsapp_conversation_controls WHERE workshop_id = ? AND customer_phone = ?" +
+                                (" FOR UPDATE" if is_postgres() else ""), (wid, phone)).fetchone()
+        previous = dict(previous) if previous else {}
+        tid = (previous.get("active_ticket_id") if active_ticket_id is _UNSET_ACTIVE_TICKET
+               else str(active_ticket_id or "").strip() or None)
+        pending = (previous.get("pending_workshop_question_id") if pending_workshop_question_id is _UNSET_PENDING_QUESTION
+                   else str(pending_workshop_question_id or "").strip() or None)
+        if tid:
+            ticket = conn.execute("SELECT 1 FROM tickets WHERE workshop_id = ? AND ticket_id = ?" +
+                                  (" FOR UPDATE" if is_postgres() else ""), (wid, tid)).fetchone()
             if not ticket:
                 raise ValueError("active_ticket_id does not belong to workshop_id")
-
-        if ticket_was_provided:
-            conn.execute(
-                """
-                INSERT INTO whatsapp_conversation_controls (
-                    workshop_id,
-                    customer_phone,
-                    mode,
-                    active_ticket_id
-                )
-                VALUES (?, ?, ?, ?)
-                ON CONFLICT(workshop_id, customer_phone) DO UPDATE SET
-                    mode = excluded.mode,
-                    active_ticket_id = excluded.active_ticket_id,
-                    revision = whatsapp_conversation_controls.revision + 1,
-                    updated_at = CURRENT_TIMESTAMP
-                """,
-                (wid, phone, normalized_mode, normalized_ticket_id),
-            )
-        else:
-            conn.execute(
-                """
-                INSERT INTO whatsapp_conversation_controls (
-                    workshop_id,
-                    customer_phone,
-                    mode
-                )
-                VALUES (?, ?, ?)
-                ON CONFLICT(workshop_id, customer_phone) DO UPDATE SET
-                    mode = excluded.mode,
-                    revision = whatsapp_conversation_controls.revision + 1,
-                    updated_at = CURRENT_TIMESTAMP
-                """,
-                (wid, phone, normalized_mode),
-            )
-        conn.commit()
-
-    return get_whatsapp_conversation_control(
-        workshop_id=wid,
-        customer_phone=phone,
-    )
+            _set_ticket_state_in_transaction(conn, wid, tid, state)
+            pending = None  # A linked ticket owns the question ledger.
+        if state == "assistant_active":
+            pending = None
+        conn.execute("""
+            INSERT INTO whatsapp_conversation_controls
+                (workshop_id, customer_phone, mode, conversation_state, active_ticket_id, pending_workshop_question_id)
+            VALUES (?, ?, ?, ?, ?, ?)
+            ON CONFLICT(workshop_id, customer_phone) DO UPDATE SET
+                mode = excluded.mode, conversation_state = excluded.conversation_state,
+                active_ticket_id = excluded.active_ticket_id,
+                pending_workshop_question_id = excluded.pending_workshop_question_id,
+                revision = whatsapp_conversation_controls.revision + 1, updated_at = CURRENT_TIMESTAMP
+            """, (wid, phone, projected_mode, state, tid, pending))
+    return get_whatsapp_conversation_control(workshop_id=wid, customer_phone=phone)

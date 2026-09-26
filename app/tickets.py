@@ -1,18 +1,24 @@
 from __future__ import annotations
 
 import json
+import uuid
 from contextlib import closing
 from datetime import datetime
 from typing import Any, Dict, Optional
 
-from app.db import atomic_database, default_workshop_id, get_conn, is_postgres
+from app.db import atomic_database, default_workshop_id, get_conn, is_postgres, lock_communication_scope
 from app.models import IntakeState
+from app.communication import (
+    CONVERSATION_STATES, MESSAGE_PURPOSES, PURPOSE_SENDERS, conversation_mode,
+    normalize_ticket_notes, open_customer_questions, pending_workshop_question,
+    validate_workshop_message,
+)
 
 
 ALLOWED_STATUS = {"offen", "in_bearbeitung", "erledigt", "archiviert"}
 ALLOWED_PRIORITY = {"niedrig", "normal", "hoch"}
 ALLOWED_REQUEST_TYPE = {"service", "diagnose", "notfall", "kostenvoranschlag"}
-ALLOWED_NOTE_TYPE = {"internal_note", "customer_message", "customer_reply"}
+ALLOWED_NOTE_TYPE = {"internal_note", "customer_message", "customer_reply", "assistant_message"}
 ALLOWED_SOURCE = {"web_chat", "whatsapp", "direktannahme"}
 
 
@@ -166,7 +172,7 @@ def _normalize_ticket_record(obj: dict[str, Any]) -> dict[str, Any]:
     obj["priority"] = _normalize_priority(obj.get("priority"))
     obj["request_type"] = _normalize_request_type(obj.get("request_type"))
     obj["source"] = _normalize_source(obj.get("source"))
-    obj["customer_question_open"] = bool(obj.get("customer_question_open"))
+    legacy_question_open = bool(obj.get("customer_question_open"))
 
     if obj.get("followup_questions") is None or not isinstance(obj.get("followup_questions"), list):
         obj["followup_questions"] = []
@@ -177,7 +183,11 @@ def _normalize_ticket_record(obj: dict[str, Any]) -> dict[str, Any]:
     if obj.get("notes") is None or not isinstance(obj.get("notes"), list):
         obj["notes"] = []
     else:
-        obj["notes"] = [_normalize_note(note) for note in obj["notes"] if isinstance(note, dict)]
+        obj["notes"] = normalize_ticket_notes(obj["notes"], workshop_id=obj["workshop_id"],
+                                               ticket_id=ticket_id, legacy_question_open=legacy_question_open)
+    obj["customer_question_open"] = bool(open_customer_questions(obj))
+    obj["open_customer_questions"] = open_customer_questions(obj)
+    obj["conversation_state"] = str(obj.get("conversation_state") or "assistant_active")
 
     if not obj.get("kunde_name") and obj.get("name"):
         obj["kunde_name"] = obj.get("name")
@@ -199,6 +209,7 @@ def _row_to_ticket_dict(row: Any) -> dict[str, Any]:
         "request_type": row["request_type"],
         "source": row["source"],
         "customer_question_open": _db_to_bool(row["customer_question_open"]),
+        "conversation_state": row["conversation_state"],
         "fahrzeug": row["fahrzeug"],
         "baujahr": row["baujahr"],
         "kilometerstand": row["kilometerstand"],
@@ -582,11 +593,15 @@ def add_ticket_note(
     note_text: str,
     note_type: str = "internal_note",
     workshop_id: str | None = None,
+    *,
+    sender_role: str | None = None,
+    purpose: str | None = None,
+    requires_human_action: bool | None = None,
+    message_id: str | None = None,
+    reply_to_message_id: str | None = None,
+    delivery_status: str | None = None,
 ) -> dict[str, Any]:
-    """
-    Fügt einem Ticket eine interne Notiz hinzu
-    und aktualisiert updated_at.
-    """
+    """Append one semantic message, resolving only an explicitly targeted question."""
     tid = (ticket_id or "").strip()
     text = (note_text or "").strip()
 
@@ -598,8 +613,31 @@ def add_ticket_note(
 
     now_iso = _now_iso()
     wid = str(workshop_id or default_workshop_id()).strip() or default_workshop_id()
+    normalized_note_type = _normalize_note_type(note_type, text)
+    purpose = purpose or {"internal_note": "internal_note", "customer_message": "customer_question",
+                          "customer_reply": "workshop_notification", "assistant_message": "automatic_answer"}[normalized_note_type]
+    if purpose not in MESSAGE_PURPOSES:
+        raise ValueError("Ungültiger Nachrichtenzweck")
+    sender_role = sender_role or PURPOSE_SENDERS[purpose]
+    if sender_role != PURPOSE_SENDERS[purpose]:
+        raise ValueError("Absender und Nachrichtenzweck passen nicht zusammen")
+    normalized_note_type = ("internal_note" if purpose == "internal_note" else
+                            {"customer": "customer_message", "workshop": "customer_reply",
+                             "assistant": "assistant_message"}[sender_role])
+    if delivery_status not in {None, "pending", "sent", "unknown", "failed"}:
+        raise ValueError("Ungültiger Versandstatus")
+    if delivery_status and sender_role != "workshop":
+        raise ValueError("Versandstatus ist nur für Werkstattnachrichten zulässig")
+    if purpose == "customer_question" and requires_human_action is False:
+        raise ValueError("Eine offene Kundenfrage erfordert eine Werkstattaktion")
+    requires_human_action = (purpose == "customer_question" if requires_human_action is None
+                             else bool(requires_human_action))
+    mid = str(message_id or uuid.uuid4().hex).strip()
+    if not mid or len(mid) > 256:
+        raise ValueError("Ungültige Nachrichten-ID")
 
     with atomic_database() as conn:
+        lock_communication_scope(conn, wid)
         row = conn.execute(
             """
             SELECT *
@@ -613,44 +651,65 @@ def add_ticket_note(
         if not row:
             raise KeyError("Ticket nicht gefunden")
 
-        notes = _safe_json_loads(row["notes_json"], [])
-        if not isinstance(notes, list):
-            notes = []
-        else:
-            notes = [_normalize_note(note) for note in notes if isinstance(note, dict)]
+        ticket = _row_to_ticket_dict(row)
+        notes = ticket["notes"]
+        for existing in notes:
+            if existing["message_id"] == mid:
+                if (existing["text"] != text or existing["purpose"] != purpose
+                        or existing["sender_role"] != sender_role
+                        or (reply_to_message_id and existing.get("reply_to_message_id") != reply_to_message_id)):
+                    raise ValueError("Nachrichten-ID wurde bereits für eine andere Nachricht verwendet")
+                return ticket
+        target = str(reply_to_message_id or "").strip() or None
+        if sender_role == "workshop" and purpose != "internal_note":
+            target = validate_workshop_message(ticket, purpose, target)
+        elif target:
+            target_note = next((note for note in notes if note["message_id"] == target), None)
+            if target_note is None:
+                raise ValueError("Antwortziel gehört nicht zu diesem Ticket")
+            if sender_role == "customer" and (target_note["purpose"] != "workshop_question"
+                                               or target_note.get("delivery_status") == "failed"
+                                               or target_note.get("response_cancelled_at")):
+                raise ValueError("Kundenantwort benötigt eine Werkstattfrage als Ziel")
+            if sender_role == "customer" and any(note.get("sender_role") == "customer"
+                                                 and note.get("reply_to_message_id") == target for note in notes):
+                raise ValueError("Diese Werkstattfrage wurde bereits beantwortet")
 
-        notes.append(
-            {
-                "type": _normalize_note_type(note_type, text),
-                "text": text,
-                "created_at": now_iso,
-            }
-        )
-        normalized_note_type = _normalize_note_type(note_type, text)
-        customer_question_open = bool(row["customer_question_open"])
-        if normalized_note_type == "customer_message":
-            customer_question_open = True
-        elif normalized_note_type == "customer_reply":
-            customer_question_open = False
-        status = _normalize_status(row["status"])
-        if normalized_note_type == "customer_reply" and status == "offen":
-            status = "in_bearbeitung"
+        note = {"type": normalized_note_type, "text": text, "created_at": now_iso,
+                "message_id": mid, "sender_role": sender_role, "purpose": purpose,
+                "requires_human_action": requires_human_action, "reply_to_message_id": target,
+                "resolved_at": None}
+        if delivery_status:
+            note["delivery_status"] = delivery_status
+        notes.append(note)
+        if purpose == "workshop_answer" and delivery_status in {None, "sent"}:
+            next(item for item in notes if item["message_id"] == target)["resolved_at"] = now_iso
+        state = ticket["conversation_state"]
+        if purpose == "workshop_question" and delivery_status != "failed":
+            state = "waiting_for_customer"
+        elif sender_role == "workshop" and purpose != "internal_note" and delivery_status != "failed":
+            state = ("waiting_for_customer" if pending_workshop_question(ticket) else
+                     "waiting_for_workshop" if open_customer_questions(ticket) else "workshop_active")
+        elif sender_role == "customer" and target:
+            state = "waiting_for_workshop" if open_customer_questions(ticket) else "workshop_active"
+        elif sender_role == "customer" and requires_human_action:
+            state = "waiting_for_workshop"
 
         conn.execute(
             """
             UPDATE tickets
-            SET notes_json = ?, updated_at = ?, customer_question_open = ?, status = ?
+            SET notes_json = ?, updated_at = ?, customer_question_open = ?
             WHERE workshop_id = ? AND ticket_id = ?
             """,
             (
                 json.dumps(notes, ensure_ascii=False),
                 now_iso,
-                _bool_to_db(customer_question_open),
-                status,
+                _bool_to_db(bool(open_customer_questions(ticket))),
                 wid,
                 tid,
             ),
         )
+        _set_ticket_state_in_transaction(conn, wid, tid, state)
         conn.commit()
 
         updated_row = conn.execute(
@@ -667,6 +726,100 @@ def add_ticket_note(
         raise KeyError("Ticket nicht gefunden")
 
     return _row_to_ticket_dict(updated_row)
+
+
+def _set_ticket_state_in_transaction(conn, workshop_id: str, ticket_id: str, state: str) -> None:
+    if state not in CONVERSATION_STATES:
+        raise ValueError("Ungültiger Gesprächszustand")
+    previous = conn.execute("SELECT * FROM tickets WHERE workshop_id = ? AND ticket_id = ?",
+                            (workshop_id, ticket_id)).fetchone()
+    if not previous:
+        raise KeyError("Ticket nicht gefunden")
+    if state == "assistant_active":
+        sending = conn.execute("""SELECT 1 FROM whatsapp_messages
+                                  WHERE workshop_id = ? AND direction = 'outbound' AND dispatch_state = 'sending'
+                                    AND (ticket_id = ? OR customer_phone IN (
+                                        SELECT customer_phone FROM whatsapp_conversation_controls
+                                        WHERE workshop_id = ? AND active_ticket_id = ?)) LIMIT 1""",
+                               (workshop_id, ticket_id, workshop_id, ticket_id)).fetchone()
+        if sending:
+            raise ValueError("Eine Nachricht wird gerade versendet. Bitte danach den Assistenten aktivieren.")
+        ticket = _row_to_ticket_dict(previous)
+        answered = {note.get("reply_to_message_id") for note in ticket["notes"]
+                    if note.get("sender_role") == "customer" and note.get("reply_to_message_id")}
+        changed = False
+        for note in ticket["notes"]:
+            if (note["purpose"] == "workshop_question" and note["message_id"] not in answered
+                    and not note.get("response_cancelled_at")):
+                note["response_cancelled_at"] = _now_iso()
+                changed = True
+        if changed:
+            conn.execute("UPDATE tickets SET notes_json = ? WHERE workshop_id = ? AND ticket_id = ?",
+                         (json.dumps(ticket["notes"], ensure_ascii=False), workshop_id, ticket_id))
+    if previous["conversation_state"] == state:
+        return
+    conn.execute("UPDATE tickets SET conversation_state = ?, updated_at = ? WHERE workshop_id = ? AND ticket_id = ?",
+                 (state, _now_iso(), workshop_id, ticket_id))
+    # Existing transport controls are a compatibility projection. Their revision
+    # invalidates a prepared assistant send whenever canonical ownership changes.
+    conn.execute("""UPDATE whatsapp_conversation_controls
+                    SET conversation_state = ?, mode = ?, revision = revision + 1, updated_at = CURRENT_TIMESTAMP
+                    WHERE workshop_id = ? AND active_ticket_id = ?""",
+                 (state, conversation_mode(state), workshop_id, ticket_id))
+
+
+def set_ticket_conversation_state(ticket_id: str, state: str, workshop_id: str | None = None) -> dict[str, Any]:
+    wid = str(workshop_id or default_workshop_id()).strip()
+    with atomic_database() as conn:
+        lock_communication_scope(conn, wid)
+        row = conn.execute("SELECT * FROM tickets WHERE workshop_id = ? AND ticket_id = ?" +
+                           (" FOR UPDATE" if is_postgres() else ""), (wid, ticket_id)).fetchone()
+        if not row:
+            raise KeyError("Ticket nicht gefunden")
+        _set_ticket_state_in_transaction(conn, wid, ticket_id, state)
+        return _row_to_ticket_dict(conn.execute("SELECT * FROM tickets WHERE workshop_id = ? AND ticket_id = ?",
+                                               (wid, ticket_id)).fetchone())
+
+
+def finalize_ticket_message_delivery(
+    ticket_id: str, message_id: str, status: str, workshop_id: str | None = None,
+) -> dict[str, Any]:
+    if status not in {"sent", "unknown", "failed"}:
+        raise ValueError("Ungültiger abschließender Versandstatus")
+    wid = str(workshop_id or default_workshop_id()).strip()
+    with atomic_database() as conn:
+        lock_communication_scope(conn, wid)
+        row = conn.execute("SELECT * FROM tickets WHERE workshop_id = ? AND ticket_id = ?" +
+                           (" FOR UPDATE" if is_postgres() else ""), (wid, ticket_id)).fetchone()
+        if not row:
+            raise KeyError("Ticket nicht gefunden")
+        ticket = _row_to_ticket_dict(row)
+        note = next((item for item in ticket["notes"] if item["message_id"] == message_id), None)
+        if note is None or note["sender_role"] != "workshop":
+            raise ValueError("Werkstattnachricht gehört nicht zu diesem Ticket")
+        if note.get("delivery_status") == status:
+            return ticket
+        if note.get("delivery_status") == "sent":
+            raise ValueError("Eine versandte Nachricht kann nicht nachträglich erneut abgeschlossen werden")
+        note["delivery_status"] = status
+        now = _now_iso()
+        if status == "sent" and note["purpose"] == "workshop_answer":
+            target = next((item for item in ticket["notes"]
+                           if item["message_id"] == note.get("reply_to_message_id")), None)
+            if target is None or target["purpose"] != "customer_question":
+                raise ValueError("Antwortziel gehört nicht zu diesem Ticket")
+            target["resolved_at"] = target.get("resolved_at") or now
+        conn.execute("""UPDATE tickets SET notes_json = ?, customer_question_open = ?, updated_at = ?
+                        WHERE workshop_id = ? AND ticket_id = ?""",
+                     (json.dumps(ticket["notes"], ensure_ascii=False), int(bool(open_customer_questions(ticket))),
+                      now, wid, ticket_id))
+        # Delivery completion never reopens waiting_for_customer: an inbound reply
+        # may already have advanced the conversation while the HTTP call ran.
+        if (status == "sent" and note["purpose"] == "workshop_answer"
+                and ticket["conversation_state"] == "waiting_for_workshop" and not open_customer_questions(ticket)):
+            _set_ticket_state_in_transaction(conn, wid, ticket_id, "workshop_active")
+        return _row_to_ticket_dict(conn.execute("SELECT * FROM tickets WHERE workshop_id = ? AND ticket_id = ?",
+                                               (wid, ticket_id)).fetchone())
 
 
 def archive_ticket(ticket_id: str, workshop_id: str | None = None) -> dict[str, Any]:

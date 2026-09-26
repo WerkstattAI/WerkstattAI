@@ -590,9 +590,9 @@
             <div class="muted">WerkstattAI nimmt Ihre Anfrage auf und erstellt daraus ein übersichtliches Ticket.</div>
           </div>
 
-          <div class="chat-status">
+          <div class="chat-status" role="status" aria-live="polite">
             <span class="dot"></span>
-            Assistent bereit
+            <span id="conversationStatus">Gespräch wird geladen …</span>
           </div>
         </div>
 
@@ -611,7 +611,7 @@
               <textarea
                 id="messageInput"
                 maxlength="4096"
-                aria-label="Nachricht an WerkstattAI"
+                aria-label="Nachricht an die Werkstatt"
                 placeholder="Beschreiben Sie kurz Ihr Anliegen …"
                 required
               ></textarea>
@@ -642,6 +642,9 @@
     const doneBoxEl = document.getElementById("doneBox");
     const charCountEl = document.getElementById("charCount");
     const sessionIdBox = document.getElementById("sessionIdBox");
+    const conversationStatus = document.getElementById("conversationStatus");
+    const seenWorkshopMessages = new Set();
+    let conversationState = "assistant_active";
 
     const WORKSHOP = {{ workshop | tojson }};
     const SESSION_STORAGE_KEY = "werkstattai_session_id:" + WORKSHOP.id;
@@ -683,6 +686,7 @@ Wählen Sie einen Bereich aus oder schreiben Sie direkt Ihr Anliegen.`;
     }
 
     function addMessage(role, text, meta = "") {
+      if (!String(text || "").trim()) return null;
       const row = document.createElement("div");
       row.className = `message-row ${role}`;
 
@@ -742,6 +746,9 @@ Wählen Sie einen Bereich aus oder schreiben Sie direkt Ihr Anliegen.`;
       resetBtn.disabled = isLoading;
       sendBtn.textContent = isLoading ? "Wird gesendet …" : "Senden";
       formEl.setAttribute("aria-busy", String(isLoading));
+      typingEl.querySelector("span").textContent = conversationState === "assistant_active"
+        ? "Assistent verarbeitet Ihre Nachricht"
+        : "Nachricht wird übermittelt";
       typingEl.style.display = isLoading ? "flex" : "none";
       if (!isLoading) {
         inputEl.focus();
@@ -801,11 +808,34 @@ Wählen Sie einen Bereich aus oder schreiben Sie direkt Ihr Anliegen.`;
       renderQuickActions();
     }
 
+    function renderCommunication(data) {
+      const details = data?.data || {};
+      conversationState = details.conversation_state || "assistant_active";
+      conversationStatus.textContent = {
+        assistant_active: "Assistent aktiv",
+        waiting_for_workshop: "Wartet auf Rückmeldung der Werkstatt",
+        workshop_active: "Die Werkstatt übernimmt das Gespräch",
+        waiting_for_customer: "Die Werkstatt wartet auf Ihre Antwort"
+      }[conversationState] || "Gespräch mit der Werkstatt";
+      if (conversationState !== "assistant_active") removeQuickActions();
+      for (const message of details.workshop_messages || []) {
+        if (!message.message_id || seenWorkshopMessages.has(message.message_id) || message.purpose === "internal_note") continue;
+        seenWorkshopMessages.add(message.message_id);
+        const purpose = {
+          workshop_answer: "Antwort auf Ihre Frage",
+          workshop_question: "Frage an Sie",
+          workshop_notification: "Information"
+        }[message.purpose] || "Nachricht";
+        addMessage("bot", message.text, `Werkstatt-Team · ${purpose}`);
+      }
+    }
+
     async function sendMessage(message) {
       setLoading(true);
 
       try {
         const data = await sendToBackend(message);
+        renderCommunication(data);
 
         if (data.reply) {
           addMessage("bot", data.reply, "WerkstattAI");
@@ -835,7 +865,23 @@ Wählen Sie einen Bereich aus oder schreiben Sie direkt Ihr Anliegen.`;
       inputEl.value = "";
       updateCount();
 
+      seenWorkshopMessages.clear();
+      renderCommunication({data: {conversation_state: "assistant_active"}});
       renderWelcome();
+    }
+
+    async function restoreConversation() {
+      setLoading(true);
+      try {
+        const data = await sendToBackend(null);
+        if (!data?.data?.ticket_id) renderWelcome();
+        renderCommunication(data);
+      } catch (_) {
+        renderWelcome();
+        conversationStatus.textContent = "Gespräch konnte nicht geladen werden";
+      } finally {
+        setLoading(false);
+      }
     }
 
     formEl.addEventListener("submit", async (e) => {
@@ -864,7 +910,7 @@ Wählen Sie einen Bereich aus oder schreiben Sie direkt Ihr Anliegen.`;
     resetBtn.addEventListener("click", resetChat);
 
     updateCount();
-    renderWelcome();
+    restoreConversation();
   </script>
 </body>
 </html>

@@ -1,3 +1,4 @@
+{% import '_communication.html' as communication %}
 <!doctype html>
 <html lang="de">
 <head>
@@ -2504,7 +2505,10 @@
       .message-recipient{grid-template-columns:1fr}
       .message-form-actions{display:grid;grid-template-columns:1fr}
       .message-cancel,.message-send{width:100%}
+      .message-template-start{align-items:stretch;flex-direction:column}
+      .message-template-button{width:100%}
     }
+    {{ communication.styles() }}
   </style>
 </head>
 <body>
@@ -2643,7 +2647,7 @@
             <select name="question_state" aria-label="Nach Fragenstatus filtern">
               <option value="all" {% if filters.question_state=="all" %}selected{% endif %}>Fragen: alle</option>
               <option value="open" {% if filters.question_state=="open" %}selected{% endif %}>Fragen: offen</option>
-              <option value="answered" {% if filters.question_state=="answered" %}selected{% endif %}>Fragen: beantwortet</option>
+              <option value="answered" {% if filters.question_state=="answered" %}selected{% endif %}>Kundenfragen: erledigt</option>
             </select>
 
             <input
@@ -2773,7 +2777,7 @@
                         {% if t.customer_question_open %}
                           Offene Kundenfrage{% if t.customer_question_count > 1 %} {{ t.customer_question_count }}{% endif %}
                         {% else %}
-                          Kundenfrage beantwortet
+                          Keine offene Kundenfrage
                         {% endif %}
                       </span>
                     </div>
@@ -2781,6 +2785,7 @@
 
                   <div class="muted id">ID: {{ t.ticket_view_id }}</div>
                   <div class="muted">Quelle: {{ t.source_label or "-" }}</div>
+                  <div>{{ communication.state_badge(t.conversation_state) }}</div>
                 </td>
 
                 <td>
@@ -2825,7 +2830,7 @@
                   {% if t.has_customer_question %}
                     <div class="last-note-block">
                       <div class="last-note-label">
-                        {% if t.customer_question_open %}Neue Kundenfrage{% else %}Kundenfrage beantwortet{% endif %}
+                        {% if t.customer_question_open %}Offene Kundenfrage{% else %}Kundenfragen erledigt{% endif %}
                       </div>
                       <div class="last-note-text">{{ t.latest_customer_question_text }}</div>
                       {% if t.latest_customer_question_created_at %}
@@ -2879,6 +2884,7 @@
                       data-message-customer="{{ t.kunde_name or 'Kunde' }}"
                       data-message-vehicle="{{ t.fahrzeug or '-' }}"
                       data-message-window-open="{% if t.service_window_open %}true{% else %}false{% endif %}"
+                      data-open-questions='{{ t.open_customer_questions|default([])|tojson }}'
                       {% if not t.can_message_customer %}disabled title="Keine Telefonnummer im Ticket hinterlegt"{% endif %}
                     >
                       <span class="whatsapp-mark" aria-hidden="true">W</span>
@@ -3080,6 +3086,8 @@
             </div>
           </div>
 
+          {{ communication.purpose_controls('dashboardMessage') }}
+
           <div class="message-field">
             <label for="messageText">Nachricht</label>
             <textarea
@@ -3132,6 +3140,7 @@
   <div id="toast" class="toast" role="status" aria-live="polite" aria-atomic="true">Kopiert</div>
 
   <script nonce="{{ request.state.csp_nonce }}">
+    {% include '_communication_script.html' %}
     document.querySelectorAll('form[data-confirm]').forEach(form => {
       form.addEventListener('submit', event => {
         if (!confirm(form.dataset.confirm)) event.preventDefault();
@@ -3143,6 +3152,7 @@
     const messageCloseBtn = document.getElementById("messageModalClose");
     const messageCancelBtn = document.getElementById("messageModalCancel");
     const ticketMessageForm = document.getElementById("ticketMessageForm");
+    const dashboardCommunicationComposer = communicationComposer(ticketMessageForm);
     const messageCustomer = document.getElementById("messageCustomer");
     const messagePhone = document.getElementById("messagePhone");
     const messageText = document.getElementById("messageText");
@@ -3167,6 +3177,7 @@
 
     if (returnedMessageStatus === "sent" && returnedMessageTicket) {
       window.sessionStorage.removeItem(messageDraftKey(returnedMessageTicket));
+      window.sessionStorage.removeItem(messageDraftKey(returnedMessageTicket) + ":communication");
     }
 
     function openModal() {
@@ -3218,6 +3229,9 @@
       manualMessagePhone.value = normalizedMessagePhone(phone);
       manualMessageTicket.value = ticketId;
       messageText.value = window.sessionStorage.getItem(messageDraftKey(ticketId)) || "";
+      dashboardCommunicationComposer.configure(
+        JSON.parse(button.dataset.openQuestions || "[]"), messageDraftKey(ticketId), false
+      );
       templateMessagePhone.value = normalizedMessagePhone(phone);
       templateMessageTicket.value = ticketId;
       messageTemplateStart.hidden = windowOpen;
@@ -3233,7 +3247,7 @@
         messageSendButton.removeAttribute("title");
       }
       if (automaticWhatsappReady && windowOpen) {
-        messageHelp.textContent = "Freie Antwort ist innerhalb des 24-Stunden-Fensters möglich. Die Werkstatt übernimmt beim Senden automatisch; „An Meta übergeben“ ist noch keine Zustellbestätigung.";
+        messageHelp.textContent = "Eine freie Textnachricht ist innerhalb des 24-Stunden-Fensters möglich. Die Werkstatt übernimmt beim Senden automatisch; „An Meta übergeben“ ist noch keine Zustellbestätigung.";
       } else if (automaticWhatsappReady) {
         messageHelp.textContent = "Das 24-Stunden-Fenster ist geschlossen. Der Freitext wird nicht gesendet. Nutzen Sie die separate Startvorlage und warten Sie auf die Antwort des Kunden; der Entwurf bleibt im Browser erhalten.";
       }
@@ -3242,7 +3256,7 @@
 
       messageBackdrop.style.display = "flex";
       messageBackdrop.setAttribute("aria-hidden", "false");
-      window.setTimeout(() => messageText.focus(), 0);
+      window.setTimeout(() => ticketMessageForm.querySelector("[data-message-purpose]").focus(), 0);
     }
 
     function closeMessageModal() {

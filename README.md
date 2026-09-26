@@ -8,6 +8,7 @@ Sicherheits- und Betriebsfragen zu beheben.**
 
 - [Projektstand, bestätigte Schwachstellen und nächste Schritte](docs/projektstand.md)
 - [Zugriffs- und WhatsApp-Korrekturen: Einspielhinweise](docs/sicherheitskorrekturen-2026-09-26.md)
+- [Kundenkommunikation: Nachrichten, Zustände und Migration](docs/kundenkommunikation.md)
 - [Demo und Werkstattkonten](docs/demo-und-produktivkonto.md)
 - [HTTP-Sicherheitsmaßnahmen](docs/http-sicherheit.md)
 - [Datenschutzfunktionen und offene Angaben](docs/recht/betrieb-und-freigabe.md)

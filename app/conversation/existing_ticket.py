@@ -1,12 +1,16 @@
 from __future__ import annotations
 
+import re
+import uuid
 from typing import Any, Tuple
 
 from app.conversation.extractors import lower, normalize
 from app.conversation.intent import extract_phone_reference, extract_ticket_reference
+from app.conversation.general_question import stored_workshop_answer
 from app.customer_access import CustomerAccess
 from app.models import IntakeState
 from app.tickets import add_ticket_note, find_ticket_by_id, find_tickets_by_phone
+from app.workshops import get_workshop
 
 
 ACCESS_DENIED_REPLY = (
@@ -46,7 +50,15 @@ def _get_latest_customer_reply(ticket: dict[str, Any]) -> dict[str, Any] | None:
         return None
 
     for note in reversed(notes):
-        if isinstance(note, dict) and _note_type(note) == "customer_reply":
+        if not isinstance(note, dict):
+            continue
+        if note.get("delivery_status") not in {None, "sent"}:
+            continue
+        if note.get("sender_role") == "workshop" and note.get("purpose") in {
+            "workshop_answer", "workshop_question", "workshop_notification",
+        }:
+            return note
+        if not note.get("purpose") and _note_type(note) == "customer_reply":
             return note
 
     return None
@@ -109,157 +121,44 @@ def _build_ticket_summary(ticket: dict[str, Any]) -> str:
     return "\n".join(lines)
 
 
-def _looks_like_status_question(text: str) -> bool:
-    t = lower(text)
-    return any(
-        key in t
-        for key in [
-            "status",
-            "wie ist der status",
-            "stand",
-            "aktueller stand",
-            "bearbeitung",
-            "fertig",
-            "schon fertig",
-            "auto fertig",
-            "fahrzeug fertig",
-            "abholbereit",
-            "bereit zur abholung",
-        ]
-    )
+def _requires_workshop_decision(text: str) -> bool:
+    """Decision words take precedence over all stored-fact shortcuts."""
+    return bool(re.search(
+        r"\b(?:preis\w*|kosten\w*|kostet|teuer|diagnos\w*|ursache\w*|defekt\w*|"
+        r"fertig\w*|abhol\w*|reparaturdauer|dauer\w*|dauert|termin\w*|"
+        r"ersatzteil\w*|teile|teil|reparier\w*|reparatur\w*|"
+        r"bestätig\w*|bestaetig\w*|freigabe\w*|garantie\w*|kulanz\w*|"
+        r"sicher|weiterfahren|fahrbereit|kaputt|bezahlen|zahlung\w*)\b|"
+        r"\bwie (?:lange|teuer)\b|\bwann (?:ist|wird|kann|könn|koenn)\w*\b",
+        lower(text),
+    ))
 
 
-def _looks_like_priority_question(text: str) -> bool:
-    t = lower(text)
-    return any(
-        key in t
-        for key in [
-            "priorität",
-            "prioritaet",
-            "wie dringend",
-            "dringlichkeit",
-            "priority",
-        ]
-    )
+def _question_text(text: str) -> str:
+    """Strip an explicit reference, retaining the actual question for matching."""
+    value = lower(text)
+    value = re.sub(r"\b[a-z]{2,10}-\d{4,8}(?:-\d{1,10})?\b", "", value)
+    value = re.sub(r"\b(?:ticket|ticketnr|ticket-nr|ticketnummer|auftrag|fall)\s*[:#-]?\s*\d{1,10}\b", "", value)
+    value = re.sub(r"(?:\s+(?:zu|zum|von|für|fuer|wegen))?\s+(?:ticket|auftrag)\s*$", "", value.strip(" .?!:;"))
+    if extract_ticket_reference(text):
+        value = re.sub(r"\s+(?:zu|zum|von|für|fuer|wegen)$", "", value.strip(" .?!:;"))
+    value = re.sub(r"^(?:hallo[,!]?|guten tag[,!]?|bitte)\s+", "", value)
+    value = re.sub(r"\s+bitte$", "", value.strip(" .?!:;"))
+    return normalize(value).strip(" .?!:;")
 
 
-def _looks_like_problem_question(text: str) -> bool:
-    t = lower(text)
-    return any(
-        key in t
-        for key in [
-            "problem",
-            "anliegen",
-            "worum geht",
-            "was war",
-            "defekt",
-            "fehler",
-        ]
-    )
+def _is_acknowledgement(text: str) -> bool:
+    return lower(text).strip(" .?!") in {
+        "danke", "vielen dank", "danke schön", "danke schoen", "dankeschön",
+        "ok", "okay", "alles klar", "verstanden", "super danke", "danke für die info",
+    }
 
 
-def _looks_like_vehicle_question(text: str) -> bool:
-    t = lower(text)
-    return any(
-        key in t
-        for key in [
-            "fahrzeug",
-            "auto",
-            "wagen",
-            "modell",
-            "marke",
-            "baujahr",
-            "kilometerstand",
-            "km-stand",
-        ]
-    )
-
-
-def _looks_like_contact_question(text: str) -> bool:
-    t = lower(text)
-    return any(
-        key in t
-        for key in [
-            "telefon",
-            "telefonnummer",
-            "nummer",
-            "kontakt",
-            "name",
-            "kunde",
-            "kundenname",
-        ]
-    )
-
-
-def _looks_like_note_question(text: str) -> bool:
-    t = lower(text)
-    return any(
-        key in t
-        for key in [
-            "notiz",
-            "notizen",
-            "letzte notiz",
-            "interne notiz",
-        ]
-    )
-
-
-def _looks_like_duration_question(text: str) -> bool:
-    t = lower(text)
-    return any(
-        key in t
-        for key in [
-            "wie lange",
-            "dauer",
-            "dauert",
-            "ungefähr",
-            "ungefaehr",
-            "wann fertig",
-            "wann ist",
-            "fertigstellung",
-            "termin",
-            "abholung",
-            "abholen",
-        ]
-    )
-
-
-def _record_customer_message(
-    ticket: dict[str, Any],
-    question: str,
-    *,
-    include_workshop_hint: bool = False,
-    workshop_id: str | None = None,
-) -> None:
-    ticket_id = str(ticket.get("ticket_id") or "").strip()
-    if not ticket_id:
-        return
-
-    text = "Kundenfrage über den Chat: " + question
-    if include_workshop_hint:
-        text += "\nBitte den Kunden kontaktieren, sobald eine Einschätzung möglich ist."
-
-    try:
-        add_ticket_note(ticket_id, text, note_type="customer_message", workshop_id=workshop_id)
-    except Exception:
-        pass
-
-
-def _looks_like_summary_question(text: str) -> bool:
-    t = lower(text)
-    return any(
-        key in t
-        for key in [
-            "zusammenfassung",
-            "zusammenfassen",
-            "zusammengefasst",
-            "komplett",
-            "alles zu dem ticket",
-            "ticket anzeigen",
-            "zeige ticket",
-            "zeig ticket",
-        ]
-    )
+def _is_customer_question(text: str) -> bool:
+    return "?" in text or _requires_workshop_decision(text) or bool(re.search(
+        r"^(?:wie|was|wer|wo|wann|warum|weshalb|wieso|welch\w*|kann|könn\w*|koenn\w*|"
+        r"ist|sind|habt|haben|gibt|darf|dürf\w*|duerf\w*|soll|muss)\b", lower(text)
+    ))
 
 
 def _resolve_ticket_from_message(
@@ -339,67 +238,84 @@ def _resolve_ticket_for_state(
     return ticket, error_reply
 
 
-def _answer_ticket_question(ticket: dict[str, Any], user_message: str) -> str:
-    if _looks_like_duration_question(user_message):
-        return (
-            f"Für Ticket **{ticket.get('ticket_id') or '-'}** kann ich noch keine genaue Dauer zusagen.\n"
-            f"Aktueller Status: **{ticket.get('status') or '-'}**.\n\n"
-            "Ich habe Ihre Frage an die Werkstatt weitergegeben. "
-            "Die Werkstatt meldet sich bei Ihnen, sobald eine verlässliche Einschätzung möglich ist."
-        )
+def _stored_ticket_answer(ticket: dict[str, Any], user_message: str) -> str | None:
+    """Return a stored fact only for a recognised, unambiguous request.
 
-    if _looks_like_status_question(user_message):
-        return (
-            f"Der Status von Ticket **{ticket.get('ticket_id') or '-'}** ist: "
-            f"**{ticket.get('status') or '-'}**."
-        )
+    Unknown text must reach the workshop; a broad word such as "Auto" or
+    "Nummer" is not evidence that the saved vehicle/contact data answers it.
+    """
+    if _requires_workshop_decision(user_message):
+        return None
+    question = _question_text(user_message)
+    ticket_id = ticket.get("ticket_id") or "-"
+    if re.fullmatch(
+        r"(?:(?:wie|was) (?:ist|lautet) (?:der |mein |aktuelle |aktueller )*status|"
+        r"(?:aktueller? )?status|wie ist der (?:aktuelle )?stand(?: (?:meines|des) (?:tickets|auftrags))?)",
+        question,
+    ):
+        return f"Der gespeicherte Status von Ticket **{ticket_id}** ist: **{ticket.get('status') or '-'}**."
 
-    if _looks_like_priority_question(user_message):
-        return (
-            f"Die Priorität von Ticket **{ticket.get('ticket_id') or '-'}** ist: "
-            f"**{ticket.get('priority') or '-'}**."
-        )
+    if re.fullmatch(r"(?:wie ist die |welche )?(?:priorität|prioritaet|dringlichkeit)(?: ist (?:gespeichert|hinterlegt))?", question):
+        return f"Die gespeicherte Priorität von Ticket **{ticket_id}** ist: **{ticket.get('priority') or '-'}**."
 
-    if _looks_like_problem_question(user_message):
+    if re.fullmatch(
+        r"(?:(?:welches?|was für ein) (?:fahrzeug|auto|modell|baujahr)|fahrzeug|auto|modell|baujahr|kilometerstand|km-stand|fahrzeugdaten)"
+        r"(?: (?:ist|sind|habt ihr))?(?: (?:bei euch |im ticket )?(?:gespeichert|hinterlegt|erfasst))?",
+        question,
+    ):
         return (
-            f"Das gemeldete Anliegen bei Ticket **{ticket.get('ticket_id') or '-'}** lautet:\n"
-            f"**{ticket.get('problem') or '-'}**"
-        )
-
-    if _looks_like_vehicle_question(user_message):
-        return (
-            f"Zum Ticket **{ticket.get('ticket_id') or '-'}** gehört folgendes Fahrzeug:\n"
+            f"Gespeicherte Fahrzeugdaten zu Ticket **{ticket_id}**:\n"
             f"- Fahrzeug: {ticket.get('fahrzeug') or '-'}\n"
             f"- Baujahr: {ticket.get('baujahr') or '-'}\n"
             f"- Kilometerstand: {ticket.get('kilometerstand') or '-'}"
         )
 
-    if _looks_like_contact_question(user_message):
+    if re.fullmatch(
+        r"(?:was (?:habe ich|wurde) (?:als (?:problem|anliegen) )?gemeldet|"
+        r"welches (?:problem|anliegen) (?:ist|wurde) (?:gespeichert|hinterlegt|gemeldet)|"
+        r"gespeichertes anliegen|gemeldetes problem)", question,
+    ):
+        return f"Das gemeldete Anliegen bei Ticket **{ticket_id}** lautet:\n**{ticket.get('problem') or '-'}**"
+
+    if re.fullmatch(
+        r"(?:(?:welche|welcher) (?:telefonnummer|nummer|name|kontaktdaten) "
+        r"(?:ist|sind|habt ihr) (?:bei euch |von mir |im ticket )?(?:gespeichert|hinterlegt)|"
+        r"(?:meine |gespeicherte )?(?:kontaktdaten|telefonnummer|kundenname))", question,
+    ):
         return (
-            f"Kontaktdaten zu Ticket **{ticket.get('ticket_id') or '-'}**:\n"
+            f"Gespeicherte Kontaktdaten zu Ticket **{ticket_id}**:\n"
             f"- Kunde: {ticket.get('name') or ticket.get('kunde_name') or '-'}\n"
             f"- Telefon: {ticket.get('telefon') or '-'}"
         )
 
-    if _looks_like_note_question(user_message):
+    if re.fullmatch(r"(?:wie (?:ist|lautet) (?:meine |die )?)?ticket(?:nummer|-nr\.?|nr)?", question):
+        return f"Ihre Ticketnummer ist **{ticket_id}**."
+
+    if re.fullmatch(
+        r"(?:(?:gibt es|habt ihr) (?:eine |neue )?(?:notiz|antwort)|"
+        r"(?:letzte |neueste )?(?:notiz|notizen|antwort)(?: der werkstatt)?)", question,
+    ):
         latest_note = _get_latest_customer_reply(ticket)
-        if not latest_note:
+        if latest_note:
             return (
-                f"Zu Ticket **{ticket.get('ticket_id') or '-'}** liegt aktuell "
-                "noch keine Antwort der Werkstatt an den Kunden vor."
+                f"Letzte Nachricht der Werkstatt zu Ticket **{ticket_id}**:\n"
+                f"{latest_note.get('text') or '-'}\n"
+                f"Erstellt: {latest_note.get('created_at') or '-'}"
             )
+        return f"Zu Ticket **{ticket_id}** liegt aktuell noch keine Antwort der Werkstatt an den Kunden vor."
 
-        return (
-            f"Letzte Antwort der Werkstatt zu Ticket **{ticket.get('ticket_id') or '-'}**:\n"
-            f"- Text: {latest_note.get('text') or '-'}\n"
-            f"- Erstellt: {latest_note.get('created_at') or '-'}"
-        )
-
-    if _looks_like_summary_question(user_message):
+    if re.fullmatch(r"(?:zusammenfassung|zusammenfassen|zusammengefasst|(?:zeige?|anzeigen)(?: (?:das|mein))?(?: ticket)?|ticket anzeigen|alles zu dem ticket)", question):
+        return _build_ticket_summary(ticket)
+    if not question and extract_ticket_reference(user_message):
+        return _build_ticket_summary(ticket)
+    # A verified phone lookup may show its matching ticket, but never creates
+    # authority: _resolve_ticket_for_state already applied CustomerAccess.
+    if extract_phone_reference(user_message) and re.fullmatch(
+        r"(?:meine? (?:telefonnummer|nummer|telefon) (?:ist|lautet) )?[+\d ()/-]+", lower(user_message)
+    ):
         return _build_ticket_summary(ticket)
 
-    # Default: kurze Zusammenfassung
-    return _build_ticket_summary(ticket)
+    return stored_workshop_answer(user_message, get_workshop(ticket.get("workshop_id")))
 
 
 def handle_existing_ticket(
@@ -407,6 +323,7 @@ def handle_existing_ticket(
     user_message: str | None,
     *,
     customer_access: CustomerAccess | None = None,
+    message_id: str | None = None,
 ) -> Tuple[IntakeState, str, bool]:
     """
     Beantwortet einfache Fragen zu bestehenden Tickets.
@@ -442,11 +359,46 @@ def handle_existing_ticket(
         return state, "Ich konnte kein passendes bestehendes Ticket ermitteln.", False
 
     state.ticket_id = str(ticket.get("ticket_id") or "")
-    _record_customer_message(
-        ticket,
+    reply = _stored_ticket_answer(ticket, msg)
+    message_id = message_id or uuid.uuid4().hex
+    automatic = reply is not None
+    acknowledgement = _is_acknowledgement(msg)
+    question = not automatic and not acknowledgement and _is_customer_question(msg)
+    add_ticket_note(
+        state.ticket_id,
         msg,
-        include_workshop_hint=_looks_like_duration_question(msg),
+        note_type="customer_message",
         workshop_id=workshop_id,
+        sender_role="customer",
+        purpose="customer_question" if question else "customer_information",
+        requires_human_action=not automatic and not acknowledgement,
+        message_id=message_id,
     )
-    reply = _answer_ticket_question(ticket, msg)
+    if automatic:
+        add_ticket_note(
+            state.ticket_id,
+            reply,
+            workshop_id=workshop_id,
+            sender_role="assistant",
+            purpose="automatic_answer",
+            requires_human_action=False,
+            reply_to_message_id=message_id,
+        )
+        return state, reply, False
+    if acknowledgement:
+        return state, "", False
+    subject = "Frage" if question else "Nachricht"
+    reply = (
+        f"Ich habe Ihre {subject} zu Ticket **{state.ticket_id}** an die Werkstatt weitergegeben. "
+        "Die Werkstatt kümmert sich darum."
+    )
+    add_ticket_note(
+        state.ticket_id,
+        reply,
+        workshop_id=workshop_id,
+        sender_role="assistant",
+        purpose="automatic_answer",
+        requires_human_action=False,
+        reply_to_message_id=message_id,
+    )
     return state, reply, False

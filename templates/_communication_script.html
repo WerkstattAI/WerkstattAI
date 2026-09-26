@@ -1,0 +1,73 @@
+    function communicationComposer(form) {
+      const purpose = form.querySelector("[data-message-purpose]");
+      const target = form.querySelector("[data-reply-target]");
+      const targetField = form.querySelector("[data-reply-target-field]");
+      const help = form.querySelector("[data-purpose-help]");
+      const messageId = form.querySelector("[data-client-message-id]");
+      const text = form.querySelector("textarea");
+      let draftKey = "";
+      function freshId() {
+        return window.crypto && typeof window.crypto.randomUUID === "function" ? window.crypto.randomUUID() : "";
+      }
+      function refreshPurpose() {
+        const answering = purpose.value === "workshop_answer";
+        targetField.hidden = !answering;
+        target.disabled = !answering;
+        target.required = answering;
+        help.textContent = {
+          workshop_answer: "Eine Antwort erledigt nur die ausgewählte Kundenfrage.",
+          workshop_question: "Der Assistent pausiert. Die nächste Kundenantwort wird dieser Frage zugeordnet.",
+          workshop_notification: "Eine Information ändert weder offene Kundenfragen noch den Ticketstatus."
+        }[purpose.value] || "Bitte wählen Sie den Zweck der Nachricht.";
+      }
+      function saveDraft() {
+        if (!draftKey) return;
+        try {
+          window.sessionStorage.setItem(draftKey, JSON.stringify({
+            purpose: purpose.value, reply_to_message_id: target.value,
+            message_id: messageId.value, text: text.value
+          }));
+        } catch (_) {}
+      }
+      function changed() {
+        messageId.value = freshId();
+        refreshPurpose();
+        saveDraft();
+      }
+      purpose.addEventListener("change", changed);
+      target.addEventListener("change", changed);
+      text.addEventListener("input", changed);
+      return {
+        configure(questions, key, clearDraft) {
+          draftKey = key + ":communication";
+          const answerOption = purpose.querySelector("option[value='workshop_answer']");
+          answerOption.disabled = questions.length === 0;
+          target.replaceChildren(new Option("Kundenfrage auswählen …", ""));
+          for (const question of questions) {
+            const date = question.created_at_display || question.created_at || "";
+            target.add(new Option(`${date}${date ? " · " : ""}${question.text || "Kundenfrage"}`, question.message_id));
+          }
+          purpose.value = questions.length ? "workshop_answer" : "workshop_notification";
+          target.value = questions.length === 1 ? questions[0].message_id : "";
+          messageId.value = freshId();
+          try {
+            if (clearDraft) window.sessionStorage.removeItem(draftKey);
+            const saved = JSON.parse(window.sessionStorage.getItem(draftKey) || "null");
+            if (saved && saved.text === text.value) {
+              const validPurpose = Array.from(purpose.options).some(option => option.value === saved.purpose && !option.disabled);
+              const validTarget = saved.purpose !== "workshop_answer" || !saved.reply_to_message_id || questions.some(question => question.message_id === saved.reply_to_message_id);
+              if (validPurpose && validTarget) {
+                purpose.value = saved.purpose;
+                target.value = saved.reply_to_message_id || "";
+                messageId.value = saved.message_id || freshId();
+              } else {
+                purpose.value = "";
+                target.value = "";
+              }
+            }
+          } catch (_) {}
+          refreshPurpose();
+          saveDraft();
+        }
+      };
+    }

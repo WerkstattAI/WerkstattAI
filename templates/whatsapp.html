@@ -1,3 +1,4 @@
+{% import '_communication.html' as communication %}
 <!doctype html>
 <html lang="de">
 <head>
@@ -812,7 +813,7 @@
       color:var(--text);
       line-height:1.5;
       overflow-wrap:anywhere;
-      white-space:pre-wrap;
+      white-space:normal;
       box-shadow:0 3px 10px rgba(28,52,45,.07);
     }
 
@@ -866,6 +867,7 @@
       color:#202d29;
       font-size:13px;
       line-height:1.55;
+      white-space:pre-wrap;
     }
 
     .message-footer{
@@ -1162,6 +1164,7 @@
       .bubble{width:97%}
       .message-footer{flex-direction:column;gap:2px}
     }
+    {{ communication.styles() }}
   </style>
 </head>
 <body>
@@ -1221,7 +1224,7 @@
               {% if readiness.is_ready %}bereit{% else %}nicht vollständig{% endif %}
             </div>
             <div class="panel-sub">
-              Antworten laufen aktuell im Modus:
+              Nachrichtenversand über:
               {% if readiness.reply_mode == "meta" %}Meta API{% else %}Versand nicht verfügbar{% endif %}
               {% if readiness.display_phone_number %}· {{ readiness.display_phone_number }}{% endif %}
             </div>
@@ -1330,7 +1333,7 @@
                 </div>
 
                 <div class="muted">{{ c.last_created_at_display or "-" }}</div>
-                <span class="conversation-mode {{ c.mode }}">{{ c.mode_label }}</span>
+                {{ communication.state_badge(c.conversation_state) }}
               </a>
             {% endfor %}
 
@@ -1362,7 +1365,8 @@
               {% if selected_conversation %}
                 <span class="stat-pill">{{ selected_conversation.message_count }} Nachrichten</span>
                 <span class="stat-pill">{{ selected_conversation.inbound_count }} vom Kunden</span>
-                <span class="stat-pill">{{ selected_conversation.outbound_count }} von der Werkstatt</span>
+                <span class="stat-pill">{{ selected_conversation.outbound_count }} ausgehend</span>
+                {{ communication.state_badge(selected_conversation.conversation_state) }}
                 {% if selected_conversation.active_ticket_id %}
                   <a class="stat-pill" href="/dashboard/ticket/{{ selected_conversation.active_ticket_id }}?workshop_id={{ workshop_id }}">Aktives Ticket {{ selected_conversation.active_ticket_id }}</a>
                 {% endif %}
@@ -1394,12 +1398,17 @@
 
           <div class="thread" id="messageThread">
             {% for m in messages %}
-              <div class="bubble {{ m.direction }}">
+              <div id="communication-{{ m.message_id }}" class="bubble {{ m.direction }}">
                 <div class="bubble-meta">
-                  <span>{{ m.sender_label }}</span>
+                  <span>{{ communication.sender_label(m.sender_role) }}</span>
                   <span class="{{ m.status_class }}">{{ m.status_label }}</span>
                 </div>
+                <div class="communication-message-heading">
+                  <span>{{ communication.purpose_label(m.purpose) }}</span>
+                  {{ communication.action_label(m) }}
+                </div>
                 <div class="message-text">{{ m.text or "-" }}</div>
+                {% if m.reply_to_message_id %}<a class="communication-message-link" href="#communication-{{ m.reply_to_message_id }}">Bezug anzeigen</a>{% endif %}
                 {% if m.message_error %}
                   <div class="message-error">{{ m.message_error }}</div>
                 {% endif %}
@@ -1447,13 +1456,14 @@
                 {% if selected_conversation and selected_conversation.active_ticket_id %}
                   <input type="hidden" name="ticket_id" value="{{ selected_conversation.active_ticket_id }}" />
                 {% endif %}
-                <label class="field-label" for="replyText">Antwort an {{ selected_phone }}</label>
+                {{ communication.purpose_controls('inboxMessage', selected_conversation.open_customer_questions|default([]) if selected_conversation else []) }}
+                <label class="field-label" for="replyText">Nachricht an {{ selected_phone }}</label>
                 <textarea
                   class="reply-input"
                   id="replyText"
                   name="reply_text"
                   maxlength="4096"
-                  placeholder="Antwort an den Kunden schreiben …"
+                  placeholder="Nachricht an den Kunden schreiben …"
                   required
                 ></textarea>
                 <div class="composer-actions">
@@ -1462,11 +1472,11 @@
                       Versand nicht verfügbar: Access Token oder Phone Number ID fehlt.
                       <a class="composer-settings-link" href="/dashboard/settings?workshop_id={{ workshop_id }}">Zu den Einstellungen</a>
                     {% elif selected_conversation and selected_conversation.service_window_open %}
-                      Freie Antwort möglich bis {{ selected_conversation.service_window_expires_at_display }}. „An Meta übergeben“ bedeutet noch nicht „zugestellt“.
+                      Freie Textnachricht möglich bis {{ selected_conversation.service_window_expires_at_display }}. Beim Senden übernimmt die Werkstatt das Gespräch. „An Meta übergeben“ bedeutet noch nicht „zugestellt“.
                     {% elif selected_conversation and selected_conversation.last_customer_message_at %}
-                      Das 24-Stunden-Kundenfenster ist geschlossen. Meta verlangt jetzt eine freigegebene Nachrichtenvorlage; eine freie Textnachricht kann abgelehnt werden.
+                      Das 24-Stunden-Kundenfenster ist geschlossen. Senden Sie die freigegebene Startvorlage und warten Sie auf die Kundenantwort. Freie Textnachrichten sind bis dahin gesperrt.
                     {% else %}
-                      Es ist noch keine Kundennachricht eingegangen. Für den Gesprächsstart verlangt Meta eine freigegebene Nachrichtenvorlage; eine freie Textnachricht kann abgelehnt werden.
+                      Es ist noch keine Kundennachricht eingegangen. Senden Sie die freigegebene Startvorlage und warten Sie auf die Kundenantwort. Erst dann sind freie Textnachrichten möglich.
                     {% endif %}
                   </div>
                   <div class="composer-buttons">
@@ -1484,7 +1494,7 @@
                     >
                       {% if not readiness.can_send %}Einrichtung fehlt
                       {% elif not selected_conversation or not selected_conversation.service_window_open %}Fenster geschlossen
-                      {% else %}Antwort senden{% endif %}
+                      {% else %}Nachricht senden{% endif %}
                     </button>
                   </div>
                 </div>
@@ -1511,7 +1521,7 @@
                 </div>
               {% endif %}
             {% else %}
-              <div class="composer-note">Wähle eine Konversation aus, um eine Antwort vorzubereiten.</div>
+              <div class="composer-note">Wähle eine Konversation aus, um eine Nachricht vorzubereiten.</div>
             {% endif %}
           </div>
         </section>
@@ -1520,6 +1530,7 @@
   </div>
 
   <script nonce="{{ request.state.csp_nonce }}">
+    {% include '_communication_script.html' %}
     const whatsappWorkspace = document.querySelector(".workspace");
     const whatsappDiagnostics = document.querySelector(".diagnostics");
     if (whatsappWorkspace && whatsappDiagnostics) {
@@ -1546,6 +1557,10 @@
           else window.sessionStorage.removeItem(draftKey);
         });
       }
+      communicationComposer(whatsappReplyForm).configure(
+        {{ (selected_conversation.open_customer_questions|default([]) if selected_conversation else [])|tojson }},
+        draftKey, replyStatus === "sent"
+      );
       whatsappReplyForm.addEventListener("submit", (event) => {
         const submitButton = event.submitter;
         if (submitButton && submitButton.id === "inboxManualLink") return;
@@ -1584,7 +1599,7 @@
       const replyText = document.getElementById("replyText");
       if (replyText && replyText.value.trim()) return;
       const activeTag = document.activeElement ? document.activeElement.tagName : "";
-      if (["INPUT", "TEXTAREA", "BUTTON"].includes(activeTag)) return;
+      if (["INPUT", "TEXTAREA", "SELECT", "BUTTON"].includes(activeTag)) return;
       window.location.reload();
     }, 15000);
   </script>

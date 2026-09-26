@@ -339,12 +339,12 @@ class IntentTests(unittest.TestCase):
         )
 
 
-    def test_existing_ticket_mode_can_switch_to_general_question(self) -> None:
+    def test_existing_ticket_profile_question_keeps_ticket_context(self) -> None:
         state = IntakeState(mode="existing", ticket_id="WS-20260505-0005")
 
         self.assertEqual(
             detect_intent(state, "Welche Öffnungszeiten habt ihr?"),
-            INTENT_GENERAL_QUESTION,
+            INTENT_EXISTING_TICKET,
         )
 
     def test_general_price_overview_is_not_started_as_quote(self) -> None:
@@ -1617,7 +1617,7 @@ class WhatsAppWebhookTests(unittest.TestCase):
             conn.execute("DELETE FROM tickets WHERE ticket_id = ?", (ticket_id,))
             conn.commit()
 
-    def test_failed_ticket_whatsapp_reply_is_not_recorded_as_customer_reply(self) -> None:
+    def test_failed_ticket_whatsapp_message_keeps_failed_audit_and_restores_assistant(self) -> None:
         init_db()
         ticket_id = "WS-TEST-WHATSAPP-TICKET-FAILED"
         customer_phone = "4917677777777"
@@ -1688,7 +1688,19 @@ class WhatsAppWebhookTests(unittest.TestCase):
             self.assertIn("reply_status=failed", response.headers["location"])
             ticket = find_ticket_by_id(ticket_id, workshop_id="demo-werkstatt")
             replies = [note for note in ticket["notes"] if note["type"] == "customer_reply"]
-            self.assertEqual(replies, [])
+            self.assertEqual(len(replies), 1)
+            self.assertEqual(replies[0]["purpose"], "workshop_notification")
+            self.assertEqual(replies[0]["delivery_status"], "failed")
+            self.assertEqual(ticket["conversation_state"], "assistant_active")
+            self.assertEqual(ticket["status"], "offen")
+            self.assertFalse(ticket["customer_question_open"])
+            _, customer_reply, _ = handle_existing_ticket(
+                IntakeState(workshop_id="demo-werkstatt", ticket_id=ticket_id, mode="existing"),
+                "Gibt es eine Notiz?",
+                customer_access=CustomerAccess("demo-werkstatt", frozenset({ticket_id})),
+            )
+            self.assertIn("noch keine Antwort der Werkstatt", customer_reply)
+            self.assertNotIn("Diese Nachricht darf nicht als gesendet gelten.", customer_reply)
 
             messages = list_whatsapp_messages(
                 workshop_id="demo-werkstatt",
@@ -2225,7 +2237,7 @@ class ExistingTicketTests(unittest.TestCase):
         self.assertNotIn("Nur fuer die Werkstatt sichtbar", reply)
         self.assertIn("noch keine Antwort der Werkstatt", reply)
 
-    def test_existing_ticket_message_is_recorded_as_customer_message(self) -> None:
+    def test_completion_question_is_recorded_for_workshop_with_handoff_confirmation(self) -> None:
         ticket = {
             "ticket_id": "WS-20260505-0005",
             "workshop_id": "demo-werkstatt",
@@ -2252,9 +2264,13 @@ class ExistingTicketTests(unittest.TestCase):
 
         self.assertFalse(done)
         self.assertEqual(state.ticket_id, "WS-20260505-0005")
-        self.assertIn("Status", reply)
-        add_note.assert_called_once()
-        self.assertEqual(add_note.call_args.kwargs["note_type"], "customer_message")
+        self.assertIn("weitergegeben", reply)
+        self.assertEqual(add_note.call_count, 2)
+        incoming, acknowledgement = add_note.call_args_list
+        self.assertEqual(incoming.kwargs["purpose"], "customer_question")
+        self.assertTrue(incoming.kwargs["requires_human_action"])
+        self.assertEqual(acknowledgement.kwargs["purpose"], "automatic_answer")
+        self.assertEqual(acknowledgement.kwargs["reply_to_message_id"], incoming.kwargs["message_id"])
 
     def test_phone_lookup_with_multiple_tickets_asks_for_exact_ticket_number(self) -> None:
         init_db()
@@ -3066,7 +3082,7 @@ class TicketMetadataTests(unittest.TestCase):
                 conn.execute("DELETE FROM tickets WHERE ticket_id = ?", (ticket_id,))
                 conn.commit()
 
-    def test_customer_question_open_toggles_with_customer_reply(self) -> None:
+    def test_explicit_workshop_answer_resolves_its_question_without_ticket_status_change(self) -> None:
         init_db()
 
         state = IntakeState(
@@ -3091,15 +3107,20 @@ class TicketMetadataTests(unittest.TestCase):
                 workshop_id="demo-werkstatt",
             )
             self.assertTrue(ticket["customer_question_open"])
+            question_id = ticket["notes"][-1]["message_id"]
 
             ticket = add_ticket_note(
                 ticket_id,
                 "Wir melden uns morgen Vormittag mit einer Einschätzung.",
                 note_type="customer_reply",
                 workshop_id="demo-werkstatt",
+                sender_role="workshop",
+                purpose="workshop_answer",
+                reply_to_message_id=question_id,
             )
             self.assertFalse(ticket["customer_question_open"])
-            self.assertEqual(ticket["status"], "in_bearbeitung")
+            self.assertEqual(ticket["status"], "offen")
+            self.assertTrue(ticket["notes"][0]["resolved_at"])
         finally:
             with get_conn() as conn:
                 conn.execute("DELETE FROM tickets WHERE ticket_id = ?", (ticket_id,))

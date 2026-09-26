@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import re
 from typing import Tuple
 
 from app.conversation.extractors import lower, normalize
@@ -162,6 +163,32 @@ def _reply_fallback() -> str:
         "- oder eine allgemeine Frage stellen\n\n"
         "Wie kann ich Ihnen helfen?"
     )
+
+
+def stored_workshop_answer(text: str, workshop: dict) -> str | None:
+    """Only unambiguous profile questions may be answered after ticket intake."""
+    value = lower(text).strip(" .?!")
+    if re.fullmatch(
+        r"(?:(?:wie sind|was sind|welche|habt ihr) (?:eure |die )?)?"
+        r"(?:öffnungszeiten|oeffnungszeiten|offnungszeiten)(?: habt ihr)?|"
+        r"(?:wann (?:habt ihr|ist die werkstatt)|habt ihr (?:am )?(?:samstag|samstags|sonntag|sonntags|heute|morgen)) (?:offen|geöffnet|geoeffnet)",
+        value,
+    ):
+        return _reply_opening_hours(workshop)
+    if re.fullmatch(
+        r"(?:adresse|standort|(?:wie lautet|was ist) (?:eure|die) adresse|"
+        r"wo (?:seid ihr|ist (?:eure|die) werkstatt|finde ich euch|findet man euch))",
+        value,
+    ):
+        return _reply_location(workshop)
+    if re.fullmatch(
+        r"(?:kontakt|kontaktdaten der werkstatt|(?:welche|was für eine) (?:telefonnummer|e-mail|email) habt ihr|"
+        r"wie kann ich (?:euch|die werkstatt) (?:telefonisch )?erreichen|"
+        r"(?:eure|werkstatt) (?:telefonnummer|e-mail|email))",
+        value,
+    ):
+        return _reply_contact(workshop)
+    return None
 
 
 # =========================================================

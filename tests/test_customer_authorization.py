@@ -47,6 +47,19 @@ class CustomerAuthorizationTests(unittest.TestCase):
             self.assertNotIn(sensitive, reply)
         self.add_note.assert_not_called()
 
+    def assert_exchange_on_owned_ticket(self, *, human_question=False):
+        self.assertEqual(self.add_note.call_count, 2)
+        incoming, outgoing = self.add_note.call_args_list
+        for message in (incoming, outgoing):
+            self.assertEqual(message.args[0], self.own_id)
+            self.assertEqual(message.kwargs["workshop_id"], "workshop-a")
+        self.assertEqual(incoming.kwargs["sender_role"], "customer")
+        self.assertEqual(incoming.kwargs["purpose"], "customer_question" if human_question else "customer_information")
+        self.assertEqual(incoming.kwargs["requires_human_action"], human_question)
+        self.assertEqual(outgoing.kwargs["sender_role"], "assistant")
+        self.assertEqual(outgoing.kwargs["purpose"], "automatic_answer")
+        self.assertEqual(outgoing.kwargs["reply_to_message_id"], incoming.kwargs["message_id"])
+
     def test_ticket_reference_without_server_context_is_denied_before_lookup(self):
         self.find.return_value = self.other
         _, reply, done = self.handle(f"Zeige Ticket {self.other_id}")
@@ -85,7 +98,7 @@ class CustomerAuthorizationTests(unittest.TestCase):
         self.assertIn(self.own_id, reply)
         self.assertIn("in Bearbeitung", reply)
         self.assertEqual(state.ticket_id, self.own_id)
-        self.add_note.assert_called_once()
+        self.assert_exchange_on_owned_ticket()
         self.assertEqual(self.add_note.call_args.args[0], self.own_id)
         self.assertEqual(self.add_note.call_args.kwargs["workshop_id"], "workshop-a")
 
@@ -107,7 +120,7 @@ class CustomerAuthorizationTests(unittest.TestCase):
         self.find.return_value = self.own
         _, reply, _ = self.handle("Wie lange dauert es noch?", self.access)
         self.assertIn(self.own_id, reply)
-        self.add_note.assert_called_once()
+        self.assert_exchange_on_owned_ticket(human_question=True)
 
     def test_context_for_another_workshop_cannot_lookup_state_workshop(self):
         _, reply, _ = self.handle(f"Ticket {self.own_id}", CustomerAccess("workshop-b", frozenset({self.own_id})))
@@ -140,7 +153,7 @@ class CustomerAuthorizationTests(unittest.TestCase):
         _, reply, _ = self.handle("Meine Telefonnummer ist 0170 12345678", self.access)
         self.assertIn(self.own_id, reply)
         self.assertNotIn(self.other_id, reply)
-        self.add_note.assert_called_once()
+        self.assert_exchange_on_owned_ticket()
 
     def test_phone_lookup_without_owned_result_matches_unknown_number(self):
         for results in ([self.other], []):
@@ -153,7 +166,7 @@ class CustomerAuthorizationTests(unittest.TestCase):
         access = CustomerAccess("workshop-a", verified_phone="4917012345678")
         _, reply, _ = self.handle(f"Status Ticket {self.own_id}", access)
         self.assertIn(self.own_id, reply)
-        self.add_note.assert_called_once()
+        self.assert_exchange_on_owned_ticket()
 
     def test_whatsapp_sender_cannot_access_foreign_ticket_even_if_id_is_remembered(self):
         self.find.return_value = self.other
@@ -168,7 +181,7 @@ class CustomerAuthorizationTests(unittest.TestCase):
         _, reply, _ = self.handle("Meine Telefonnummer ist 12345678", access)
         self.assertIn(self.own_id, reply)
         self.assertNotIn(self.other_id, reply)
-        self.add_note.assert_called_once()
+        self.assert_exchange_on_owned_ticket()
 
     def test_invalid_verified_phone_never_falls_back_to_browser_grant(self):
         self.find.return_value = self.own
@@ -187,7 +200,7 @@ class CustomerAuthorizationTests(unittest.TestCase):
         self.find.return_value = self.own
         _, reply, _ = next_step(self.state, f"Status Ticket {self.own_id}", customer_access=self.access)
         self.assertIn(self.own_id, reply)
-        self.add_note.assert_called_once()
+        self.assert_exchange_on_owned_ticket()
 
     def test_router_without_authorization_fails_closed(self):
         _, reply, _ = next_step(self.state, f"Status Ticket {self.own_id}")

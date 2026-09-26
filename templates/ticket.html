@@ -1,3 +1,4 @@
+{% import '_communication.html' as communication %}
 <!doctype html>
 <html lang="de">
 <head>
@@ -1773,6 +1774,7 @@
       .conversation-control-bar form,.template-start-card form,
       .conversation-mode-button,.template-start-button{width:100%}
     }
+    {{ communication.styles() }}
   </style>
 </head>
 <body>
@@ -1865,16 +1867,17 @@
             </span>
             {% if ticket.has_customer_question %}
               <span class="conversation-state {% if ticket.customer_question_open %}open{% else %}answered{% endif %}">
-                {% if ticket.customer_question_open %}Offene Kundenfrage{% else %}Kundenfrage beantwortet{% endif %}
+                {% if ticket.customer_question_open %}Offene Kundenfrage{% else %}Keine offene Kundenfrage{% endif %}
               </span>
             {% endif %}
+            {{ communication.state_badge(ticket.conversation_state) }}
           </div>
 
           <div class="status-sub">
             Ticket-ID: {{ ticket.ticket_view_id or "-" }}<br>
             Quelle: {{ ticket.source_label or "-" }}<br>
             {% if ticket.has_customer_question %}
-            Kundenkommunikation: {% if ticket.customer_question_open %}Offen{% else %}Beantwortet{% endif %}<br>
+            Kundenfragen: {% if ticket.customer_question_open %}Offen{% else %}Erledigt{% endif %}<br>
             {% endif %}
             Backend-Status: {{ ticket.status_label or "-" }}
           </div>
@@ -2022,7 +2025,7 @@
               {% if ticket.has_whatsapp_conversation or ticket.source == "whatsapp" %}
                 WhatsApp an den Kunden
               {% else %}
-                Antwort an den Kunden
+                Nachricht an den Kunden
               {% endif %}
             </h3>
             <div style="margin-bottom:10px;">
@@ -2048,15 +2051,15 @@
                     Automatischer Versand ist noch nicht eingerichtet. Access Token oder Phone Number ID fehlt.
                     <a href="/dashboard/settings?workshop_id={{ workshop_id }}">Einstellungen öffnen</a>
                   {% elif not ticket.service_window_open %}
-                    Das 24-Stunden-Fenster ist geschlossen. Freitext wird serverseitig blockiert.
+                    Das 24-Stunden-Fenster ist geschlossen. Freie Textnachrichten können erst nach einer neuen Kundenantwort gesendet werden.
                     Senden Sie zuerst die separate Startvorlage und warten Sie auf die Antwort des Kunden.
                   {% else %}
-                    Freie Antwort ist im 24-Stunden-Fenster möglich. Beim Senden übernimmt die Werkstatt die Unterhaltung und der Assistent pausiert. Erst „Zugestellt“ bestätigt den Empfang.
+                    Eine freie Textnachricht ist im 24-Stunden-Fenster möglich. Beim Senden übernimmt die Werkstatt die Unterhaltung und der Assistent pausiert. Erst „Zugestellt“ bestätigt den Empfang.
                   {% endif %}
                 {% elif ticket.source == "web_chat" %}
-                  Diese Antwort wird für den Web-Chat gespeichert und dem Kunden bei seiner nächsten Ticket-Abfrage angezeigt.
+                  Diese Nachricht wird für den Web-Chat gespeichert und dem Kunden beim erneuten Öffnen des Chats angezeigt.
                 {% else %}
-                  Diese Antwort wird zur Dokumentation im Ticket gespeichert. Für einen direkten WhatsApp-Kontakt nutze „Kunde schreiben“ in der Übersicht Aktive Tickets.
+                  Diese Nachricht wird zur Dokumentation im Ticket gespeichert. Für einen direkten WhatsApp-Kontakt nutze „Kunde schreiben“ in der Übersicht Aktive Tickets.
                 {% endif %}
               </div>
             </div>
@@ -2064,7 +2067,7 @@
             {% if (ticket.has_whatsapp_conversation or ticket.source == "whatsapp") and ticket.whatsapp_phone %}
               <div class="conversation-control-bar">
                 <div>
-                  <strong>{% if ticket.whatsapp_mode == "manual" %}Werkstatt antwortet{% else %}Assistent antwortet{% endif %}</strong>
+                  <strong>{{ communication.state_label(ticket.conversation_state) }}</strong>
                   {% if ticket.whatsapp_mode == "manual" %}Automatische Antworten sind pausiert.{% else %}Der Assistent reagiert auf die nächste Kundennachricht.{% endif %}
                 </div>
                 <form method="post" action="/dashboard/whatsapp/control">
@@ -2079,16 +2082,32 @@
                   {% endif %}
                 </form>
               </div>
+            {% elif ticket.source == "web_chat" %}
+              <div class="conversation-control-bar">
+                <div>
+                  <strong>{{ communication.state_label(ticket.conversation_state) }}</strong>
+                  {% if ticket.conversation_state == "assistant_active" %}Der Assistent beantwortet eindeutige Fragen zu gespeicherten Daten.{% else %}Automatische Antworten sind pausiert.{% endif %}
+                </div>
+                <form method="post" action="/dashboard/ticket/{{ ticket.ticket_view_id }}/conversation-control">
+                  <input type="hidden" name="workshop_id" value="{{ workshop_id }}" />
+                  {% if ticket.conversation_state == "assistant_active" %}
+                    <button class="conversation-mode-button" type="submit" name="state" value="workshop_active">Werkstatt übernimmt</button>
+                  {% else %}
+                    <button class="conversation-mode-button assistant" type="submit" name="state" value="assistant_active">Assistent übernimmt</button>
+                  {% endif %}
+                </form>
+              </div>
             {% endif %}
 
             <form class="note-form customer-reply-form" method="post" action="/dashboard/ticket/{{ ticket.ticket_view_id }}/notes">
               <input type="hidden" name="workshop_id" value="{{ workshop_id }}" />
               <input type="hidden" name="note_type" value="customer_reply">
+              {{ communication.purpose_controls('ticketMessage', ticket.open_customer_questions|default([])) }}
               <div class="note-form-row">
                 <textarea
                   id="ticketCustomerReplyText"
                   name="note_text"
-                  placeholder="Antwort an den Kunden formulieren..."
+                  placeholder="Nachricht an den Kunden formulieren …"
                   maxlength="4096"
                   required
                 ></textarea>
@@ -2130,23 +2149,10 @@
               </div>
             {% endif %}
 
-            {% if ticket.customer_replies %}
-              <div class="note-stack">
-                {% for note in ticket.customer_replies | reverse %}
-                  <div class="note-card customer-reply">
-                    <div class="note-label">Antwort an den Kunden</div>
-                    <div class="note-text">{{ note.text }}</div>
-                    <div class="note-date">{{ note.created_at_display }}</div>
-                  </div>
-                {% endfor %}
-              </div>
-            {% else %}
-              <div class="muted">Noch keine Antwort an den Kunden gespeichert.</div>
-            {% endif %}
           </div>
 
           <div class="communication-panel full">
-            <h3 class="section-title">Nachrichten vom Kunden</h3>
+            <h3 class="section-title">Gesprächsverlauf</h3>
             <div style="margin-bottom:10px;">
               <span class="channel-badge {{ ticket.source or 'web_chat' }}">
                 {% if ticket.source == "whatsapp" %}
@@ -2160,18 +2166,19 @@
               </span>
             </div>
 
-            {% if ticket.customer_messages %}
+            {% if ticket.communication_messages %}
               <div class="note-stack">
-                {% for note in ticket.customer_messages | reverse %}
-                  <div class="note-card customer-question">
-                    <div class="note-label">Nachricht vom Kunden</div>
+                {% for note in ticket.communication_messages | reverse %}
+                  <div id="communication-{{ note.message_id }}" class="note-card {% if note.sender_role == 'customer' %}customer-question{% else %}customer-reply{% endif %}">
+                    {{ communication.message_heading(note) }}
                     <div class="note-text">{{ note.text }}</div>
+                    {% if note.reply_to_message_id %}<a class="communication-message-link" href="#communication-{{ note.reply_to_message_id }}">Bezug anzeigen</a>{% endif %}
                     <div class="note-date">{{ note.created_at_display }}</div>
                   </div>
                 {% endfor %}
               </div>
             {% else %}
-              <div class="muted">Noch keine Nachricht vom Kunden vorhanden.</div>
+              <div class="muted">Noch keine Kundennachrichten oder Werkstattnachrichten vorhanden.</div>
             {% endif %}
           </div>
         </div>
@@ -2317,6 +2324,7 @@
   <div id="toast" class="toast">✅ Kopiert!</div>
 
   <script nonce="{{ request.state.csp_nonce }}">
+    {% include '_communication_script.html' %}
     document.querySelectorAll('form[data-confirm]').forEach(form => {
       form.addEventListener('submit', event => {
         if (!confirm(form.dataset.confirm)) event.preventDefault();
@@ -2327,7 +2335,7 @@
     const ticketReplyUsesWhatsapp = {{ (ticket.has_whatsapp_conversation or ticket.source == "whatsapp") | tojson }};
     const ticketReplyStatus = {{ reply_status | tojson }};
     const ticketDraftKey = "werkstattai:ticket-detail-whatsapp-draft:{{ workshop_id }}:{{ ticket.ticket_view_id }}";
-    if (ticketCustomerReplyText && ticketHasWhatsappRecipient) {
+    if (ticketCustomerReplyText) {
       if (ticketReplyStatus === "sent" || (ticketReplyStatus === "saved" && !ticketReplyUsesWhatsapp)) {
         window.sessionStorage.removeItem(ticketDraftKey);
       } else if (!ticketCustomerReplyText.value) {
@@ -2340,6 +2348,14 @@
           window.sessionStorage.removeItem(ticketDraftKey);
         }
       });
+    }
+
+    const ticketCommunicationForm = document.querySelector(".customer-reply-form");
+    if (ticketCommunicationForm) {
+      communicationComposer(ticketCommunicationForm).configure(
+        {{ ticket.open_customer_questions|default([])|tojson }}, ticketDraftKey,
+        ticketReplyStatus === "sent" || (ticketReplyStatus === "saved" && !ticketReplyUsesWhatsapp)
+      );
     }
 
     document.querySelectorAll(".customer-reply-form, .guarded-send-form").forEach((form) => {

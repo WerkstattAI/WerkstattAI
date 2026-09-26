@@ -123,7 +123,8 @@ class WebSessionSecurityTests(unittest.TestCase):
         ticket = self.make_ticket(self.first)
         result = self.send(self.first, "Wie ist der Status?")
         self.assertEqual(result["data"]["ticket_id"], ticket)
-        self.assertTrue(set(result["data"]).issubset({"step", "mode", "workshop_id", "ticket_id", "request_type", "priority"}))
+        self.assertTrue(set(result["data"]).issubset({"step", "mode", "workshop_id", "ticket_id", "request_type", "priority",
+                                                     "conversation_state", "workshop_messages"}))
         self.assertNotIn("telefon", result["data"])
         self.assertNotIn("last_user_message", result["data"])
 

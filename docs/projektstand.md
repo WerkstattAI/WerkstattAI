@@ -25,6 +25,16 @@ Betrieb. Erfolgreiche Funktionstests sind keine Sicherheits- oder Rechtsfreigabe
 | Datenschutz | Rechtstextentwürfe, Export, Löschvorschau, Passwortbestätigung, Vorgangsvermerke und AVV-Grundlage | Anbieterangaben, Verträge, verbindliche Fristen und externe Bestände offen |
 | HTTP-Schutz | Sicherheitsheader, Eingabegrenzen, Signaturkontrolle und gemeinsame Rate-Limits | Ersetzt keine vollständige Objektberechtigung und keine Paketaktualisierungen |
 
+## Kundenkommunikation erweitert
+
+Die nachfolgende Überarbeitung trennt Absender, Nachrichtenzweck und
+Gesprächszustand. Gezielte Antworten lösen einzelne Kundenfragen; Rückfragen und
+Informationen ändern den Ticketstatus nicht. Die additive Migration wurde mit
+SQLite und einer isolierten PostgreSQL-18-Datenbank geprüft. Details, geänderte
+Dateien, Legacy-Behandlung und Grenzen stehen unter
+[Kundenkommunikation](kundenkommunikation.md). Das ist weiterhin eine lokale
+Implementierung, keine Bestätigung des produktiven Betriebs.
+
 ## Priorisierte Arbeitspakete
 
 ### 1. Kundenberechtigungen und Sitzungen – lokal korrigiert
@@ -70,7 +80,9 @@ sowie ein verständlicher Bearbeitungsweg für Bilder und Sprachnachrichten.
   Anwendungstests benötigt und ist bisher nicht separat deklariert.
 - Python 3.12 mit den tatsächlichen Docker-Abhängigkeiten sowie PostgreSQL
   testen. Der lokale Testlauf verwendet Python 3.14.3, Pydantic 2.12.5 und SQLite;
-  der PostgreSQL-Treiber ist in dieser Testumgebung nicht installiert.
+  der PostgreSQL-Treiber ist in der lokalen virtuellen Umgebung nicht installiert.
+  Die neue Kommunikationsmigration wurde zusätzlich isoliert mit PostgreSQL 18,
+  Python 3.12 und psycopg 3.2.3 getestet; ein vollständiger Produktionstest bleibt offen.
 - Schemaänderungen an einer bestehenden Testdatenbank prüfen und einen
   nachvollziehbaren Migrations-/Wiederherstellungsablauf festlegen.
 - Einen separaten Bereitschaftscheck ergänzen, der einen Datenbankausfall

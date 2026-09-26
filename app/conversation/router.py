@@ -24,6 +24,7 @@ def next_step(
     user_message: str | None,
     *,
     customer_access: CustomerAccess | None = None,
+    message_id: str | None = None,
 ) -> Tuple[IntakeState, str, bool]:
     """
     Zentraler Router für alle Konversationen.
@@ -40,7 +41,7 @@ def next_step(
         return handle_new_request(state, user_message)
 
     if intent == INTENT_EXISTING_TICKET:
-        return handle_existing_ticket(state, user_message, customer_access=customer_access)
+        return handle_existing_ticket(state, user_message, customer_access=customer_access, message_id=message_id)
 
     if intent == INTENT_GENERAL_QUESTION:
         return handle_general_question(state, user_message)

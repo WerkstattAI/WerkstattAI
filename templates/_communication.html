@@ -1,0 +1,80 @@
+{% macro sender_label(role) -%}
+{{ {'customer': 'Kunde', 'assistant': 'Assistent', 'workshop': 'Werkstatt-Team'}.get(role, 'Frühere Nachricht') }}
+{%- endmacro %}
+
+{% macro purpose_label(purpose) -%}
+{{ {'intake_question': 'Auftragsaufnahme', 'automatic_answer': 'Automatische Antwort', 'customer_question': 'Kundenfrage', 'customer_information': 'Kundeninformation', 'workshop_answer': 'Antwort auf Kundenfrage', 'workshop_question': 'Frage an Kunden', 'workshop_notification': 'Information an Kunden', 'internal_note': 'Interne Notiz'}.get(purpose, 'Frühere Nachricht · Zweck nicht erfasst') }}
+{%- endmacro %}
+
+{% macro state_label(state) -%}
+{{ {'assistant_active': 'Assistent aktiv', 'waiting_for_workshop': 'Wartet auf Werkstatt', 'workshop_active': 'Werkstatt übernimmt', 'waiting_for_customer': 'Wartet auf Kundenantwort'}.get(state, 'Gesprächszustand nicht erfasst') }}
+{%- endmacro %}
+
+{% macro state_badge(state) -%}
+<span class="communication-state {{ state }}">{{ state_label(state) }}</span>
+{%- endmacro %}
+
+{% macro purpose_controls(prefix, questions=[]) %}
+<div class="communication-controls" data-communication-controls>
+  <div class="communication-field">
+    <label for="{{ prefix }}Purpose">Was möchten Sie senden?</label>
+    <select id="{{ prefix }}Purpose" name="purpose" required data-message-purpose aria-describedby="{{ prefix }}PurposeHelp">
+      <option value="" disabled>Zweck auswählen …</option>
+      <option value="workshop_answer" {% if questions %}selected{% else %}disabled{% endif %}>Auf Kundenfrage antworten</option>
+      <option value="workshop_question">Frage an Kunden stellen</option>
+      <option value="workshop_notification" {% if not questions %}selected{% endif %}>Information an Kunden senden</option>
+    </select>
+  </div>
+  <div class="communication-field" data-reply-target-field {% if not questions %}hidden{% endif %}>
+    <label for="{{ prefix }}ReplyTarget">Welche offene Kundenfrage beantworten Sie?</label>
+    <select id="{{ prefix }}ReplyTarget" name="reply_to_message_id" data-reply-target {% if questions %}required{% else %}disabled{% endif %}>
+      <option value="">Kundenfrage auswählen …</option>
+      {% for question in questions %}
+      <option value="{{ question.message_id }}" {% if questions|length == 1 %}selected{% endif %}>{{ question.created_at_display or question.created_at or '' }} · {{ question.text }}</option>
+      {% endfor %}
+    </select>
+  </div>
+  <p class="communication-help" id="{{ prefix }}PurposeHelp" data-purpose-help>
+    {% if questions %}Eine Antwort erledigt nur die ausgewählte Kundenfrage.{% else %}Eine Information ändert weder offene Kundenfragen noch den Ticketstatus.{% endif %}
+  </p>
+  <input type="hidden" name="message_id" value="" data-client-message-id />
+</div>
+{% endmacro %}
+
+{% macro action_label(message) %}
+  {% if message.requires_human_action %}
+    {% if message.purpose == 'customer_question' %}
+    <span class="communication-question-status {% if message.resolved_at or message.legacy_closed %}resolved{% else %}unresolved{% endif %}">{% if message.legacy_closed %}Früher als erledigt markiert{% elif message.resolved_at %}Beantwortet{% else %}Offene Kundenfrage{% endif %}</span>
+    {% else %}
+    <span class="communication-question-status unresolved">Zur Bearbeitung</span>
+    {% endif %}
+  {% endif %}
+{% endmacro %}
+
+{% macro message_heading(message) %}
+<div class="communication-message-heading">
+  <strong>{{ sender_label(message.sender_role) }}</strong>
+  <span>{% if message.legacy_semantics_uncertain %}Frühere Nachricht · Zweck nicht sicher erfasst{% else %}{{ purpose_label(message.purpose) }}{% endif %}</span>
+  {{ action_label(message) }}
+  {% if message.delivery_status in ['pending', 'unknown', 'failed'] %}<span class="communication-question-status unresolved">{{ {'pending': 'Versand läuft', 'unknown': 'Versandstatus unklar', 'failed': 'Nicht gesendet'}[message.delivery_status] }}</span>{% endif %}
+</div>
+{% endmacro %}
+
+{% macro styles() %}
+.communication-controls{display:grid;gap:10px;margin-bottom:12px;min-width:0}
+.communication-field{display:grid;gap:6px;min-width:0}
+.communication-field[hidden]{display:none}
+.communication-field label{font-size:12px;font-weight:750;color:#43564f}
+.communication-field select{display:block;width:100%;max-width:100%;min-height:42px;border:1px solid #cbd8d2;border-radius:8px;padding:9px 30px 9px 10px;background:#fff;color:#233b31;font:inherit;font-size:13px;text-overflow:ellipsis}
+.communication-field select:focus{outline:2px solid #2f8c74;outline-offset:2px}
+.communication-help{margin:0;font-size:12px;line-height:1.5;color:#586d63}
+.communication-state{display:inline-flex;align-items:center;max-width:100%;padding:5px 9px;border:1px solid #c8ddd3;border-radius:7px;background:#eff8f3;color:#2c6852;font-size:12px;font-weight:750;line-height:1.4}
+.communication-state.waiting_for_workshop{background:#fff2e1;border-color:#ecd0a2;color:#8a5a18}
+.communication-state.waiting_for_customer{background:#edf3fb;border-color:#c4d4e9;color:#3d618b}
+.communication-state.workshop_active{background:#f4effb;border-color:#d7c8e9;color:#715297}
+.communication-message-heading{display:flex;gap:6px 12px;align-items:center;flex-wrap:wrap;margin-bottom:7px;font-size:12px;color:#50675c}
+.communication-question-status{font-size:11px;font-weight:750}
+.communication-question-status.unresolved{color:#995525}
+.communication-question-status.resolved{color:#25714f}
+.communication-message-link{font-size:12px;color:#26705c}
+{% endmacro %}

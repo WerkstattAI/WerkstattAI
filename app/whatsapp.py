@@ -3,6 +3,7 @@ from __future__ import annotations
 import hashlib
 import hmac
 import json
+import uuid
 import urllib.error
 import urllib.request
 from dataclasses import dataclass
@@ -382,11 +383,13 @@ def save_whatsapp_message(
     reply_to_wa_message_id: str | None = None,
     dispatch_state: str = "complete",
     control_revision: int | None = None,
+    message_id: str | None = None,
 ) -> bool:
     normalized_direction = _normalize_direction(direction)
     normalized_status = _normalize_status(status, normalized_direction)
     wid = str(workshop_id or "").strip()
     phone = str(customer_phone or "").strip()
+    semantic_id = message_id or str(uuid.uuid4())
     message_id = str(wa_message_id or "").strip() or None
     event_time = None
     if normalized_direction == "inbound":
@@ -435,9 +438,10 @@ def save_whatsapp_message(
                 processing_state,
                 reply_to_wa_message_id,
                 dispatch_state,
-                control_revision
+                control_revision,
+                message_id
             )
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
             """,
             (
                 wid,
@@ -456,6 +460,7 @@ def save_whatsapp_message(
                 reply_to_wa_message_id,
                 dispatch_state,
                 control_revision,
+                semantic_id,
             ),
         )
         conn.commit()
@@ -465,6 +470,8 @@ def save_whatsapp_message(
 
 def _lock_conversation(conn: Any, workshop_id: str, customer_phone: str) -> dict[str, Any]:
     """Serialize one conversation across processes, including employee changes."""
+    from app.db import lock_communication_scope
+    lock_communication_scope(conn, workshop_id)
     conn.execute("""
         INSERT INTO whatsapp_conversation_controls (workshop_id, customer_phone)
         VALUES (?, ?) ON CONFLICT(workshop_id, customer_phone) DO NOTHING
@@ -484,7 +491,8 @@ def prepare_whatsapp_inbound(*, workshop_id: str, message: WhatsAppInboundMessag
     session, ticket, notes and incoming-message marker as one unit.
     """
     with atomic_database() as conn:
-        control = _lock_conversation(conn, workshop_id, message.from_phone)
+        _lock_conversation(conn, workshop_id, message.from_phone)
+        control = get_whatsapp_conversation_control(workshop_id=workshop_id, customer_phone=message.from_phone)
         existing = conn.execute("""
             SELECT processing_state FROM whatsapp_messages
             WHERE workshop_id = ? AND direction = 'inbound' AND wa_message_id = ?
@@ -511,7 +519,7 @@ def prepare_whatsapp_inbound(*, workshop_id: str, message: WhatsAppInboundMessag
                 customer_phone=message.from_phone, direction="inbound", message_type=message.message_type,
                 text=message.text, wa_message_id=message.message_id, ticket_id=active_ticket_id,
                 status="received", payload=message.raw, message_timestamp=message.timestamp,
-                processing_state="pending",
+                processing_state="pending", message_id="wa:" + message.message_id,
             )
 
         def complete():
@@ -521,6 +529,22 @@ def prepare_whatsapp_inbound(*, workshop_id: str, message: WhatsAppInboundMessag
             """, (workshop_id, message.message_id))
 
         if control["mode"] == "manual":
+            from app.tickets import find_ticket_by_id
+            from app.customer_handoff import receive_customer_message
+            ticket = find_ticket_by_id(active_ticket_id, workshop_id) if active_ticket_id else None
+            metadata = dict(message.raw)
+            metadata.update(message_id="wa:" + message.message_id, sender_role="customer", purpose="customer_information",
+                            requires_human_action=True, reply_to_message_id=control.get("pending_workshop_question_id"))
+            if ticket and message.text:
+                ticket = receive_customer_message(ticket, message.text, workshop_id=workshop_id, message_id="wa:" + message.message_id)
+                note = next(n for n in ticket["notes"] if n["message_id"] == "wa:" + message.message_id)
+                metadata.update({key: note.get(key) for key in ("purpose", "requires_human_action", "reply_to_message_id", "resolved_at")})
+            elif control.get("conversation_state") == "waiting_for_customer":
+                from app.db import set_whatsapp_conversation_control
+                set_whatsapp_conversation_control(workshop_id=workshop_id, customer_phone=message.from_phone,
+                                                  conversation_state="workshop_active", pending_workshop_question_id=None)
+            conn.execute("UPDATE whatsapp_messages SET payload_json = ? WHERE workshop_id = ? AND message_id = ?",
+                         (json.dumps(metadata, ensure_ascii=False), workshop_id, "wa:" + message.message_id))
             complete()
             return {"action": "manual", "active_ticket_id": active_ticket_id, "reason": "saved_for_manual_reply"}
         if message.message_type != "text" or not message.text:
@@ -535,22 +559,36 @@ def prepare_whatsapp_inbound(*, workshop_id: str, message: WhatsAppInboundMessag
         response = process_message()
         ticket_id = str(response.data.get("ticket_id") or active_ticket_id or "").strip() or None
         current = get_whatsapp_conversation_control(workshop_id=workshop_id, customer_phone=message.from_phone)
-        if current["mode"] != "assistant" or current["revision"] != control["revision"]:
+        if current["conversation_state"] in {"workshop_active", "waiting_for_customer"}:
             complete()
             return {"action": "manual", "active_ticket_id": current.get("active_ticket_id"),
                     "reason": "manual_takeover_before_assistant_reply"}
         if ticket_id:
-            # Linking the generated ticket never re-enables the assistant or
-            # overwrites a later employee revision.
-            conn.execute("""
-                UPDATE whatsapp_conversation_controls SET active_ticket_id = ?, updated_at = CURRENT_TIMESTAMP
-                WHERE workshop_id = ? AND customer_phone = ? AND mode = 'assistant' AND revision = ?
-            """, (ticket_id, workshop_id, message.from_phone, control["revision"]))
+            conn.execute("UPDATE whatsapp_conversation_controls SET active_ticket_id = ? WHERE workshop_id = ? AND customer_phone = ?",
+                         (ticket_id, workshop_id, message.from_phone))
+        current = get_whatsapp_conversation_control(workshop_id=workshop_id, customer_phone=message.from_phone)
+        from app.tickets import find_ticket_by_id
+        ticket = find_ticket_by_id(ticket_id, workshop_id) if ticket_id else None
+        notes = (ticket or {}).get("notes", [])
+        input_note = next((n for n in notes if n.get("message_id") == "wa:" + message.message_id), {})
+        input_meta = dict(message.raw)
+        input_meta.update(sender_role="customer", purpose="customer_information", requires_human_action=False)
+        input_meta.update({key: input_note[key] for key in ("purpose", "requires_human_action", "reply_to_message_id", "resolved_at") if key in input_note})
+        conn.execute("UPDATE whatsapp_messages SET ticket_id = ?, payload_json = ? WHERE workshop_id = ? AND message_id = ?",
+                     (ticket_id, json.dumps(input_meta, ensure_ascii=False), workshop_id, "wa:" + message.message_id))
+        if not response.reply:
+            complete()
+            return {"action": "ignored"}
+        answer_note = next((n for n in reversed(notes) if n.get("sender_role") == "assistant" and n.get("reply_to_message_id") == "wa:" + message.message_id), {})
+        answer_meta = {"source": "webhook", "reply_to_wa_message_id": message.message_id, "done": response.done,
+                       "sender_role": "assistant", "purpose": "automatic_answer" if ticket_id else "intake_question",
+                       "requires_human_action": False, "reply_to_message_id": "wa:" + message.message_id,
+                       "handoff_ack": current["conversation_state"] == "waiting_for_workshop"}
         save_whatsapp_message(
             workshop_id=workshop_id, phone_number_id=message.phone_number_id, customer_phone=message.from_phone,
             direction="outbound", text=response.reply, ticket_id=ticket_id, status="pending",
-            payload={"source": "webhook", "reply_to_wa_message_id": message.message_id, "done": response.done},
-            reply_to_wa_message_id=message.message_id, dispatch_state="pending", control_revision=control["revision"],
+            payload=answer_meta, message_id=answer_note.get("message_id"),
+            reply_to_wa_message_id=message.message_id, dispatch_state="pending", control_revision=current["revision"],
         )
         complete()
         reply = conn.execute("""
@@ -564,7 +602,8 @@ def deliver_prepared_whatsapp_reply(*, workshop_id: str, customer_phone: str,
                                     reply_to_wa_message_id: str, send_message: Any) -> dict[str, Any]:
     """Claim a durable reply before HTTP; ambiguous sends are never auto-repeated."""
     with atomic_database() as conn:
-        control = _lock_conversation(conn, workshop_id, customer_phone)
+        _lock_conversation(conn, workshop_id, customer_phone)
+        control = get_whatsapp_conversation_control(workshop_id=workshop_id, customer_phone=customer_phone)
         result = conn.execute("""
             SELECT * FROM whatsapp_messages WHERE workshop_id = ? AND direction = 'outbound'
             AND reply_to_wa_message_id = ?
@@ -574,8 +613,13 @@ def deliver_prepared_whatsapp_reply(*, workshop_id: str, customer_phone: str,
         reply = dict(result)
         if reply["dispatch_state"] != "pending":
             return {"status": reply["status"], "wa_message_id": reply["wa_message_id"], "retry": False}
+        if conn.execute("SELECT 1 FROM whatsapp_messages WHERE workshop_id = ? AND customer_phone = ? "
+                        "AND direction = 'outbound' AND dispatch_state = 'sending' AND id <> ? LIMIT 1",
+                        (workshop_id, customer_phone, reply["id"])).fetchone():
+            return {"status": "pending", "wa_message_id": None, "retry": True}
         reason = None
-        if control["mode"] != "assistant" or control["revision"] != reply["control_revision"]:
+        handoff_ack = json.loads(reply["payload_json"] or "{}").get("handoff_ack") and control["conversation_state"] == "waiting_for_workshop"
+        if (control["mode"] != "assistant" and not handoff_ack) or control["revision"] != reply["control_revision"]:
             reason = "manual_takeover_before_assistant_reply"
         elif not whatsapp_customer_service_window_for_phone(
             workshop_id=workshop_id, customer_phone=customer_phone,
@@ -631,10 +675,12 @@ def update_whatsapp_message_status(
     if not wid or not message_id or normalized_status not in MESSAGE_STATUSES:
         return False
 
-    with get_conn() as conn:
+    with atomic_database() as conn:
+        from app.db import lock_communication_scope
+        lock_communication_scope(conn, wid)
         row = conn.execute(
             """
-            SELECT payload_json
+            SELECT payload_json, ticket_id, message_id
             FROM whatsapp_messages
             WHERE workshop_id = ?
               AND direction = 'outbound'
@@ -682,6 +728,13 @@ def update_whatsapp_message_status(
         )
         conn.commit()
 
+        if normalized_status in {"sent", "delivered", "read"} and row["ticket_id"] and current_payload.get("sender_role") == "workshop":
+            from app.tickets import find_ticket_by_id, finalize_ticket_message_delivery
+            ticket = find_ticket_by_id(row["ticket_id"], wid)
+            note = next((n for n in (ticket or {}).get("notes", []) if n.get("message_id") == row["message_id"]), None)
+            if note:
+                finalize_ticket_message_delivery(row["ticket_id"], row["message_id"], "sent", workshop_id=wid)
+
     return True
 
 
@@ -719,6 +772,7 @@ def list_whatsapp_messages(
             message_type,
             text,
             wa_message_id,
+            message_id,
             ticket_id,
             status,
             payload_json,
@@ -732,7 +786,27 @@ def list_whatsapp_messages(
     with get_conn() as conn:
         rows = conn.execute(sql, params).fetchall()
 
-    return [dict(row) for row in rows]
+    result = []
+    from app.tickets import find_ticket_by_id
+    tickets = {}
+    for row in rows:
+        item = dict(row)
+        metadata = json.loads(item.get("payload_json") or "{}")
+        role = metadata.get("sender_role") or ("customer" if item["direction"] == "inbound" else
+                ("assistant" if metadata.get("source") == "webhook" else "workshop"))
+        item.update(sender_role=role, purpose=metadata.get("purpose") or ("customer_information" if role == "customer" else
+                    "automatic_answer" if role == "assistant" else "workshop_notification"),
+                    requires_human_action=bool(metadata.get("requires_human_action")),
+                    reply_to_message_id=metadata.get("reply_to_message_id"), resolved_at=metadata.get("resolved_at"))
+        tid = item.get("ticket_id")
+        if tid:
+            if tid not in tickets:
+                tickets[tid] = find_ticket_by_id(tid, workshop_id=wid) or {}
+            note = next((note for note in tickets[tid].get("notes", []) if note.get("message_id") == item["message_id"]), None)
+            if note:
+                item.update({key: note.get(key) for key in ("sender_role", "purpose", "requires_human_action", "reply_to_message_id", "resolved_at")})
+        result.append(item)
+    return result
 
 
 def _post_graph_api_json(

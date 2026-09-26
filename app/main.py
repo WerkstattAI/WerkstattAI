@@ -12,8 +12,12 @@ from app.ai_service import polish_reply_de
 from app.auth import decode_session_token, get_current_user, is_dashboard_path, login_redirect_url
 from app.customer_access import CustomerAccess, normalize_customer_phone
 from app.customer_sessions import bound_web_session
+from app.customer_handoff import receive_customer_message
 from app.config import settings
 from app.db import (
+    atomic_database,
+    get_conn,
+    lock_communication_scope,
     default_workshop_id,
     demo_workshop_id,
     get_whatsapp_conversation_control,
@@ -160,6 +164,7 @@ def _response_ticket_id(response: ChatResponse) -> str | None:
     return str(ticket_id).strip() or None
 
 
+@atomic_database()
 def process_chat_message(
     *,
     workshop_id: str,
@@ -167,7 +172,9 @@ def process_chat_message(
     message: str | None,
     channel: str,
     phone: str | None = None,
+    message_id: str | None = None,
 ) -> ChatResponse:
+    lock_communication_scope(get_conn(), workshop_id)
     if not is_subscription_active(workshop_id):
         raise HTTPException(
             status_code=402,
@@ -185,7 +192,16 @@ def process_chat_message(
         allowed_ticket_ids=frozenset({state.ticket_id}) if channel == "web_chat" and state.ticket_id else frozenset(),
         verified_phone=verified_phone,
     )
-    new_state, reply, done = next_step(state, message, customer_access=access)
+    ticket = find_ticket_by_id(state.ticket_id, workshop_id) if state.ticket_id else None
+    if ticket and access.allows(ticket) and ticket.get("conversation_state") != "assistant_active":
+        if message and message.strip():
+            ticket = receive_customer_message(ticket, message, workshop_id=workshop_id, message_id=message_id)
+        # Manual workshop questions never become intake answers, even after a reload.
+        return ChatResponse(reply="", done=False, data={**_dump_state(state),
+            "conversation_state": ticket["conversation_state"],
+            "workshop_messages": [n for n in ticket["notes"] if n.get("sender_role") == "workshop"
+                                  and n.get("purpose") != "internal_note" and n.get("delivery_status") in {None, "sent"}]})
+    new_state, reply, done = next_step(state, message, customer_access=access, message_id=message_id)
     new_state.workshop_id = workshop_id
 
     reply = polish_reply_de(reply)
@@ -208,10 +224,13 @@ def process_chat_message(
         phone=phone,
     )
 
+    ticket = find_ticket_by_id(new_state.ticket_id, workshop_id) if new_state.ticket_id else None
     return ChatResponse(
         reply=reply,
         done=done,
-        data=_dump_state(new_state),
+        data={**_dump_state(new_state), "conversation_state": (ticket or {}).get("conversation_state", "assistant_active"),
+              "workshop_messages": [n for n in (ticket or {}).get("notes", []) if n.get("sender_role") == "workshop"
+                                    and n.get("purpose") != "internal_note" and n.get("delivery_status") in {None, "sent"}]},
     )
 
 
@@ -259,66 +278,51 @@ def _verify_whatsapp_webhook_challenge(
 
 
 def _process_test_whatsapp_webhook(payload: WhatsAppWebhookRequest) -> WhatsAppWebhookResponse:
+    """The local test format uses the same ownership/recording flow as Meta."""
+    import uuid
+    from datetime import datetime, timezone
+    from app.whatsapp import (
+        WhatsAppInboundMessage, WhatsAppSendResult, deliver_prepared_whatsapp_reply,
+        prepare_whatsapp_inbound,
+    )
+
     workshop_id = _normalize_workshop_id(payload.workshop_id)
-    session_id = whatsapp_session_id(payload.from_phone)
-    control = get_whatsapp_conversation_control(
-        workshop_id=workshop_id,
-        customer_phone=payload.from_phone,
+    phone = normalize_customer_phone(payload.from_phone)
+    if not phone:
+        raise HTTPException(status_code=400, detail="Ungültiger WhatsApp-Absender")
+    session_id = whatsapp_session_id(phone)
+    message_id = "local-test-" + uuid.uuid4().hex
+    message = WhatsAppInboundMessage(
+        phone_number_id="local-test", display_phone_number=None, from_phone=phone,
+        message_id=message_id, timestamp=str(int(datetime.now(timezone.utc).timestamp())),
+        message_type="text", text=payload.text, raw={"test_payload": True},
     )
-    active_ticket_id = str(control.get("active_ticket_id") or "").strip() or None
+    processed_response = None
 
-    if payload.text:
-        save_whatsapp_message(
-            workshop_id=workshop_id,
-            phone_number_id=None,
-            customer_phone=payload.from_phone,
-            direction="inbound",
-            message_type="text",
-            text=payload.text,
-            ticket_id=active_ticket_id,
-            status="received",
-            payload={"test_payload": True},
+    def process():
+        nonlocal processed_response
+        processed_response = process_chat_message(
+            workshop_id=workshop_id, session_id=session_id, message=payload.text,
+            channel="whatsapp", phone=phone, message_id="wa:" + message_id,
         )
+        return processed_response
 
-    if control.get("mode") == "manual":
-        return WhatsAppWebhookResponse(
-            reply="Nachricht wurde für die manuelle Bearbeitung gespeichert.",
-            done=False,
-            session_id=session_id,
-            workshop_id=workshop_id,
-            data={
-                "handling_mode": "manual",
-                "active_ticket_id": active_ticket_id,
-            },
+    outcome = prepare_whatsapp_inbound(workshop_id=workshop_id, message=message, process_message=process)
+    reply = ""
+    if outcome["action"] == "reply":
+        delivery = deliver_prepared_whatsapp_reply(
+            workshop_id=workshop_id, customer_phone=phone, reply_to_wa_message_id=message_id,
+            send_message=lambda _: WhatsAppSendResult(True, 200, None, {"local_only": True}),
         )
-
-    response = process_chat_message(
-        workshop_id=workshop_id,
-        session_id=session_id,
-        message=payload.text,
-        channel="whatsapp",
-        phone=payload.from_phone,
-    )
-
-    response_ticket_id = _response_ticket_id(response) or active_ticket_id
-    save_whatsapp_message(
-        workshop_id=workshop_id,
-        phone_number_id=None,
-        customer_phone=payload.from_phone,
-        direction="outbound",
-        message_type="text",
-        text=response.reply,
-        ticket_id=response_ticket_id,
-        status="sent_local",
-        payload={"test_payload": True},
-    )
-
+        if not delivery.get("suppressed_reason"):
+            reply = str(outcome["reply"].get("text") or "")
+    control = get_whatsapp_conversation_control(workshop_id=workshop_id, customer_phone=phone)
     return WhatsAppWebhookResponse(
-        reply=response.reply,
-        done=response.done,
-        session_id=session_id,
-        workshop_id=workshop_id,
-        data=response.data,
+        reply=reply, done=processed_response.done if processed_response else False,
+        session_id=session_id, workshop_id=workshop_id,
+        data={**(processed_response.data if processed_response else {}),
+              "handling_mode": control["mode"], "conversation_state": control["conversation_state"],
+              "active_ticket_id": control.get("active_ticket_id")},
     )
 
 
@@ -438,6 +442,7 @@ async def whatsapp_webhook(request: Request):
                 process_message=lambda: process_chat_message(
                     workshop_id=workshop_id, session_id=session_id,
                     message=message.text, channel="whatsapp", phone=message.from_phone,
+                    message_id="wa:" + message.message_id,
                 ),
             )
         except Exception:
@@ -580,7 +585,7 @@ def chat(payload: ChatRequest, request: Request, response: Response) -> ChatResp
     )
     # The browser needs only workflow status, not the complete persisted state.
     return ChatResponse(reply=result.reply, done=result.done, data={
-        key: result.data.get(key) for key in ("step", "mode", "workshop_id", "ticket_id", "request_type", "priority")
+        key: result.data.get(key) for key in ("step", "mode", "workshop_id", "ticket_id", "request_type", "priority", "conversation_state", "workshop_messages")
     })
 
 

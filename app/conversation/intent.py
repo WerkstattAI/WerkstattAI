@@ -446,6 +446,12 @@ def detect_intent(state: IntakeState, user_message: str | None) -> str:
     if has_explicit_existing_choice(msg):
         return INTENT_EXISTING_TICKET
 
+    # After intake, price/diagnosis questions belong to the existing ticket.
+    # They must not start a quote flow or escape into general FAQ answers.
+    # Human ownership is checked by the transport before this router runs.
+    if getattr(state, "ticket_id", None):
+        return INTENT_EXISTING_TICKET
+
     if has_explicit_general_choice(msg):
         return INTENT_GENERAL_QUESTION
 
@@ -455,6 +461,9 @@ def detect_intent(state: IntakeState, user_message: str | None) -> str:
     if mode == "quote" and is_active_quote_step(getattr(state, "step", None)):
         return INTENT_QUOTE_REQUEST
 
+    if has_direct_ticket_reference(msg):
+        return INTENT_EXISTING_TICKET
+
     if looks_like_price_overview_question(msg):
         return INTENT_GENERAL_QUESTION
 
@@ -463,9 +472,6 @@ def detect_intent(state: IntakeState, user_message: str | None) -> str:
 
     if looks_like_ai_freeform_request(msg):
         return INTENT_UNCLEAR
-
-    if has_direct_ticket_reference(msg):
-        return INTENT_EXISTING_TICKET
 
     if looks_like_general_question(msg) and not has_explicit_ticket_context(msg):
         return INTENT_GENERAL_QUESTION

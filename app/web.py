@@ -20,8 +20,13 @@ from app.admin import (
 from app.auth import authenticate_user, clear_session_cookie, get_current_user, set_session_cookie
 from app.config import settings
 from app.customer_sessions import browser_identity
+from app.communication import open_customer_questions
+from app.manual_dispatch import send_workshop_message
 from app.legal import provider_details
 from app.db import (
+    atomic_database,
+    get_conn,
+    lock_communication_scope,
     default_workshop_id,
     demo_workshop_id,
     get_whatsapp_conversation_control,
@@ -36,6 +41,8 @@ from app.tickets import (
     list_latest_tickets,
     save_ticket,
     update_ticket_status,
+    set_ticket_conversation_state,
+    validate_workshop_message,
 )
 from app.whatsapp import (
     list_whatsapp_conversations,
@@ -500,51 +507,37 @@ def _take_over_conversation_before_send(
 ) -> dict[str, Any] | None:
     """Pause the assistant before an external send so it cannot race the employee."""
     try:
-        previous_control = get_whatsapp_conversation_control(
-            workshop_id=workshop_id,
-            customer_phone=customer_phone,
-        )
-        if ticket_id:
-            set_whatsapp_conversation_control(
-                workshop_id=workshop_id,
-                customer_phone=customer_phone,
-                mode="manual",
-                active_ticket_id=ticket_id,
-            )
-        else:
-            set_whatsapp_conversation_control(
-                workshop_id=workshop_id,
-                customer_phone=customer_phone,
-                mode="manual",
-            )
-        return previous_control
+        with atomic_database() as conn:
+            lock_communication_scope(conn, workshop_id)
+            if conn.execute("SELECT 1 FROM whatsapp_messages WHERE workshop_id = ? AND customer_phone = ? "
+                            "AND direction = 'outbound' AND dispatch_state = 'sending' LIMIT 1",
+                            (workshop_id, customer_phone)).fetchone():
+                raise ValueError("Für diese Unterhaltung läuft bereits ein Versand.")
+            previous_control = get_whatsapp_conversation_control(workshop_id=workshop_id, customer_phone=customer_phone)
+            state = previous_control["conversation_state"] if previous_control["mode"] == "manual" else "workshop_active"
+            current = set_whatsapp_conversation_control(workshop_id=workshop_id, customer_phone=customer_phone,
+                conversation_state=state, active_ticket_id=ticket_id or previous_control.get("active_ticket_id"))
+            previous_control["_takeover_revision"] = current["revision"]
+            return previous_control
     except Exception:
-        logger.exception(
-            "Could not switch WhatsApp conversation to manual for workshop=%s phone=%s",
-            workshop_id,
-            customer_phone,
-        )
+        logger.exception("Could not reserve manual conversation control")
         return None
 
 
-def _restore_whatsapp_conversation_control(
-    *,
-    previous_control: dict[str, Any],
-) -> None:
-    """Best-effort rollback when Meta rejects a send after the pre-send takeover."""
+def _restore_whatsapp_conversation_control(*, previous_control: dict[str, Any]) -> None:
+    """Only undo this attempt; never overwrite a newer workshop/customer action."""
     try:
-        set_whatsapp_conversation_control(
-            workshop_id=str(previous_control.get("workshop_id") or ""),
-            customer_phone=str(previous_control.get("customer_phone") or ""),
-            mode=str(previous_control.get("mode") or "assistant"),
-            active_ticket_id=previous_control.get("active_ticket_id"),
-        )
+        wid, phone = previous_control["workshop_id"], previous_control["customer_phone"]
+        with atomic_database() as conn:
+            lock_communication_scope(conn, wid)
+            current = get_whatsapp_conversation_control(workshop_id=wid, customer_phone=phone)
+            if current["revision"] != previous_control.get("_takeover_revision"):
+                return
+            set_whatsapp_conversation_control(workshop_id=wid, customer_phone=phone,
+                conversation_state=previous_control["conversation_state"], active_ticket_id=previous_control.get("active_ticket_id"),
+                pending_workshop_question_id=previous_control.get("pending_workshop_question_id"))
     except Exception:
-        logger.exception(
-            "Could not restore WhatsApp conversation control after failed send for workshop=%s phone=%s",
-            previous_control.get("workshop_id"),
-            previous_control.get("customer_phone"),
-        )
+        logger.exception("Could not restore manual conversation control")
 
 
 def _linked_ticket_whatsapp_phone(
@@ -589,6 +582,9 @@ def _send_ticket_customer_whatsapp(
     ticket: dict[str, Any],
     text: str,
     source: str = "dashboard_ticket",
+    purpose: str = "workshop_notification",
+    reply_to_message_id: str | None = None,
+    message_id: str | None = None,
 ) -> tuple[bool, str, str]:
     if not text:
         return False, "Die Nachricht darf nicht leer sein.", ""
@@ -620,102 +616,21 @@ def _send_ticket_customer_whatsapp(
     if window_error:
         return False, window_error, recipient
 
-    previous_control = _take_over_conversation_before_send(
-        workshop_id=workshop_id,
-        customer_phone=recipient,
-        ticket_id=ticket_id,
-    )
-    if previous_control is None:
-        return (
-            False,
-            "Die Werkstatt konnte die Unterhaltung nicht sicher übernehmen. Es wurde nichts gesendet.",
-            recipient,
-        )
-
-    send_result = send_whatsapp_text_message(
-        phone_number_id=phone_number_id,
-        customer_phone=recipient,
-        text=text,
-        access_token=access_token,
-        graph_api_version=settings.whatsapp_graph_api_version,
-    )
-    manual_mode_set = True
-    if not send_result.ok and send_result.status_code is not None:
-        _restore_whatsapp_conversation_control(
-            previous_control=previous_control,
-        )
-    message_payload = {
-        "source": source,
-        "local_only": False,
-        "user": (get_current_user(request) or {}).get("email"),
-        "meta_status_code": send_result.status_code,
-        "meta_response": send_result.payload,
-        "meta_error": send_result.error,
-    }
-
     try:
-        save_whatsapp_message(
-            workshop_id=workshop_id,
-            phone_number_id=phone_number_id,
-            customer_phone=recipient,
-            direction="outbound",
-            message_type="text",
-            text=text,
-            wa_message_id=send_result.wa_message_id,
-            ticket_id=ticket_id,
-            status=_meta_outbound_status(send_result),
-            payload=message_payload,
-        )
+        result = send_workshop_message(workshop_id=workshop_id, customer_phone=recipient,
+            phone_number_id=phone_number_id, ticket_id=ticket_id, text=text, purpose=purpose,
+            reply_to_message_id=reply_to_message_id, message_id=message_id, source=source,
+            user=(get_current_user(request) or {}).get("email"),
+            send=lambda: send_whatsapp_text_message(phone_number_id=phone_number_id, customer_phone=recipient,
+                text=text, access_token=access_token, graph_api_version=settings.whatsapp_graph_api_version))
+    except ValueError as exc:
+        return False, str(exc), recipient
     except Exception:
-        logger.exception(
-            "Could not persist WhatsApp send result for workshop=%s ticket=%s",
-            workshop_id,
-            ticket_id,
-        )
-        if not send_result.ok:
-            return False, _meta_send_error(send_result), recipient
-        detail = (
-            "Die Nachricht wurde an Meta übergeben, konnte intern aber nicht protokolliert "
-            "werden. Bitte nicht erneut senden."
-        )
-        if not manual_mode_set:
-            detail += " Der Assistent konnte nicht automatisch pausiert werden."
-        return (
-            True,
-            detail,
-            recipient,
-        )
-
-    if not send_result.ok:
-        return False, _meta_send_error(send_result), recipient
-
-    try:
-        add_ticket_note(ticket_id, text, note_type="customer_reply", workshop_id=workshop_id)
-    except Exception:
-        logger.exception(
-            "Could not add customer reply note after WhatsApp send for workshop=%s ticket=%s",
-            workshop_id,
-            ticket_id,
-        )
-        detail = (
-            "Die Nachricht wurde an Meta übergeben, die Ticketnotiz konnte aber nicht "
-            "gespeichert werden. Bitte nicht erneut senden."
-        )
-        if not manual_mode_set:
-            detail += " Der Assistent konnte nicht automatisch pausiert werden."
-        return (
-            True,
-            detail,
-            recipient,
-        )
-
-    detail = (
-        f"WhatsApp-Nachricht wurde an Meta für {recipient} übergeben. "
-        "Die Werkstatt hat die Unterhaltung übernommen; erst „Zugestellt“ bestätigt den Empfang."
-    )
-    if not manual_mode_set:
-        detail += " Der Assistent konnte nicht automatisch pausiert werden."
-    return True, detail, recipient
+        logger.exception("Could not finalize manual send")
+        return False, "Der Versandstatus ist unklar. Bitte den Verlauf prüfen und nicht erneut senden.", recipient
+    if not result.ok:
+        return False, _meta_send_error(result), recipient
+    return True, f"WhatsApp-Nachricht wurde an Meta für {recipient} übergeben. Die Werkstatt hat die Unterhaltung übernommen.", recipient
 
 
 def _pick_first(d: dict, keys: list[str]) -> str:
@@ -793,6 +708,8 @@ def _matches_query(t: dict, q: str) -> bool:
 def _is_customer_question_note(note: dict) -> bool:
     text = str(note.get("text", "") if isinstance(note, dict) else "").strip()
     note_type = str(note.get("type", "") if isinstance(note, dict) else "").strip().lower()
+    if note.get("purpose"):
+        return note["purpose"] == "customer_question"
     return note_type == "customer_message" or text.lower().startswith("kundenfrage über den chat:")
 
 
@@ -805,6 +722,16 @@ def _note_type(note: dict) -> str:
         return note_type
 
     return "customer_message" if _is_customer_question_note(note) else "internal_note"
+
+
+def _communication_context(ticket: dict) -> None:
+    ticket["open_customer_questions"] = open_customer_questions(ticket)
+    ticket["customer_question_open"] = bool(ticket["open_customer_questions"])
+    ticket["customer_question_count"] = len(ticket["open_customer_questions"])
+    ticket["communication_messages"] = [n for n in ticket.get("notes", []) if n.get("purpose") != "internal_note"]
+    for note in ticket["communication_messages"]:
+        note["created_at_display"] = _format_datetime_for_display(note.get("created_at"))
+    ticket["has_customer_question"] = any(n.get("purpose") == "customer_question" for n in ticket.get("notes", []))
 
 
 def _details_payload(t: dict) -> dict:
@@ -911,19 +838,7 @@ def _prepare_tickets(limit: int, workshop_id: str | None = None) -> list[dict]:
             t["last_note_created_at"]
         )
 
-        if t["has_customer_question"] and not t["customer_question_open"]:
-            latest_customer_question_at = _parse_iso(t.get("latest_customer_question_created_at"))
-            customer_replies = [
-                note for note in notes
-                if isinstance(note, dict) and _note_type(note) == "customer_reply"
-            ]
-            latest_customer_reply_at = _parse_iso(
-                customer_replies[-1].get("created_at")
-                if customer_replies
-                else None
-            )
-            if latest_customer_reply_at < latest_customer_question_at:
-                t["customer_question_open"] = True
+        _communication_context(t)
 
         t["details_payload"] = _details_payload(t)
         t["details_json"] = json.dumps(
@@ -1572,6 +1487,9 @@ def dashboard_whatsapp(
         )
         item["mode"] = control.get("mode") or "assistant"
         item["active_ticket_id"] = control.get("active_ticket_id")
+        item["conversation_state"] = control["conversation_state"]
+        active_ticket = find_ticket_by_id(item["active_ticket_id"], wid) if item["active_ticket_id"] else None
+        item["open_customer_questions"] = open_customer_questions(active_ticket or {})
         item["mode_label"] = (
             "Werkstatt antwortet"
             if item["mode"] == "manual"
@@ -1679,54 +1597,19 @@ def dashboard_whatsapp_test(
             window_error + " Nutzen Sie für den Ersttest die konfigurierte Startvorlage.",
         )
 
-    previous_control = _take_over_conversation_before_send(
-        workshop_id=wid,
-        customer_phone=phone,
-    )
-    if previous_control is None:
-        return redirect(
-            "failed",
-            "Die Werkstatt konnte den Testkontakt nicht sicher übernehmen. Es wurde nichts gesendet.",
-        )
-
-    send_result = send_whatsapp_text_message(
-        phone_number_id=phone_number_id,
-        customer_phone=phone,
-        text=text,
-        access_token=access_token,
-        graph_api_version=settings.whatsapp_graph_api_version,
-    )
-    if not send_result.ok and send_result.status_code is not None:
-        _restore_whatsapp_conversation_control(previous_control=previous_control)
-
-    status = _meta_outbound_status(send_result)
-    save_whatsapp_message(
-        workshop_id=wid,
-        phone_number_id=phone_number_id,
-        customer_phone=phone,
-        direction="outbound",
-        message_type="text",
-        text=text,
-        wa_message_id=send_result.wa_message_id,
-        status=status,
-        payload={
-            "source": "dashboard_test",
-            "local_only": False,
-            "user": (get_current_user(request) or {}).get("email"),
-            "meta_status_code": send_result.status_code,
-            "meta_response": send_result.payload,
-            "meta_error": send_result.error,
-        },
-    )
-
-    if send_result.ok:
-        return redirect("sent", "Testnachricht wurde an die Meta API übergeben. Die Zustellung wird separat bestätigt.")
-
-    detail = _meta_send_error(send_result)
-    return redirect(
-        "unknown" if send_result.status_code is None else "failed",
-        detail,
-    )
+    try:
+        result = send_workshop_message(workshop_id=wid, customer_phone=phone, phone_number_id=phone_number_id,
+            ticket_id=None, text=text, purpose="workshop_notification", reply_to_message_id=None, message_id=None,
+            source="dashboard_test", user=(get_current_user(request) or {}).get("email"),
+            send=lambda: send_whatsapp_text_message(phone_number_id=phone_number_id, customer_phone=phone,
+                text=text, access_token=access_token, graph_api_version=settings.whatsapp_graph_api_version))
+    except ValueError as exc:
+        return redirect("failed", str(exc))
+    except Exception:
+        return redirect("unknown", "Der Versandstatus ist unklar. Bitte den Verlauf prüfen und nicht erneut senden.")
+    if not result.ok:
+        return redirect("unknown" if result.status_code is None else "failed", _meta_send_error(result))
+    return redirect("sent", "Testnachricht wurde an Meta übergeben. Die Werkstatt hat die Unterhaltung übernommen.")
 
 
 @router.post("/dashboard/whatsapp/reply")
@@ -1736,7 +1619,13 @@ def dashboard_whatsapp_reply(
     reply_text: str = Form(..., max_length=4096),
     ticket_id: str | None = Form(None, max_length=128),
     workshop_id: str | None = Form(None, max_length=128),
+    purpose: str = Form("workshop_notification", max_length=64),
+    reply_to_message_id: str | None = Form(None, max_length=256),
+    message_id: str | None = Form(None, max_length=128),
 ):
+    purpose = purpose if isinstance(purpose, str) else "workshop_notification"
+    reply_to_message_id = reply_to_message_id.strip() or None if isinstance(reply_to_message_id, str) else None
+    message_id = message_id.strip() or None if isinstance(message_id, str) else None
     wid = _workshop_id_for_request(request, workshop_id)
     phone = _normalize_whatsapp_recipient(customer_phone)
     text = (reply_text or "").strip()
@@ -1763,6 +1652,8 @@ def dashboard_whatsapp_reply(
 
     try:
         normalized_ticket_id = ticket_id.strip() if isinstance(ticket_id, str) else ""
+        if not normalized_ticket_id:
+            normalized_ticket_id = str(get_whatsapp_conversation_control(workshop_id=wid, customer_phone=phone).get("active_ticket_id") or "")
         if normalized_ticket_id:
             ticket = find_ticket_by_id(normalized_ticket_id, workshop_id=wid)
             if not ticket:
@@ -1783,6 +1674,7 @@ def dashboard_whatsapp_reply(
                 ticket=ticket,
                 text=text,
                 source="dashboard_whatsapp_inbox",
+                purpose=purpose, reply_to_message_id=reply_to_message_id, message_id=message_id,
             )
             return redirect(_human_send_redirect_status(sent, detail), detail)
         if not list_whatsapp_messages(
@@ -1810,84 +1702,18 @@ def dashboard_whatsapp_reply(
         if window_error:
             return redirect("failed", window_error)
 
-        previous_control = _take_over_conversation_before_send(
-            workshop_id=wid,
-            customer_phone=phone,
-        )
-        if previous_control is None:
-            return redirect(
-                "failed",
-                "Die Werkstatt konnte die Unterhaltung nicht sicher übernehmen. Es wurde nichts gesendet.",
-            )
-
-        send_result = send_whatsapp_text_message(
-            phone_number_id=phone_number_id,
-            customer_phone=phone,
-            text=text,
-            access_token=access_token,
-            graph_api_version=settings.whatsapp_graph_api_version,
-        )
-        manual_mode_set = True
-        if not send_result.ok and send_result.status_code is not None:
-            _restore_whatsapp_conversation_control(
-                previous_control=previous_control,
-            )
-        status = _meta_outbound_status(send_result)
-
-        try:
-            save_whatsapp_message(
-                workshop_id=wid,
-                phone_number_id=phone_number_id,
-                customer_phone=phone,
-                direction="outbound",
-                message_type="text",
-                text=text,
-                wa_message_id=send_result.wa_message_id,
-                status=status,
-                payload={
-                    "source": "dashboard",
-                    "local_only": False,
-                    "user": (get_current_user(request) or {}).get("email"),
-                    "meta_status_code": send_result.status_code,
-                    "meta_response": send_result.payload,
-                    "meta_error": send_result.error,
-                },
-            )
-        except Exception:
-            logger.exception(
-                "Could not persist inbox WhatsApp send result for workshop=%s",
-                wid,
-            )
-            if send_result.ok:
-                return redirect(
-                    "sent",
-                    "Die Nachricht wurde an Meta übergeben, konnte intern aber nicht protokolliert werden. Bitte nicht erneut senden.",
-                )
-            detail = _meta_send_error(send_result)
-            return redirect(
-                "unknown" if send_result.status_code is None else "failed",
-                detail,
-            )
-
+        send_result = send_workshop_message(workshop_id=wid, customer_phone=phone, phone_number_id=phone_number_id,
+            text=text, ticket_id=None, purpose=purpose, reply_to_message_id=reply_to_message_id,
+            message_id=message_id, source="dashboard", user=(get_current_user(request) or {}).get("email"),
+            send=lambda: send_whatsapp_text_message(phone_number_id=phone_number_id, customer_phone=phone,
+                text=text, access_token=access_token, graph_api_version=settings.whatsapp_graph_api_version))
         if not send_result.ok:
-            detail = _meta_send_error(send_result)
-            return redirect(
-                "unknown" if send_result.status_code is None else "failed",
-                detail,
-            )
+            return redirect("unknown" if send_result.status_code is None else "failed", _meta_send_error(send_result))
+    except ValueError as exc:
+        return redirect("failed", str(exc))
     except Exception:
-        return redirect("failed", "Die Antwort konnte technisch nicht gesendet werden.")
-
-    detail = (
-        "WhatsApp-Nachricht wurde an Meta übergeben. Die Werkstatt hat die Unterhaltung "
-        "übernommen. Erst der Status „Zugestellt“ bestätigt den Empfang am Kundenhandy."
-    )
-    if not manual_mode_set:
-        detail += " Der Assistent konnte nicht automatisch pausiert werden."
-    return redirect(
-        "sent",
-        detail,
-    )
+        return redirect("unknown", "Der Versandstatus konnte nicht abschließend gespeichert werden. Bitte den Verlauf prüfen und nicht erneut senden.")
+    return redirect("sent", "Nachricht wurde an Meta übergeben. Die Werkstatt hat die Unterhaltung übernommen.")
 
 
 def _whatsapp_action_redirect(
@@ -2010,87 +1836,23 @@ def dashboard_whatsapp_start_template(
             "Startvorlage nicht verfügbar. Es fehlt: " + ", ".join(missing) + ".",
         )
 
-    previous_control = _take_over_conversation_before_send(
-        workshop_id=wid,
-        customer_phone=phone,
-        ticket_id=normalized_ticket_id or None,
-    )
-    if previous_control is None:
-        return redirect(
-            "failed",
-            "Die Werkstatt konnte die Unterhaltung nicht sicher übernehmen. Die Vorlage wurde nicht gesendet.",
-        )
-
-    send_result = send_whatsapp_template_message(
-        phone_number_id=phone_number_id,
-        customer_phone=phone,
-        template_name=template_name,
-        template_language=template_language,
-        access_token=access_token,
-        graph_api_version=settings.whatsapp_graph_api_version,
-    )
-    manual_mode_set = True
-    if not send_result.ok and send_result.status_code is not None:
-        _restore_whatsapp_conversation_control(previous_control=previous_control)
-
-    audit_text = f"Startvorlage „{template_name}“"
     try:
-        save_whatsapp_message(
-            workshop_id=wid,
-            phone_number_id=phone_number_id,
-            customer_phone=phone,
-            direction="outbound",
-            message_type="template",
-            text=audit_text,
-            wa_message_id=send_result.wa_message_id,
-            ticket_id=normalized_ticket_id or None,
-            status=_meta_outbound_status(send_result),
-            payload={
-                "source": f"dashboard_start_template_{normalized_context}",
-                "local_only": False,
-                "user": (get_current_user(request) or {}).get("email"),
-                "template_name": template_name,
-                "template_language": template_language,
-                "meta_status_code": send_result.status_code,
-                "meta_response": send_result.payload,
-                "meta_error": send_result.error,
-            },
-        )
+        result = send_workshop_message(workshop_id=wid, customer_phone=phone, phone_number_id=phone_number_id,
+            ticket_id=normalized_ticket_id or None, text=f"Startvorlage „{template_name}“",
+            purpose="workshop_notification", reply_to_message_id=None, message_id=None,
+            source=f"dashboard_start_template_{normalized_context}", message_type="template",
+            template_metadata={"template_name": template_name, "template_language": template_language},
+            user=(get_current_user(request) or {}).get("email"),
+            send=lambda: send_whatsapp_template_message(phone_number_id=phone_number_id, customer_phone=phone,
+                template_name=template_name, template_language=template_language,
+                access_token=access_token, graph_api_version=settings.whatsapp_graph_api_version))
+    except ValueError as exc:
+        return redirect("failed", str(exc))
     except Exception:
-        logger.exception(
-            "Could not persist WhatsApp template send for workshop=%s phone=%s",
-            wid,
-            phone,
-        )
-        if send_result.ok:
-            detail = (
-                "Die Startvorlage wurde an Meta übergeben, konnte intern aber nicht "
-                "protokolliert werden. Bitte nicht erneut senden."
-            )
-            if not manual_mode_set:
-                detail += " Der Assistent konnte nicht automatisch pausiert werden."
-            return redirect("template_sent", detail)
-        detail = _meta_send_error(send_result)
-        return redirect(
-            "unknown" if send_result.status_code is None else "failed",
-            detail,
-        )
-
-    if not send_result.ok:
-        detail = _meta_send_error(send_result)
-        return redirect(
-            "unknown" if send_result.status_code is None else "failed",
-            detail,
-        )
-
-    detail = (
-        f"Startvorlage „{template_name}“ wurde an Meta übergeben, aber noch nicht als "
-        "zugestellt bestätigt. Bitte warten Sie auf die Antwort des Kunden; erst sie öffnet "
-        "das 24-Stunden-Fenster für Ihren freien Text."
-    )
-    if not manual_mode_set:
-        detail += " Der Assistent konnte nicht automatisch pausiert werden."
-    return redirect("template_sent", detail)
+        return redirect("unknown", "Der Versandstatus ist unklar. Bitte den Verlauf prüfen und nicht erneut senden.")
+    if not result.ok:
+        return redirect("unknown" if result.status_code is None else "failed", _meta_send_error(result))
+    return redirect("template_sent", f"Startvorlage „{template_name}“ wurde an Meta übergeben. Erst die Kundenantwort öffnet das 24-Stunden-Fenster für Freitext.")
 
 
 @router.post("/dashboard/whatsapp/control")
@@ -2426,25 +2188,13 @@ def ticket_detail(
         item["created_at_display"] = _format_datetime_for_display(item.get("created_at"))
         notes.append(item)
     t["notes"] = notes
-    t["internal_notes"] = [note for note in notes if _note_type(note) == "internal_note"]
+    t["internal_notes"] = [note for note in notes if note.get("purpose") == "internal_note"]
     t["customer_messages"] = [note for note in notes if _note_type(note) == "customer_message"]
     t["customer_replies"] = [note for note in notes if _note_type(note) == "customer_reply"]
     t["customer_question_open"] = bool(t.get("customer_question_open"))
     t["has_customer_question"] = bool(t["customer_messages"])
 
-    if t["has_customer_question"] and not t["customer_question_open"]:
-        latest_customer_question_at = _parse_iso(
-            t["customer_messages"][-1].get("created_at")
-            if t["customer_messages"]
-            else None
-        )
-        latest_customer_reply_at = _parse_iso(
-            t["customer_replies"][-1].get("created_at")
-            if t["customer_replies"]
-            else None
-        )
-        if latest_customer_reply_at < latest_customer_question_at:
-            t["customer_question_open"] = True
+    _communication_context(t)
 
     t["raw_json"] = json.dumps(t, ensure_ascii=False, default=str, indent=2)
 
@@ -2503,7 +2253,13 @@ def ticket_send_customer_message(
     ticket_id: str,
     message_text: str = Form(..., max_length=4096),
     workshop_id: str | None = Form(None, max_length=128),
+    purpose: str = Form("workshop_notification", max_length=64),
+    reply_to_message_id: str | None = Form(None, max_length=256),
+    message_id: str | None = Form(None, max_length=128),
 ):
+    purpose = purpose if isinstance(purpose, str) else "workshop_notification"
+    reply_to_message_id = reply_to_message_id.strip() or None if isinstance(reply_to_message_id, str) else None
+    message_id = message_id.strip() or None if isinstance(message_id, str) else None
     wid = _workshop_id_for_request(request, workshop_id)
     text = (message_text or "").strip()
 
@@ -2538,6 +2294,7 @@ def ticket_send_customer_message(
             ticket=ticket,
             text=text,
             source="dashboard_active_tickets",
+            purpose=purpose, reply_to_message_id=reply_to_message_id, message_id=message_id,
         )
     except Exception:
         return redirect("failed", "Die Nachricht konnte technisch nicht gesendet werden.")
@@ -2552,7 +2309,13 @@ def ticket_add_note(
     note_text: str = Form(..., max_length=4096),
     note_type: str = Form("internal_note", max_length=128),
     workshop_id: str | None = Form(None, max_length=128),
+    purpose: str = Form("workshop_notification", max_length=64),
+    reply_to_message_id: str | None = Form(None, max_length=256),
+    message_id: str | None = Form(None, max_length=128),
 ):
+    purpose = purpose if isinstance(purpose, str) else "workshop_notification"
+    reply_to_message_id = reply_to_message_id.strip() or None if isinstance(reply_to_message_id, str) else None
+    message_id = message_id.strip() or None if isinstance(message_id, str) else None
     wid = _workshop_id_for_request(request, workshop_id)
 
     def redirect_reply(status: str = "", detail: str = "") -> RedirectResponse:
@@ -2592,14 +2355,15 @@ def ticket_add_note(
                     workshop_id=wid,
                     ticket_id=ticket_id,
                     ticket=ticket,
-                    text=text,
+                    text=text, purpose=purpose, reply_to_message_id=reply_to_message_id, message_id=message_id,
                 )
                 return redirect_reply(_human_send_redirect_status(sent, detail), detail)
 
             add_ticket_note(
                 ticket_id,
                 text,
-                note_type="customer_reply",
+                note_type="customer_reply", sender_role="workshop", purpose=purpose,
+                reply_to_message_id=reply_to_message_id, message_id=message_id,
                 workshop_id=wid,
             )
             detail = (
@@ -2616,6 +2380,21 @@ def ticket_add_note(
         return HTMLResponse("Notiz konnte nicht gespeichert werden", status_code=400)
 
     return RedirectResponse(url=f"/dashboard/ticket/{ticket_id}?workshop_id={wid}", status_code=303)
+
+
+@router.post("/dashboard/ticket/{ticket_id}/conversation-control")
+def ticket_conversation_control(request: Request, ticket_id: str,
+                                state: str = Form(..., max_length=64), workshop_id: str | None = Form(None)):
+    wid = _workshop_id_for_request(request, workshop_id)
+    if state not in {"assistant_active", "workshop_active"}:
+        return HTMLResponse("Ungültiger Gesprächszustand", status_code=400)
+    try:
+        set_ticket_conversation_state(ticket_id, state, wid)
+    except KeyError:
+        return HTMLResponse("Ticket nicht gefunden", status_code=404)
+    except ValueError as exc:
+        return HTMLResponse(str(exc), status_code=400)
+    return RedirectResponse(url=f"/dashboard/ticket/{ticket_id}?" + urlencode({"workshop_id": wid}), status_code=303)
 
 
 @router.post("/dashboard/ticket/{ticket_id}/archive")
