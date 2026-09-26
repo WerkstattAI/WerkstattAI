@@ -9,7 +9,7 @@ from dataclasses import dataclass
 from datetime import datetime, timedelta, timezone
 from typing import Any
 
-from app.db import get_conn
+from app.db import atomic_database, get_conn, get_whatsapp_conversation_control, is_postgres
 
 
 MESSAGE_DIRECTIONS = {"inbound", "outbound"}
@@ -21,8 +21,10 @@ MESSAGE_STATUSES = {
     "read",
     "failed",
     "unknown",
+    "pending",
 }
 CUSTOMER_SERVICE_WINDOW = timedelta(hours=24)
+_UNSET_MESSAGE_TIMESTAMP = object()
 
 
 @dataclass(frozen=True)
@@ -219,6 +221,25 @@ def _now_iso() -> str:
     return datetime.now().isoformat(timespec="seconds")
 
 
+def customer_message_datetime(value: Any) -> str | None:
+    """Normalize the sender's event time to UTC; invalid/future times fail closed."""
+    try:
+        if isinstance(value, datetime):
+            timestamp = value
+        elif str(value or "").strip().isdigit():
+            timestamp = datetime.fromtimestamp(int(str(value).strip()), timezone.utc)
+        else:
+            timestamp = datetime.fromisoformat(str(value or "").strip().replace("Z", "+00:00"))
+        if timestamp.tzinfo is None:
+            return None
+        timestamp = timestamp.astimezone(timezone.utc)
+        if timestamp > datetime.now(timezone.utc):
+            return None
+        return timestamp.isoformat(timespec="seconds")
+    except (ValueError, TypeError, OverflowError, OSError):
+        return None
+
+
 def _parse_message_datetime(value: Any) -> datetime | None:
     if isinstance(value, datetime):
         return value
@@ -284,7 +305,7 @@ def whatsapp_customer_service_window_for_phone(
     with get_conn() as conn:
         row = conn.execute(
             """
-            SELECT MAX(created_at) AS last_customer_message_at
+            SELECT MAX(customer_message_at) AS last_customer_message_at
             FROM whatsapp_messages
             WHERE workshop_id = ?
               AND customer_phone = ?
@@ -356,12 +377,24 @@ def save_whatsapp_message(
     ticket_id: str | None = None,
     status: str | None = None,
     payload: dict[str, Any] | None = None,
+    message_timestamp: Any = _UNSET_MESSAGE_TIMESTAMP,
+    processing_state: str = "complete",
+    reply_to_wa_message_id: str | None = None,
+    dispatch_state: str = "complete",
+    control_revision: int | None = None,
 ) -> bool:
     normalized_direction = _normalize_direction(direction)
     normalized_status = _normalize_status(status, normalized_direction)
     wid = str(workshop_id or "").strip()
     phone = str(customer_phone or "").strip()
     message_id = str(wa_message_id or "").strip() or None
+    event_time = None
+    if normalized_direction == "inbound":
+        if message_timestamp is _UNSET_MESSAGE_TIMESTAMP:
+            # Internal/test callers may record a message that arrived now. Meta
+            # webhook callers always pass their explicit timestamp, even if absent.
+            message_timestamp = (payload or {}).get("timestamp", datetime.now(timezone.utc))
+        event_time = customer_message_datetime(message_timestamp)
 
     if not wid:
         raise ValueError("workshop_id is required")
@@ -397,9 +430,14 @@ def save_whatsapp_message(
                 ticket_id,
                 status,
                 payload_json,
-                created_at
+                created_at,
+                customer_message_at,
+                processing_state,
+                reply_to_wa_message_id,
+                dispatch_state,
+                control_revision
             )
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
             """,
             (
                 wid,
@@ -413,11 +451,170 @@ def save_whatsapp_message(
                 normalized_status,
                 json.dumps(payload or {}, ensure_ascii=False),
                 _now_iso(),
+                event_time,
+                processing_state,
+                reply_to_wa_message_id,
+                dispatch_state,
+                control_revision,
             ),
         )
         conn.commit()
 
     return True
+
+
+def _lock_conversation(conn: Any, workshop_id: str, customer_phone: str) -> dict[str, Any]:
+    """Serialize one conversation across processes, including employee changes."""
+    conn.execute("""
+        INSERT INTO whatsapp_conversation_controls (workshop_id, customer_phone)
+        VALUES (?, ?) ON CONFLICT(workshop_id, customer_phone) DO NOTHING
+    """, (workshop_id, customer_phone))
+    suffix = " FOR UPDATE" if is_postgres() else ""
+    row = conn.execute("""
+        SELECT * FROM whatsapp_conversation_controls
+        WHERE workshop_id = ? AND customer_phone = ?
+    """ + suffix, (workshop_id, customer_phone)).fetchone()
+    return dict(row)
+
+
+def prepare_whatsapp_inbound(*, workshop_id: str, message: WhatsAppInboundMessage, process_message: Any) -> dict[str, Any]:
+    """Persist intake side effects and its reply together; retries reuse the reply.
+
+    The transaction contains no network calls. A failed processor rolls back its
+    session, ticket, notes and incoming-message marker as one unit.
+    """
+    with atomic_database() as conn:
+        control = _lock_conversation(conn, workshop_id, message.from_phone)
+        existing = conn.execute("""
+            SELECT processing_state FROM whatsapp_messages
+            WHERE workshop_id = ? AND direction = 'inbound' AND wa_message_id = ?
+        """, (workshop_id, message.message_id)).fetchone()
+        if existing and existing["processing_state"] == "complete":
+            reply = conn.execute("""
+                SELECT * FROM whatsapp_messages WHERE workshop_id = ?
+                AND direction = 'outbound' AND reply_to_wa_message_id = ?
+            """, (workshop_id, message.message_id)).fetchone()
+            if reply and reply["dispatch_state"] == "pending":
+                return {"action": "reply", "reply": dict(reply), "resumed": True}
+            return {"action": "duplicate"}
+
+        active_ticket_id = str(control.get("active_ticket_id") or "").strip() or None
+        if not existing:
+            save_whatsapp_event(
+                workshop_id=workshop_id, phone_number_id=message.phone_number_id,
+                display_phone_number=message.display_phone_number, wa_message_id=message.message_id,
+                from_phone=message.from_phone, event_type="message", message_type=message.message_type,
+                text=message.text, payload=message.raw,
+            )
+            save_whatsapp_message(
+                workshop_id=workshop_id, phone_number_id=message.phone_number_id,
+                customer_phone=message.from_phone, direction="inbound", message_type=message.message_type,
+                text=message.text, wa_message_id=message.message_id, ticket_id=active_ticket_id,
+                status="received", payload=message.raw, message_timestamp=message.timestamp,
+                processing_state="pending",
+            )
+
+        def complete():
+            conn.execute("""
+                UPDATE whatsapp_messages SET processing_state = 'complete'
+                WHERE workshop_id = ? AND direction = 'inbound' AND wa_message_id = ?
+            """, (workshop_id, message.message_id))
+
+        if control["mode"] == "manual":
+            complete()
+            return {"action": "manual", "active_ticket_id": active_ticket_id, "reason": "saved_for_manual_reply"}
+        if message.message_type != "text" or not message.text:
+            complete()
+            return {"action": "ignored"}
+        if not whatsapp_customer_service_window_for_phone(
+            workshop_id=workshop_id, customer_phone=message.from_phone,
+        )["service_window_open"]:
+            complete()
+            return {"action": "manual", "active_ticket_id": active_ticket_id, "reason": "customer_service_window_closed"}
+
+        response = process_message()
+        ticket_id = str(response.data.get("ticket_id") or active_ticket_id or "").strip() or None
+        current = get_whatsapp_conversation_control(workshop_id=workshop_id, customer_phone=message.from_phone)
+        if current["mode"] != "assistant" or current["revision"] != control["revision"]:
+            complete()
+            return {"action": "manual", "active_ticket_id": current.get("active_ticket_id"),
+                    "reason": "manual_takeover_before_assistant_reply"}
+        if ticket_id:
+            # Linking the generated ticket never re-enables the assistant or
+            # overwrites a later employee revision.
+            conn.execute("""
+                UPDATE whatsapp_conversation_controls SET active_ticket_id = ?, updated_at = CURRENT_TIMESTAMP
+                WHERE workshop_id = ? AND customer_phone = ? AND mode = 'assistant' AND revision = ?
+            """, (ticket_id, workshop_id, message.from_phone, control["revision"]))
+        save_whatsapp_message(
+            workshop_id=workshop_id, phone_number_id=message.phone_number_id, customer_phone=message.from_phone,
+            direction="outbound", text=response.reply, ticket_id=ticket_id, status="pending",
+            payload={"source": "webhook", "reply_to_wa_message_id": message.message_id, "done": response.done},
+            reply_to_wa_message_id=message.message_id, dispatch_state="pending", control_revision=control["revision"],
+        )
+        complete()
+        reply = conn.execute("""
+            SELECT * FROM whatsapp_messages WHERE workshop_id = ?
+            AND direction = 'outbound' AND reply_to_wa_message_id = ?
+        """, (workshop_id, message.message_id)).fetchone()
+        return {"action": "reply", "reply": dict(reply), "resumed": False}
+
+
+def deliver_prepared_whatsapp_reply(*, workshop_id: str, customer_phone: str,
+                                    reply_to_wa_message_id: str, send_message: Any) -> dict[str, Any]:
+    """Claim a durable reply before HTTP; ambiguous sends are never auto-repeated."""
+    with atomic_database() as conn:
+        control = _lock_conversation(conn, workshop_id, customer_phone)
+        result = conn.execute("""
+            SELECT * FROM whatsapp_messages WHERE workshop_id = ? AND direction = 'outbound'
+            AND reply_to_wa_message_id = ?
+        """, (workshop_id, reply_to_wa_message_id)).fetchone()
+        if not result:
+            return {"status": "failed", "wa_message_id": None, "retry": False, "meta_error": "Prepared reply is missing"}
+        reply = dict(result)
+        if reply["dispatch_state"] != "pending":
+            return {"status": reply["status"], "wa_message_id": reply["wa_message_id"], "retry": False}
+        reason = None
+        if control["mode"] != "assistant" or control["revision"] != reply["control_revision"]:
+            reason = "manual_takeover_before_assistant_reply"
+        elif not whatsapp_customer_service_window_for_phone(
+            workshop_id=workshop_id, customer_phone=customer_phone,
+        )["service_window_open"]:
+            reason = "customer_service_window_closed"
+        if reason:
+            payload = json.loads(reply["payload_json"] or "{}")
+            payload["suppressed_reason"] = reason
+            conn.execute("""
+                UPDATE whatsapp_messages SET status = 'failed', dispatch_state = 'complete', payload_json = ? WHERE id = ?
+            """, (json.dumps(payload, ensure_ascii=False), reply["id"]))
+            return {"status": "failed", "wa_message_id": None, "retry": False, "suppressed_reason": reason}
+        # A process crash after this commit is an uncertain send, not permission
+        # to send twice. The inbox exposes that uncertainty for manual handling.
+        conn.execute("UPDATE whatsapp_messages SET dispatch_state = 'sending', status = 'unknown' WHERE id = ?",
+                     (reply["id"],))
+
+    try:
+        send_result = send_message(reply)
+    except Exception as exc:
+        send_result = WhatsAppSendResult(False, None, None, {}, str(exc))
+    retry = not send_result.ok and send_result.status_code is not None and (
+        send_result.status_code == 429 or send_result.status_code >= 500
+    )
+    status = "sent" if send_result.ok else ("failed" if send_result.status_code is not None else "unknown")
+    if send_result.payload.get("local_only"):
+        status = "sent_local"
+    with atomic_database() as conn:
+        payload = json.loads(reply["payload_json"] or "{}")
+        payload.update({"local_only": bool(send_result.payload.get("local_only")),
+                        "meta_status_code": send_result.status_code, "meta_response": send_result.payload,
+                        "meta_error": send_result.error})
+        conn.execute("""
+            UPDATE whatsapp_messages SET status = ?, dispatch_state = ?, wa_message_id = ?, payload_json = ?
+            WHERE id = ?
+        """, (status, "pending" if retry else "complete", send_result.wa_message_id,
+              json.dumps(payload, ensure_ascii=False), reply["id"]))
+    return {"status": status, "wa_message_id": send_result.wa_message_id,
+            "meta_status_code": send_result.status_code, "meta_error": send_result.error, "retry": retry}
 
 
 def update_whatsapp_message_status(
@@ -584,6 +781,21 @@ def send_whatsapp_text_message(
         return WhatsAppSendResult(False, None, None, {}, "message text is missing")
     if not normalized_token:
         return WhatsAppSendResult(False, None, None, {}, "access token is missing")
+
+    # This is the shared boundary used by automatic, ticket, inbox and test sends.
+    # Resolve the sender to exactly one tenant, then check its inbound event time.
+    with get_conn() as conn:
+        workshops = conn.execute(
+            "SELECT id FROM workshops WHERE whatsapp_phone_number_id = ? LIMIT 2",
+            (normalized_phone_number_id,),
+        ).fetchall()
+    if len(workshops) != 1:
+        return WhatsAppSendResult(False, 409, None, {}, "WhatsApp sender is not assigned to exactly one workshop")
+    window = whatsapp_customer_service_window_for_phone(
+        workshop_id=str(workshops[0]["id"]), customer_phone=normalized_customer_phone,
+    )
+    if not window["service_window_open"]:
+        return WhatsAppSendResult(False, 409, None, {}, "Das 24-Stunden-Kundenfenster ist geschlossen. Bitte eine freigegebene Vorlage verwenden.")
 
     payload = {
         "messaging_product": "whatsapp",

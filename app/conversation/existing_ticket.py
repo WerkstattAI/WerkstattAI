@@ -4,8 +4,15 @@ from typing import Any, Tuple
 
 from app.conversation.extractors import lower, normalize
 from app.conversation.intent import extract_phone_reference, extract_ticket_reference
+from app.customer_access import CustomerAccess
 from app.models import IntakeState
 from app.tickets import add_ticket_note, find_ticket_by_id, find_tickets_by_phone
+
+
+ACCESS_DENIED_REPLY = (
+    "Ich kann dieses Ticket hier nicht zuordnen. "
+    "Bitte nutzen Sie den ursprünglichen Kundenchat oder wenden Sie sich direkt an die Werkstatt."
+)
 
 
 def _format_ticket_short(ticket: dict[str, Any]) -> str:
@@ -258,6 +265,8 @@ def _looks_like_summary_question(text: str) -> bool:
 def _resolve_ticket_from_message(
     user_message: str,
     workshop_id: str | None = None,
+    *,
+    customer_access: CustomerAccess | None = None,
 ) -> tuple[dict[str, Any] | None, str | None]:
     """
     Versucht zuerst Ticket-ID, danach Telefonnummer.
@@ -266,19 +275,25 @@ def _resolve_ticket_from_message(
     - kein Ticket -> (None, Fehlermeldung)
     - mehrere Tickets -> (None, Rückfrage/Übersicht)
     """
+    if customer_access is None or not workshop_id or customer_access.workshop_id != workshop_id:
+        return None, ACCESS_DENIED_REPLY
+
     ticket_ref = extract_ticket_reference(user_message)
     if ticket_ref:
         ticket = find_ticket_by_id(ticket_ref, workshop_id=workshop_id)
-        if ticket:
+        if customer_access.allows(ticket):
             return ticket, None
-        return None, f"Ich konnte kein Ticket mit der Nummer **{ticket_ref}** finden."
+        return None, ACCESS_DENIED_REPLY
 
     phone_ref = extract_phone_reference(user_message)
     if phone_ref:
-        matches = find_tickets_by_phone(phone_ref, workshop_id=workshop_id)
+        matches = [
+            ticket for ticket in find_tickets_by_phone(phone_ref, workshop_id=workshop_id)
+            if customer_access.allows(ticket)
+        ]
 
         if not matches:
-            return None, "Ich konnte kein Ticket zu dieser Telefonnummer finden."
+            return None, ACCESS_DENIED_REPLY
 
         if len(matches) == 1:
             return matches[0], None
@@ -303,16 +318,23 @@ def _resolve_ticket_from_message(
 def _resolve_ticket_for_state(
     state: IntakeState,
     user_message: str,
+    *,
+    customer_access: CustomerAccess | None = None,
 ) -> tuple[dict[str, Any] | None, str | None]:
     workshop_id = getattr(state, "workshop_id", None)
-    ticket, error_reply = _resolve_ticket_from_message(user_message, workshop_id=workshop_id)
+    if customer_access is None or not workshop_id or customer_access.workshop_id != workshop_id:
+        return None, ACCESS_DENIED_REPLY
+    ticket, error_reply = _resolve_ticket_from_message(
+        user_message, workshop_id=workshop_id, customer_access=customer_access,
+    )
     if ticket or extract_ticket_reference(user_message) or extract_phone_reference(user_message):
         return ticket, error_reply
 
     if getattr(state, "ticket_id", None):
         remembered = find_ticket_by_id(state.ticket_id or "", workshop_id=workshop_id)
-        if remembered:
+        if customer_access.allows(remembered):
             return remembered, None
+        return None, ACCESS_DENIED_REPLY
 
     return ticket, error_reply
 
@@ -383,6 +405,8 @@ def _answer_ticket_question(ticket: dict[str, Any], user_message: str) -> str:
 def handle_existing_ticket(
     state: IntakeState,
     user_message: str | None,
+    *,
+    customer_access: CustomerAccess | None = None,
 ) -> Tuple[IntakeState, str, bool]:
     """
     Beantwortet einfache Fragen zu bestehenden Tickets.
@@ -410,7 +434,7 @@ def handle_existing_ticket(
     state.mode = "existing"
     workshop_id = getattr(state, "workshop_id", None)
 
-    ticket, error_reply = _resolve_ticket_for_state(state, msg)
+    ticket, error_reply = _resolve_ticket_for_state(state, msg, customer_access=customer_access)
     if error_reply:
         return state, error_reply, False
 

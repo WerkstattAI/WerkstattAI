@@ -42,7 +42,10 @@ class HttpSecurityTests(unittest.TestCase):
     def client(self, **changes):
         return TestClient(secure_application(api, replace(self.config, **changes)))
 
-    def test_chat_limit_survives_new_middleware_instances_and_session_changes(self):
+    @patch("app.rate_limits.time")
+    def test_chat_limit_survives_new_middleware_instances_and_session_changes(self, clock):
+        # This test exercises instance sharing, not the wall-clock minute boundary.
+        clock.time.return_value = 1800000001
         for index in range(3):
             with self.client(rate_limit_chat_per_minute=2) as client:
                 response = client.post("/chat", json={"session_id": f"session-{index}", "message": "Hallo"})

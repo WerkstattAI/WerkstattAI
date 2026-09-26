@@ -2,6 +2,8 @@ from __future__ import annotations
 
 import os
 import sqlite3
+from contextlib import contextmanager
+from contextvars import ContextVar
 from datetime import datetime, timedelta, timezone
 from typing import Any
 
@@ -12,6 +14,67 @@ from app.security_config import validate_new_admin_password
 
 WHATSAPP_CONVERSATION_MODES = frozenset({"assistant", "manual"})
 _UNSET_ACTIVE_TICKET = object()
+_TRANSACTION_CONNECTION: ContextVar[Any] = ContextVar("werkstattai_transaction", default=None)
+
+
+class _TransactionConnection:
+    """Let existing helpers share an outer transaction without committing/closing it."""
+
+    def __init__(self, connection: Any):
+        self.connection = connection
+        self.rollback_only = False
+
+    def __enter__(self):
+        return self
+
+    def __exit__(self, exc_type, exc, tb):
+        if exc_type:
+            self.rollback_only = True
+
+    def execute(self, *args, **kwargs):
+        return self.connection.execute(*args, **kwargs)
+
+    def commit(self):
+        pass
+
+    def close(self):
+        pass
+
+    def rollback(self):
+        self.rollback_only = True
+
+
+@contextmanager
+def atomic_database():
+    """Commit database-only business processing together, including nested helpers.
+
+    SQLite takes its write reservation up front. PostgreSQL callers additionally
+    lock the relevant conversation row. Never hold this transaction across HTTP.
+    """
+    current = _TRANSACTION_CONNECTION.get()
+    if current is not None:
+        try:
+            yield current
+        except BaseException:
+            current.rollback_only = True
+            raise
+        return
+    connection = get_conn()
+    shared = _TransactionConnection(connection)
+    token = _TRANSACTION_CONNECTION.set(shared)
+    try:
+        if not settings.database_url:
+            connection.execute("BEGIN IMMEDIATE")
+        yield shared
+        if shared.rollback_only:
+            raise RuntimeError("Nested database operation failed; transaction rolled back")
+        connection.commit()
+    except BaseException:
+        connection.rollback()
+        raise
+    finally:
+        _TRANSACTION_CONNECTION.reset(token)
+        connection.close()
 
 
 def _project_root() -> str:
@@ -70,6 +133,9 @@ def is_postgres() -> bool:
 
 
 def get_conn() -> sqlite3.Connection | PostgresConnection:
+    shared = _TRANSACTION_CONNECTION.get()
+    if shared is not None:
+        return shared
     if settings.database_url:
         return PostgresConnection(settings.database_url)
 
@@ -300,6 +366,9 @@ def init_db() -> None:
             "source",
             "TEXT NOT NULL DEFAULT 'web_chat'",
         )
+        # Never infer ownership from a freely entered contact number, including
+        # historical tickets. Only trusted transports supply this on creation.
+        _add_column_if_missing(conn, "tickets", "verified_customer_phone", "TEXT")
         _add_column_if_missing(
             conn,
             "tickets",
@@ -492,6 +561,33 @@ def init_db() -> None:
             ON whatsapp_messages(workshop_id, customer_phone, created_at)
             """
         )
+        _add_column_if_missing(conn, "whatsapp_messages", "customer_message_at", "TEXT")
+        # Existing rows are complete: deployment must never replay old conversations.
+        _add_column_if_missing(conn, "whatsapp_messages", "processing_state", "TEXT NOT NULL DEFAULT 'complete'")
+        _add_column_if_missing(conn, "whatsapp_messages", "reply_to_wa_message_id", "TEXT")
+        _add_column_if_missing(conn, "whatsapp_messages", "dispatch_state", "TEXT NOT NULL DEFAULT 'complete'")
+        _add_column_if_missing(conn, "whatsapp_messages", "control_revision", "INTEGER")
+        conn.execute("""
+            CREATE UNIQUE INDEX IF NOT EXISTS idx_whatsapp_reply_source
+            ON whatsapp_messages(workshop_id, reply_to_wa_message_id)
+            WHERE direction = 'outbound' AND reply_to_wa_message_id IS NOT NULL
+        """)
+        # Recover trustworthy event times from old signed webhook payloads.
+        # Rows without a valid Meta timestamp remain closed until a new message.
+        from app.whatsapp import customer_message_datetime
+        import json
+        for message in conn.execute("""
+            SELECT id, payload_json FROM whatsapp_messages
+            WHERE direction = 'inbound' AND customer_message_at IS NULL
+        """).fetchall():
+            try:
+                payload = json.loads(message["payload_json"] or "{}")
+                timestamp = customer_message_datetime(payload.get("timestamp")) if isinstance(payload, dict) else None
+            except (TypeError, ValueError):
+                timestamp = None
+            if timestamp:
+                conn.execute("UPDATE whatsapp_messages SET customer_message_at = ? WHERE id = ?",
+                             (timestamp, message["id"]))
 
         conn.execute(
             """
@@ -529,6 +625,7 @@ def init_db() -> None:
             ON whatsapp_conversation_controls(workshop_id, active_ticket_id)
             """
         )
+        _add_column_if_missing(conn, "whatsapp_conversation_controls", "revision", "INTEGER NOT NULL DEFAULT 0")
 
         conn.execute(
             """
@@ -587,6 +684,7 @@ def get_whatsapp_conversation_control(
                 customer_phone,
                 mode,
                 active_ticket_id,
+                revision,
                 created_at,
                 updated_at
             FROM whatsapp_conversation_controls
@@ -604,6 +702,7 @@ def get_whatsapp_conversation_control(
         "customer_phone": phone,
         "mode": "assistant",
         "active_ticket_id": None,
+        "revision": 0,
         "created_at": None,
         "updated_at": None,
     }
@@ -661,6 +760,7 @@ def set_whatsapp_conversation_control(
                 ON CONFLICT(workshop_id, customer_phone) DO UPDATE SET
                     mode = excluded.mode,
                     active_ticket_id = excluded.active_ticket_id,
+                    revision = whatsapp_conversation_controls.revision + 1,
                     updated_at = CURRENT_TIMESTAMP
                 """,
                 (wid, phone, normalized_mode, normalized_ticket_id),
@@ -676,6 +776,7 @@ def set_whatsapp_conversation_control(
                 VALUES (?, ?, ?)
                 ON CONFLICT(workshop_id, customer_phone) DO UPDATE SET
                     mode = excluded.mode,
+                    revision = whatsapp_conversation_controls.revision + 1,
                     updated_at = CURRENT_TIMESTAMP
                 """,
                 (wid, phone, normalized_mode),

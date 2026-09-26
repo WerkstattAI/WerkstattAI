@@ -89,6 +89,16 @@ class PrivacyTests(unittest.TestCase):
     def records(self, wid="a", phone=None):
         return preview(wid, selection_for("phone", phone or self.phone))
 
+    def test_verified_sender_is_included_even_when_callback_number_differs(self):
+        with closing(get_conn()) as conn:
+            conn.execute("INSERT INTO tickets (workshop_id, ticket_id, telefon, verified_customer_phone, created_at, updated_at, status, priority) "
+                         "VALUES (?, ?, ?, ?, '2026-09-26', '2026-09-26', 'offen', 'normal')",
+                         ("a", "T-verified-owner", "491708888888", self.phone))
+            conn.commit()
+        selected = self.records()
+        self.assertIn("T-verified-owner", {ticket["ticket_id"] for ticket in selected["tickets"]})
+        self.assertNotIn("T-b", {ticket["ticket_id"] for ticket in selected["tickets"]})
+
     def test_public_legal_routes_and_provider_fields(self):
         self.client.cookies.clear()
         with patch.dict(os.environ, {"LEGAL_BUSINESS_ID": "DE-test-only", "LEGAL_PROVIDER_NAME": "<Testanbieter>"}):
@@ -122,13 +132,13 @@ class PrivacyTests(unittest.TestCase):
         with closing(get_conn()) as conn:
             conn.execute("UPDATE users SET role = 'employee' WHERE email = ?", (self.owner["email"],))
             conn.commit()
-        self.assertEqual(self.client.get("/dashboard/privacy").status_code, 403)
+        self.assertEqual(self.client.get("/dashboard/privacy", follow_redirects=False).status_code, 303)
         self.login({**self.owner, "role": "employee"})
         self.assertEqual(self.client.get("/dashboard/privacy").status_code, 403)
         with closing(get_conn()) as conn:
             conn.execute("DELETE FROM users WHERE email = ?", (self.owner["email"],))
             conn.commit()
-        self.assertEqual(self.client.get("/dashboard/privacy").status_code, 403)
+        self.assertEqual(self.client.get("/dashboard/privacy", follow_redirects=False).status_code, 303)
 
     def test_full_export_omits_passwords_and_other_tenants(self):
         response = self.client.post("/dashboard/privacy/export", data={"workshop_id": "a", "token": self.form_token()})

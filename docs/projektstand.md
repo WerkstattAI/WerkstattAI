@@ -1,7 +1,7 @@
 # WerkstattAI – Projektstand und nächste Schritte
 
-Stand: 15. September 2026. Grundlage ist eine lokale Codeprüfung mit drei
-unabhängigen Teilprüfungen sowie Tests mit synthetischen Daten. Hosting-Konten,
+Stand: 26. September 2026. Grundlage sind lokale Codeprüfungen, die anschließenden
+Sicherheitskorrekturen und Tests mit synthetischen Daten. Hosting-Konten,
 produktive Datenbanken und reale WhatsApp-Nachrichten wurden nicht geprüft.
 
 ## Einschätzung
@@ -18,50 +18,47 @@ Betrieb. Erfolgreiche Funktionstests sind keine Sicherheits- oder Rechtsfreigabe
 | Bereich | Stand | Wesentliche Grenze |
 | --- | --- | --- |
 | Kundenannahme | Webchat, strukturierte Aufnahme, Rückfragen, Priorität und Tickets | Regelbasierter Assistent; keine aktive externe KI-Anbindung im geprüften Code |
-| Werkstattverwaltung | Dashboard, Ticketstatus, Notizen, Archiv, Direktannahme und Profile | Kundenberechtigungen und Sitzungswiderruf benötigen weitere Absicherung |
+| Werkstattverwaltung | Dashboard, Ticketstatus, Notizen, Archiv, Direktannahme und Profile | Kundenberechtigungen und Sitzungswiderruf lokal korrigiert; Einspielen und Produktionsprüfung offen |
 | Werkstattzuordnung | Eigene Kundenlinks, getrennte Demo, Zuordnung von Tickets und Sitzungen | Öffentliche Kundenlinks ersetzen keinen Identitätsnachweis |
-| WhatsApp | Signaturprüfung, Posteingang, manuelle Antworten, Vorlagen, Zustellstatus und Übernahme durch Mitarbeiter | Zeitfenster, Fehlerwiederholung und konkurrierende Übernahme sind noch nicht durchgehend robust |
+| WhatsApp | Signaturprüfung, Posteingang, manuelle Antworten, Vorlagen, Zustellstatus und Übernahme durch Mitarbeiter | Zeitfenster, Fehlerwiederholung und Übernahme lokal abgesichert; Meta-Testkonto und PostgreSQL noch zu prüfen |
 | Konten und Abo | Benutzerverwaltung, Rollen und Trial-/Abo-Status | Statusverwaltung ist kein Nachweis eines vollständigen Zahlungs- und Abrechnungsprozesses |
 | Datenschutz | Rechtstextentwürfe, Export, Löschvorschau, Passwortbestätigung, Vorgangsvermerke und AVV-Grundlage | Anbieterangaben, Verträge, verbindliche Fristen und externe Bestände offen |
 | HTTP-Schutz | Sicherheitsheader, Eingabegrenzen, Signaturkontrolle und gemeinsame Rate-Limits | Ersetzt keine vollständige Objektberechtigung und keine Paketaktualisierungen |
 
 ## Priorisierte Arbeitspakete
 
-### 1. Kundenberechtigungen und Sitzungen – vor echten Kundendaten
+### 1. Kundenberechtigungen und Sitzungen – lokal korrigiert
 
-- Bestehende Vorgänge erst nach Prüfung der Berechtigung des jeweiligen Kunden
-  anzeigen oder ändern; dies für Webchat und WhatsApp durchsetzen.
-- Web- und WhatsApp-Sitzungen serverseitig voneinander trennen und öffentliche
-  Sitzungen wirksam an ihren Benutzer beziehungsweise Browser binden.
-- Benutzerlöschung, Rollenwechsel und Passwortreset müssen bestehende Zugriffe
-  widerrufen. Alle Dashboard- und API-Wege müssen denselben aktuellen
-  Berechtigungsstand prüfen.
-- Die in der isolierten Prüfung bestätigten Fehlverhalten als Sicherheitstests
-  festhalten; ein Fix gilt erst mit bestandenen Regressionstests als abgeschlossen.
+- Eigene Tickets werden anhand der gebundenen Browsersitzung beziehungsweise
+  des bestätigten WhatsApp-Absenders freigegeben. Eingegebene Kontakttelefonnummern
+  und Ticketnummern allein erteilen keinen Zugriff.
+- Web- und WhatsApp-Sitzungen sind serverseitig getrennt. Ein signiertes
+  HttpOnly-Cookie bindet Webgespräche an ihren Browser und ihre Werkstatt.
+- Dashboard und API prüfen die aktuelle Benutzerzuordnung bei jedem Zugriff.
+  Passwortreset, Benutzerlöschung sowie Rollen-/Werkstattwechsel entziehen
+  bisherigen Anmeldungen den Zugriff.
+- Regressionstests prüfen fremde Zugriffe, Mandantentrennung, manipulierte Cookies,
+  Sitzungsübernahme sowie die eigenen berechtigten Abläufe.
 
-Diese Punkte wurden mit synthetischen Daten reproduziert. Technische
-Reproduktionsdetails gehören in die betreute Behebung und sind hier nicht als
-öffentliche Schrittfolge dokumentiert. Betroffene Bereiche sind
-`app/conversation/existing_ticket.py`, `app/conversation_sessions.py`,
-`app/auth.py`, `app/main.py` und `app/web.py`.
+Beim Einspielen müssen Nutzer sich neu anmelden; alte öffentliche Webgespräche
+werden nicht automatisch übernommen. Historische Tickets bleiben für die Werkstatt
+zugänglich. Einzelheiten stehen in den [Einspielhinweisen](sicherheitskorrekturen-2026-09-26.md).
 
-### 2. WhatsApp zuverlässig abschließen
+### 2. WhatsApp – wesentliche Logikfehler lokal korrigiert
 
-- Das 24-Stunden-Fenster anhand des tatsächlichen Zeitpunkts der letzten
-  Kundennachricht berechnen, einschließlich verspäteter Webhooks.
-- Fensterprüfung an einer gemeinsamen Stelle für jeden Freitext-Versand
-  durchsetzen; automatische Antworten einschließen.
-- Nach Verarbeitungs- oder Versandfehlern Wiederaufnahme ermöglichen. Eine
-  bereits gespeicherte Eingangsnachricht darf nicht automatisch als vollständig
-  verarbeitet gelten.
-- Eine zwischenzeitliche Mitarbeiterübernahme darf nicht durch eine laufende
-  automatische Antwort zurückgesetzt werden.
-- Bilder und Sprachnachrichten benötigen einen verständlichen Bearbeitungsweg.
+- Das 24-Stunden-Fenster nutzt den Meta-Zeitpunkt der letzten Kundennachricht.
+  Verspätete, fehlende oder ungültige Zeitpunkte eröffnen kein neues Fenster.
+- Automatische Antworten und der gemeinsame Freitextsender prüfen das Fenster.
+- Eingang, Ticketänderungen, Notizen, Sitzung und vorbereitete Antwort werden
+  atomar gespeichert. Verarbeitungsausfälle können erneut versucht werden;
+  bereits vorbereitete Antworten wiederholen die Kundenannahme nicht.
+- Unklarer Versand nach Timeout/Abbruch wird nicht blind wiederholt. Eine
+  zwischenzeitliche Mitarbeiterübernahme wird nicht zurückgesetzt.
+- Gleichzeitige Ticketnotizen werden durch Datenbanktransaktionen geschützt.
 
-Die ersten vier Punkte wurden mit simuliertem Versand reproduziert. Die
-[WhatsApp Business Messaging Policy](https://business.whatsapp.com/policy)
-erlaubt Freitextantworten innerhalb von 24 Stunden nach der letzten
-Kundennachricht; außerhalb dieses Fensters sind genehmigte Vorlagen erforderlich.
+Noch offen: Erprobung mit Meta-Testkonto und Produktionsdatenbank, ein betrieblicher
+Ablauf für unklare Sendungen, eine Hintergrundwarteschlange für ausstehende Antworten
+sowie ein verständlicher Bearbeitungsweg für Bilder und Sprachnachrichten.
 
 ### 3. Abhängigkeiten und Produktionsprüfung
 
@@ -118,9 +115,11 @@ und in der [AVV-Grundlage](recht/avv-grundlage.md).
 
 ## Grenzen der Aussage
 
-- Nach den Korrekturen: **163 Python-Tests und 3 Worker-Tests bestanden**.
-  Die bestehenden Tests decken die zusätzlich reproduzierten Sicherheits- und
-  WhatsApp-Fehler noch nicht als Schutzanforderungen ab.
+- Nach den Korrekturen: **216 Python-Tests im Gesamtlauf und 3 Worker-Tests bestanden**.
+  Nach der letzten Änderung an der Tickettransaktion wurden zusätzlich die
+  betroffenen Ticket-/Datenschutztests und 13 WhatsApp-Tests einschließlich
+  paralleler Notizspeicherung geprüft.
+  Die ergänzten Tests decken auch die bestätigten Zugriffs- und WhatsApp-Fehler ab.
 - Sicherheitsreproduktionen verwenden ausschließlich temporäre SQLite-Daten
   und gemockten Nachrichtenversand. Keine produktiven Kundendaten abgerufen.
 - Kein Browser für visuelle Kontrolle verbunden; Oberfläche über TestClient

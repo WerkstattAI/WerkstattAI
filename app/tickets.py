@@ -1,14 +1,13 @@
 from __future__ import annotations
 
 import json
-import threading
+from contextlib import closing
 from datetime import datetime
 from typing import Any, Dict, Optional
 
-from app.db import default_workshop_id, get_conn
+from app.db import atomic_database, default_workshop_id, get_conn, is_postgres
 from app.models import IntakeState
 
-_LOCK = threading.Lock()
 
 ALLOWED_STATUS = {"offen", "in_bearbeitung", "erledigt", "archiviert"}
 ALLOWED_PRIORITY = {"niedrig", "normal", "hoch"}
@@ -209,6 +208,7 @@ def _row_to_ticket_dict(row: Any) -> dict[str, Any]:
         "name": row["name"],
         "kunde_name": row["kunde_name"],
         "telefon": row["telefon"],
+        "verified_customer_phone": row["verified_customer_phone"],
         "followup_questions": _safe_json_loads(row["followup_questions_json"], []),
         "followup_answers": _safe_json_loads(row["followup_answers_json"], []),
         "notes": _safe_json_loads(row["notes_json"], []),
@@ -224,7 +224,7 @@ def _next_sequence_for_today(today: str) -> int:
     Committing the reservation before inserting the ticket allows harmless gaps,
     but prevents two requests from receiving the same number.
     """
-    with get_conn() as conn:
+    with closing(get_conn()) as conn:
         existing = conn.execute(
             """
             SELECT last_value FROM ticket_sequences WHERE ticket_date = ?
@@ -270,7 +270,7 @@ def generate_ticket_id(workshop_id: str | None = None) -> str:
     return f"WS-{today}-{seq:04d}"
 
 
-def save_ticket(state: IntakeState, workshop_id: str | None = None) -> str:
+def save_ticket(state: IntakeState, workshop_id: str | None = None, *, verified_customer_phone: str | None = None) -> str:
     """
     Speichert ein Ticket in SQLite
     und gibt die ticket_id zurück.
@@ -321,60 +321,61 @@ def save_ticket(state: IntakeState, workshop_id: str | None = None) -> str:
 
     record = _normalize_ticket_record(record)
 
-    with _LOCK:
-        with get_conn() as conn:
-            conn.execute(
-                """
-                INSERT INTO tickets (
-                    workshop_id,
-                    ticket_id,
-                    created_at,
-                    updated_at,
-                    status,
-                    priority,
-                    request_type,
-                    source,
-                    customer_question_open,
-                    fahrzeug,
-                    baujahr,
-                    kilometerstand,
-                    fahrbereit,
-                    abschleppdienst,
-                    problem,
-                    name,
-                    kunde_name,
-                    telefon,
-                    followup_questions_json,
-                    followup_answers_json,
-                    notes_json
-                )
-                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-                """,
-                (
-                    record["workshop_id"],
-                    record["ticket_id"],
-                    record["created_at"],
-                    record["updated_at"],
-                    record["status"],
-                    record["priority"],
-                    record["request_type"],
-                    record["source"],
-                    _bool_to_db(record["customer_question_open"]),
-                    record["fahrzeug"],
-                    record["baujahr"],
-                    record["kilometerstand"],
-                    _bool_to_db(record["fahrbereit"]),
-                    _bool_to_db(record["abschleppdienst"]),
-                    record["problem"],
-                    record["name"],
-                    record["kunde_name"],
-                    record["telefon"],
-                    json.dumps(record["followup_questions"], ensure_ascii=False),
-                    json.dumps(record["followup_answers"], ensure_ascii=False),
-                    json.dumps(record["notes"], ensure_ascii=False),
-                ),
+    with closing(get_conn()) as conn:
+        conn.execute(
+            """
+            INSERT INTO tickets (
+                workshop_id,
+                ticket_id,
+                created_at,
+                updated_at,
+                status,
+                priority,
+                request_type,
+                source,
+                customer_question_open,
+                fahrzeug,
+                baujahr,
+                kilometerstand,
+                fahrbereit,
+                abschleppdienst,
+                problem,
+                name,
+                kunde_name,
+                telefon,
+                followup_questions_json,
+                followup_answers_json,
+                notes_json,
+                verified_customer_phone
             )
-            conn.commit()
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            """,
+            (
+                record["workshop_id"],
+                record["ticket_id"],
+                record["created_at"],
+                record["updated_at"],
+                record["status"],
+                record["priority"],
+                record["request_type"],
+                record["source"],
+                _bool_to_db(record["customer_question_open"]),
+                record["fahrzeug"],
+                record["baujahr"],
+                record["kilometerstand"],
+                _bool_to_db(record["fahrbereit"]),
+                _bool_to_db(record["abschleppdienst"]),
+                record["problem"],
+                record["name"],
+                record["kunde_name"],
+                record["telefon"],
+                json.dumps(record["followup_questions"], ensure_ascii=False),
+                json.dumps(record["followup_answers"], ensure_ascii=False),
+                json.dumps(record["notes"], ensure_ascii=False),
+                verified_customer_phone,
+            ),
+        )
+        conn.commit()
 
     return ticket_id
 
@@ -385,17 +386,16 @@ def load_all_tickets(workshop_id: str | None = None) -> list[dict[str, Any]]:
     """
     wid = str(workshop_id or default_workshop_id()).strip() or default_workshop_id()
 
-    with _LOCK:
-        with get_conn() as conn:
-            rows = conn.execute(
-                """
-                SELECT *
-                FROM tickets
-                WHERE workshop_id = ?
-                ORDER BY created_at ASC, id ASC
-                """,
-                (wid,),
-            ).fetchall()
+    with closing(get_conn()) as conn:
+        rows = conn.execute(
+            """
+            SELECT *
+            FROM tickets
+            WHERE workshop_id = ?
+            ORDER BY created_at ASC, id ASC
+            """,
+            (wid,),
+        ).fetchall()
 
     return [_row_to_ticket_dict(row) for row in rows]
 
@@ -408,18 +408,17 @@ def list_latest_tickets(limit: int = 50, workshop_id: str | None = None) -> list
     safe_limit = max(0, min(int(limit), 500))
     wid = str(workshop_id or default_workshop_id()).strip() or default_workshop_id()
 
-    with _LOCK:
-        with get_conn() as conn:
-            rows = conn.execute(
-                """
-                SELECT *
-                FROM tickets
-                WHERE workshop_id = ?
-                ORDER BY created_at DESC, id DESC
-                LIMIT ?
-                """,
-                (wid, safe_limit),
-            ).fetchall()
+    with closing(get_conn()) as conn:
+        rows = conn.execute(
+            """
+            SELECT *
+            FROM tickets
+            WHERE workshop_id = ?
+            ORDER BY created_at DESC, id DESC
+            LIMIT ?
+            """,
+            (wid, safe_limit),
+        ).fetchall()
 
     return [_row_to_ticket_dict(row) for row in rows]
 
@@ -466,17 +465,16 @@ def find_tickets_by_phone(phone: str, workshop_id: str | None = None) -> list[di
 
     wid = str(workshop_id or default_workshop_id()).strip() or default_workshop_id()
 
-    with _LOCK:
-        with get_conn() as conn:
-            rows = conn.execute(
-                """
-                SELECT *
-                FROM tickets
-                WHERE workshop_id = ? AND telefon IS NOT NULL
-                ORDER BY created_at DESC, id DESC
-                """,
-                (wid,),
-            ).fetchall()
+    with closing(get_conn()) as conn:
+        rows = conn.execute(
+            """
+            SELECT *
+            FROM tickets
+            WHERE workshop_id = ? AND telefon IS NOT NULL
+            ORDER BY created_at DESC, id DESC
+            """,
+            (wid,),
+        ).fetchall()
 
     matches: list[dict[str, Any]] = []
 
@@ -515,17 +513,16 @@ def find_ticket_by_id(ticket_id: str, workshop_id: str | None = None) -> Optiona
 
     wid = str(workshop_id or default_workshop_id()).strip() or default_workshop_id()
 
-    with _LOCK:
-        with get_conn() as conn:
-            row = conn.execute(
-                """
-                SELECT *
-                FROM tickets
-                WHERE workshop_id = ? AND ticket_id = ?
-                LIMIT 1
-                """,
-                (wid, tid),
-            ).fetchone()
+    with closing(get_conn()) as conn:
+        row = conn.execute(
+            """
+            SELECT *
+            FROM tickets
+            WHERE workshop_id = ? AND ticket_id = ?
+            LIMIT 1
+            """,
+            (wid, tid),
+        ).fetchone()
 
     if not row:
         return None
@@ -549,31 +546,30 @@ def update_ticket_status(ticket_id: str, new_status: str, workshop_id: str | Non
     now_iso = _now_iso()
     wid = str(workshop_id or default_workshop_id()).strip() or default_workshop_id()
 
-    with _LOCK:
-        with get_conn() as conn:
-            cur = conn.execute(
-                """
-                UPDATE tickets
-                SET status = ?, updated_at = ?
-                WHERE workshop_id = ? AND ticket_id = ?
-                """,
-                (status, now_iso, wid, tid),
-            )
+    with closing(get_conn()) as conn:
+        cur = conn.execute(
+            """
+            UPDATE tickets
+            SET status = ?, updated_at = ?
+            WHERE workshop_id = ? AND ticket_id = ?
+            """,
+            (status, now_iso, wid, tid),
+        )
 
-            if cur.rowcount == 0:
-                raise KeyError("Ticket nicht gefunden")
+        if cur.rowcount == 0:
+            raise KeyError("Ticket nicht gefunden")
 
-            conn.commit()
+        conn.commit()
 
-            row = conn.execute(
-                """
-                SELECT *
-                FROM tickets
-                WHERE workshop_id = ? AND ticket_id = ?
-                LIMIT 1
-                """,
-                (wid, tid),
-            ).fetchone()
+        row = conn.execute(
+            """
+            SELECT *
+            FROM tickets
+            WHERE workshop_id = ? AND ticket_id = ?
+            LIMIT 1
+            """,
+            (wid, tid),
+        ).fetchone()
 
     if not row:
         raise KeyError("Ticket nicht gefunden")
@@ -603,70 +599,69 @@ def add_ticket_note(
     now_iso = _now_iso()
     wid = str(workshop_id or default_workshop_id()).strip() or default_workshop_id()
 
-    with _LOCK:
-        with get_conn() as conn:
-            row = conn.execute(
-                """
-                SELECT *
-                FROM tickets
-                WHERE workshop_id = ? AND ticket_id = ?
-                LIMIT 1
-                """,
-                (wid, tid),
-            ).fetchone()
+    with atomic_database() as conn:
+        row = conn.execute(
+            """
+            SELECT *
+            FROM tickets
+            WHERE workshop_id = ? AND ticket_id = ?
+            LIMIT 1
+            """ + (" FOR UPDATE" if is_postgres() else ""),
+            (wid, tid),
+        ).fetchone()
 
-            if not row:
-                raise KeyError("Ticket nicht gefunden")
+        if not row:
+            raise KeyError("Ticket nicht gefunden")
 
-            notes = _safe_json_loads(row["notes_json"], [])
-            if not isinstance(notes, list):
-                notes = []
-            else:
-                notes = [_normalize_note(note) for note in notes if isinstance(note, dict)]
+        notes = _safe_json_loads(row["notes_json"], [])
+        if not isinstance(notes, list):
+            notes = []
+        else:
+            notes = [_normalize_note(note) for note in notes if isinstance(note, dict)]
 
-            notes.append(
-                {
-                    "type": _normalize_note_type(note_type, text),
-                    "text": text,
-                    "created_at": now_iso,
-                }
-            )
-            normalized_note_type = _normalize_note_type(note_type, text)
-            customer_question_open = bool(row["customer_question_open"])
-            if normalized_note_type == "customer_message":
-                customer_question_open = True
-            elif normalized_note_type == "customer_reply":
-                customer_question_open = False
-            status = _normalize_status(row["status"])
-            if normalized_note_type == "customer_reply" and status == "offen":
-                status = "in_bearbeitung"
+        notes.append(
+            {
+                "type": _normalize_note_type(note_type, text),
+                "text": text,
+                "created_at": now_iso,
+            }
+        )
+        normalized_note_type = _normalize_note_type(note_type, text)
+        customer_question_open = bool(row["customer_question_open"])
+        if normalized_note_type == "customer_message":
+            customer_question_open = True
+        elif normalized_note_type == "customer_reply":
+            customer_question_open = False
+        status = _normalize_status(row["status"])
+        if normalized_note_type == "customer_reply" and status == "offen":
+            status = "in_bearbeitung"
 
-            conn.execute(
-                """
-                UPDATE tickets
-                SET notes_json = ?, updated_at = ?, customer_question_open = ?, status = ?
-                WHERE workshop_id = ? AND ticket_id = ?
-                """,
-                (
-                    json.dumps(notes, ensure_ascii=False),
-                    now_iso,
-                    _bool_to_db(customer_question_open),
-                    status,
-                    wid,
-                    tid,
-                ),
-            )
-            conn.commit()
+        conn.execute(
+            """
+            UPDATE tickets
+            SET notes_json = ?, updated_at = ?, customer_question_open = ?, status = ?
+            WHERE workshop_id = ? AND ticket_id = ?
+            """,
+            (
+                json.dumps(notes, ensure_ascii=False),
+                now_iso,
+                _bool_to_db(customer_question_open),
+                status,
+                wid,
+                tid,
+            ),
+        )
+        conn.commit()
 
-            updated_row = conn.execute(
-                """
-                SELECT *
-                FROM tickets
-                WHERE workshop_id = ? AND ticket_id = ?
-                LIMIT 1
-                """,
-                (wid, tid),
-            ).fetchone()
+        updated_row = conn.execute(
+            """
+            SELECT *
+            FROM tickets
+            WHERE workshop_id = ? AND ticket_id = ?
+            LIMIT 1
+            """,
+            (wid, tid),
+        ).fetchone()
 
     if not updated_row:
         raise KeyError("Ticket nicht gefunden")

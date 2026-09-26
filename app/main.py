@@ -3,13 +3,15 @@ from __future__ import annotations
 import logging
 from typing import Annotated
 
-from fastapi import FastAPI, HTTPException, Query, Request
+from fastapi import FastAPI, HTTPException, Query, Request, Response
 from fastapi.exceptions import RequestValidationError
 from fastapi.responses import JSONResponse, PlainTextResponse, RedirectResponse
 from pydantic import BaseModel, Field, ValidationError
 
 from app.ai_service import polish_reply_de
-from app.auth import decode_session_token, is_dashboard_path, login_redirect_url
+from app.auth import decode_session_token, get_current_user, is_dashboard_path, login_redirect_url
+from app.customer_access import CustomerAccess, normalize_customer_phone
+from app.customer_sessions import bound_web_session
 from app.config import settings
 from app.db import (
     default_workshop_id,
@@ -127,10 +129,7 @@ def _normalize_workshop_id(value: str | None = None) -> str:
 
 
 def _current_user_from_request(request: Request) -> dict | None:
-    user = getattr(request.state, "user", None)
-    if isinstance(user, dict):
-        return user
-    return decode_session_token(request.cookies.get("werkstattai_session"))
+    return get_current_user(request)
 
 
 def _workshop_id_for_api_request(request: Request, value: str | None = None) -> str:
@@ -175,17 +174,25 @@ def process_chat_message(
             detail="WerkstattAI ist fuer diese Werkstatt nicht aktiv.",
         )
 
-    state = load_session_state(session_id, workshop_id=workshop_id)
+    verified_phone = normalize_customer_phone(phone) if channel == "whatsapp" else None
+    if channel == "whatsapp" and not verified_phone:
+        raise HTTPException(status_code=400, detail="Ungültiger WhatsApp-Absender")
+    state = load_session_state(session_id, workshop_id=workshop_id, channel=channel)
     state.workshop_id = workshop_id
 
-    new_state, reply, done = next_step(state, message)
+    access = CustomerAccess(
+        workshop_id=workshop_id,
+        allowed_ticket_ids=frozenset({state.ticket_id}) if channel == "web_chat" and state.ticket_id else frozenset(),
+        verified_phone=verified_phone,
+    )
+    new_state, reply, done = next_step(state, message, customer_access=access)
     new_state.workshop_id = workshop_id
 
     reply = polish_reply_de(reply)
 
     if done and not new_state.ticket_id:
         new_state.source = channel
-        ticket_id = save_ticket(new_state, workshop_id=workshop_id)
+        ticket_id = save_ticket(new_state, workshop_id=workshop_id, verified_customer_phone=verified_phone)
         new_state.ticket_id = ticket_id
         reply = (
             reply
@@ -324,61 +331,26 @@ def _save_or_send_whatsapp_reply(
     ticket_id: str | None,
     reply_to_wa_message_id: str,
 ) -> dict:
-    access_token = str(settings.whatsapp_access_token or "").strip()
-    payload = {
-        "source": "webhook",
-        "reply_to_wa_message_id": reply_to_wa_message_id,
-        "local_only": True,
-    }
-    status = "sent_local"
-    wa_message_id = None
-    meta_status_code = None
-    meta_error = None
+    from app.whatsapp import WhatsAppSendResult, deliver_prepared_whatsapp_reply
 
-    if access_token and phone_number_id:
-        send_result = send_whatsapp_text_message(
-            phone_number_id=phone_number_id,
-            customer_phone=customer_phone,
-            text=text,
+    def send(prepared: dict):
+        access_token = str(settings.whatsapp_access_token or "").strip()
+        if not access_token:
+            if not is_production(settings):
+                return WhatsAppSendResult(True, 200, None, {"local_only": True})
+            return WhatsAppSendResult(False, 503, None, {}, "WhatsApp access token is missing")
+        return send_whatsapp_text_message(
+            phone_number_id=str(prepared["phone_number_id"] or ""),
+            customer_phone=prepared["customer_phone"],
+            text=prepared["text"],
             access_token=access_token,
             graph_api_version=settings.whatsapp_graph_api_version,
         )
-        status = (
-            "sent"
-            if send_result.ok
-            else ("failed" if send_result.status_code is not None else "unknown")
-        )
-        wa_message_id = send_result.wa_message_id
-        meta_status_code = send_result.status_code
-        meta_error = send_result.error
-        payload = {
-            "source": "webhook",
-            "reply_to_wa_message_id": reply_to_wa_message_id,
-            "local_only": False,
-            "meta_status_code": send_result.status_code,
-            "meta_response": send_result.payload,
-            "meta_error": send_result.error,
-        }
 
-    save_whatsapp_message(
-        workshop_id=workshop_id,
-        phone_number_id=phone_number_id,
-        customer_phone=customer_phone,
-        direction="outbound",
-        message_type="text",
-        text=text,
-        wa_message_id=wa_message_id,
-        ticket_id=ticket_id,
-        status=status,
-        payload=payload,
+    return deliver_prepared_whatsapp_reply(
+        workshop_id=workshop_id, customer_phone=customer_phone,
+        reply_to_wa_message_id=reply_to_wa_message_id, send_message=send,
     )
-
-    return {
-        "status": status,
-        "wa_message_id": wa_message_id,
-        "meta_status_code": meta_status_code,
-        "meta_error": meta_error,
-    }
 
 
 @app.post("/webhooks/whatsapp")
@@ -451,126 +423,65 @@ async def whatsapp_webhook(request: Request):
         else:
             ignored += 1
 
+    from app.whatsapp import prepare_whatsapp_inbound
+    import json
+
     for message in messages:
         workshop_id = find_workshop_id_by_whatsapp_phone_number_id(message.phone_number_id)
         if not workshop_id:
             ignored += 1
             continue
-
-        save_whatsapp_event(
-            workshop_id=workshop_id,
-            phone_number_id=message.phone_number_id,
-            display_phone_number=message.display_phone_number,
-            wa_message_id=message.message_id,
-            from_phone=message.from_phone,
-            event_type="message",
-            message_type=message.message_type,
-            text=message.text,
-            payload=message.raw,
-        )
-
-        control = get_whatsapp_conversation_control(
-            workshop_id=workshop_id,
-            customer_phone=message.from_phone,
-        )
-        active_ticket_id = str(control.get("active_ticket_id") or "").strip() or None
-
-        is_new_message = save_whatsapp_message(
-            workshop_id=workshop_id,
-            phone_number_id=message.phone_number_id,
-            customer_phone=message.from_phone,
-            direction="inbound",
-            message_type=message.message_type,
-            text=message.text,
-            wa_message_id=message.message_id,
-            ticket_id=active_ticket_id,
-            status="received",
-            payload=message.raw,
-        )
-        if not is_new_message:
-            ignored += 1
-            continue
-
-        if control.get("mode") == "manual":
-            manual_pending += 1
-            manual_messages.append(
-                {
-                    "message_id": message.message_id,
-                    "workshop_id": workshop_id,
-                    "customer_phone": message.from_phone,
-                    "message_type": message.message_type,
-                    "active_ticket_id": active_ticket_id,
-                    "action": "saved_for_manual_reply",
-                }
-            )
-            continue
-
-        if message.message_type != "text" or not message.text:
-            ignored += 1
-            continue
-
         session_id = whatsapp_session_id(message.from_phone)
-        response = process_chat_message(
-            workshop_id=workshop_id,
-            session_id=session_id,
-            message=message.text,
-            channel="whatsapp",
-            phone=message.from_phone,
-        )
-        latest_control = get_whatsapp_conversation_control(
-            workshop_id=workshop_id,
-            customer_phone=message.from_phone,
-        )
-        if latest_control.get("mode") == "manual":
-            manual_pending += 1
-            manual_messages.append(
-                {
-                    "message_id": message.message_id,
-                    "workshop_id": workshop_id,
-                    "customer_phone": message.from_phone,
-                    "message_type": message.message_type,
-                    "active_ticket_id": latest_control.get("active_ticket_id"),
-                    "action": "manual_takeover_before_assistant_reply",
-                }
+        try:
+            outcome = prepare_whatsapp_inbound(
+                workshop_id=workshop_id, message=message,
+                process_message=lambda: process_chat_message(
+                    workshop_id=workshop_id, session_id=session_id,
+                    message=message.text, channel="whatsapp", phone=message.from_phone,
+                ),
             )
+        except Exception:
+            logger.exception("WhatsApp processing failed; the webhook can be retried")
+            raise HTTPException(status_code=503, detail="WhatsApp processing temporarily unavailable")
+        if outcome["action"] in {"duplicate", "ignored"}:
+            ignored += 1
             continue
-        response_ticket_id = _response_ticket_id(response) or active_ticket_id
+        if outcome["action"] == "manual":
+            manual_pending += 1
+            manual_messages.append({
+                "message_id": message.message_id, "workshop_id": workshop_id,
+                "customer_phone": message.from_phone, "message_type": message.message_type,
+                "active_ticket_id": outcome.get("active_ticket_id"), "action": outcome["reason"],
+            })
+            continue
+        prepared = outcome["reply"]
         send_info = _save_or_send_whatsapp_reply(
-            workshop_id=workshop_id,
-            phone_number_id=message.phone_number_id,
-            customer_phone=message.from_phone,
-            text=response.reply,
-            ticket_id=response_ticket_id,
-            reply_to_wa_message_id=message.message_id,
+            workshop_id=workshop_id, phone_number_id=message.phone_number_id,
+            customer_phone=message.from_phone, text=prepared["text"],
+            ticket_id=prepared["ticket_id"], reply_to_wa_message_id=message.message_id,
         )
-        if response_ticket_id:
-            try:
-                set_whatsapp_conversation_control(
-                    workshop_id=workshop_id,
-                    customer_phone=message.from_phone,
-                    mode="assistant",
-                    active_ticket_id=response_ticket_id,
-                )
-            except Exception:
-                logger.exception(
-                    "Could not persist WhatsApp assistant ticket control for workshop=%s phone=%s",
-                    workshop_id,
-                    message.from_phone,
-                )
+        if send_info.get("retry"):
+            raise HTTPException(status_code=503, detail="WhatsApp delivery temporarily unavailable")
+        if send_info.get("suppressed_reason"):
+            manual_pending += 1
+            manual_messages.append({
+                "message_id": message.message_id, "workshop_id": workshop_id,
+                "customer_phone": message.from_phone, "message_type": message.message_type,
+                "active_ticket_id": prepared["ticket_id"], "action": send_info["suppressed_reason"],
+            })
+            continue
         processed += 1
-        replies.append(
-            {
-                "message_id": message.message_id,
-                "session_id": session_id,
-                "workshop_id": workshop_id,
-                "reply": response.reply,
-                "done": response.done,
-                "send_status": send_info["status"],
-                "outbound_wa_message_id": send_info["wa_message_id"],
-                "handling_mode": "assistant",
-                "active_ticket_id": response_ticket_id,
-            }
-        )
+        metadata = json.loads(prepared["payload_json"] or "{}")
+        replies.append({
+            "message_id": message.message_id, "session_id": session_id,
+            "workshop_id": workshop_id, "reply": prepared["text"],
+            "done": bool(metadata.get("done")), "send_status": send_info["status"],
+            "outbound_wa_message_id": send_info["wa_message_id"],
+            "handling_mode": get_whatsapp_conversation_control(
+                workshop_id=workshop_id, customer_phone=message.from_phone,
+            )["mode"],
+            "active_ticket_id": prepared["ticket_id"],
+        })
 
     return {
         "ok": True,
@@ -654,19 +565,23 @@ def patch_ticket_status(
 
 
 @app.post("/chat", response_model=ChatResponse)
-def chat(payload: ChatRequest) -> ChatResponse:
+def chat(payload: ChatRequest, request: Request, response: Response) -> ChatResponse:
     # Anonymous /assistant traffic is always demo traffic unless a workshop
     # was explicitly selected through its customer-chat link.
     workshop_id = demo_workshop_id() if payload.workshop_id is None else payload.workshop_id.strip()
     if not workshop_id:
         raise HTTPException(status_code=404, detail="Werkstatt wurde nicht gefunden.")
-    return process_chat_message(
+    result = process_chat_message(
         workshop_id=workshop_id,
-        session_id=payload.session_id,
+        session_id=bound_web_session(request, response, workshop_id, payload.session_id),
         message=payload.message,
         channel=payload.channel,
         phone=payload.phone,
     )
+    # The browser needs only workflow status, not the complete persisted state.
+    return ChatResponse(reply=result.reply, done=result.done, data={
+        key: result.data.get(key) for key in ("step", "mode", "workshop_id", "ticket_id", "request_type", "priority")
+    })
 
 
 # Wrap the complete ASGI application so headers also cover errors and CORS responses.

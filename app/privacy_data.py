@@ -118,7 +118,8 @@ def select_records(records: dict, selection: dict) -> dict:
     phone = selection["value"] if selection["kind"] == "phone" else None
     ticket_ids = {selection["value"]} if selection["kind"] == "ticket" else set()
     if phone:
-        ticket_ids.update(row["ticket_id"] for row in records["tickets"] if normalize_phone(row["telefon"]) == phone)
+        ticket_ids.update(row["ticket_id"] for row in records["tickets"]
+                          if phone in (normalize_phone(row["telefon"]), normalize_phone(row.get("verified_customer_phone"))))
         ticket_ids.update(row["ticket_id"] for row in records["whatsapp_messages"]
                           if row["ticket_id"] and normalize_phone(row["customer_phone"]) == phone)
         ticket_ids.update(row["active_ticket_id"] for row in records["whatsapp_conversation_controls"]

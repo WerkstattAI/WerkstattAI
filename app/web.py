@@ -19,6 +19,7 @@ from app.admin import (
 )
 from app.auth import authenticate_user, clear_session_cookie, get_current_user, set_session_cookie
 from app.config import settings
+from app.customer_sessions import browser_identity
 from app.legal import provider_details
 from app.db import (
     default_workshop_id,
@@ -256,6 +257,7 @@ def _message_status_label(value: str | None) -> str:
         "read": "Gelesen",
         "failed": "Fehler",
         "unknown": "Versandstatus unklar",
+        "pending": "Versand ausstehend",
     }
     return labels.get(str(value or "").strip().lower(), str(value or "-"))
 
@@ -1174,7 +1176,7 @@ def assistant_page(request: Request, workshop_id: str | None = None):
     workshop = get_workshop_identity(wid)
     if not workshop:
         return HTMLResponse("Werkstatt wurde nicht gefunden.", status_code=404)
-    return templates.TemplateResponse(
+    response = templates.TemplateResponse(
         request,
         "chat.html",
         {
@@ -1182,6 +1184,8 @@ def assistant_page(request: Request, workshop_id: str | None = None):
             "workshop": workshop,
         },
     )
+    browser_identity(request, response)
+    return response
 
 
 @router.get("/login", response_class=HTMLResponse)
@@ -1223,7 +1227,15 @@ def login_submit(
 
     target = next if next.startswith("/") and not next.startswith("//") else "/dashboard"
     response = RedirectResponse(url=target, status_code=303)
-    set_session_cookie(response, user, request=request)
+    try:
+        set_session_cookie(response, user, request=request)
+    except ValueError:
+        return templates.TemplateResponse(
+            request, "login.html",
+            _template_context(request, next=next or "/dashboard",
+                              error="Der Zugang hat sich geändert. Bitte erneut anmelden."),
+            status_code=401,
+        )
     return response
 
 

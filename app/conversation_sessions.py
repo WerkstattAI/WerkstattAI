@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+from contextlib import closing
 from datetime import datetime
 from typing import Any
 
@@ -22,38 +23,43 @@ def _state_from_dict(data: dict[str, Any]) -> IntakeState:
     return IntakeState(**data)
 
 
-def _storage_session_id(session_id: str, workshop_id: str) -> str:
-    return f"{workshop_id}:{session_id}"
+def _storage_session_id(session_id: str, workshop_id: str, channel: str = "web_chat") -> str:
+    if channel not in {"web_chat", "whatsapp"}:
+        raise ValueError("Unknown conversation channel")
+    return "session-v2:" + json.dumps([workshop_id, channel, session_id], ensure_ascii=True, separators=(",", ":"))
 
 
-def load_session_state(session_id: str, workshop_id: str | None = None) -> IntakeState:
+def load_session_state(session_id: str, workshop_id: str | None = None, *, channel: str = "web_chat") -> IntakeState:
     sid = (session_id or "").strip()
     if not sid:
         return IntakeState()
 
     wid = str(workshop_id or default_workshop_id()).strip() or default_workshop_id()
-    storage_sid = _storage_session_id(sid, wid)
+    storage_sid = _storage_session_id(sid, wid, channel)
 
-    with get_conn() as conn:
+    with closing(get_conn()) as conn:
         row = conn.execute(
             """
             SELECT state_json
             FROM conversation_sessions
-            WHERE session_id = ? AND workshop_id = ?
+            WHERE session_id = ? AND workshop_id = ? AND channel = ?
             LIMIT 1
             """,
-            (storage_sid, wid),
+            (storage_sid, wid, channel),
         ).fetchone()
 
-        if not row:
+        # Only signed WhatsApp traffic may resume old channel-scoped records.
+        # Old public web sessions had no browser ownership and must not be adopted.
+        if not row and channel == "whatsapp":
             row = conn.execute(
                 """
                 SELECT state_json
                 FROM conversation_sessions
-                WHERE session_id = ? AND workshop_id = ?
+                WHERE session_id IN (?, ?) AND workshop_id = ? AND channel = 'whatsapp'
+                ORDER BY CASE WHEN session_id = ? THEN 0 ELSE 1 END
                 LIMIT 1
                 """,
-                (sid, wid),
+                (f"{wid}:{sid}", sid, wid, f"{wid}:{sid}"),
             ).fetchone()
 
     if not row:
@@ -90,12 +96,12 @@ def save_session_state(
     now = _now_iso()
     wid = str(workshop_id or state.workshop_id or default_workshop_id()).strip() or default_workshop_id()
     state.workshop_id = wid
-    storage_sid = _storage_session_id(sid, wid)
     state_json = json.dumps(_state_to_dict(state), ensure_ascii=False)
     normalized_channel = (channel or "web_chat").strip() or "web_chat"
+    storage_sid = _storage_session_id(sid, wid, normalized_channel)
     normalized_phone = (phone or getattr(state, "telefon", None) or "").strip() or None
 
-    with get_conn() as conn:
+    with closing(get_conn()) as conn:
         conn.execute(
             """
             INSERT INTO conversation_sessions (

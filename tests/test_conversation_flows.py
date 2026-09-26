@@ -40,6 +40,8 @@ from app.db import (
     set_whatsapp_conversation_control,
 )
 from app.config import settings
+from app.customer_access import CustomerAccess
+from app.conversation_sessions import _storage_session_id
 from app.conversation.analysis import analyze_problem
 from app.conversation.existing_ticket import handle_existing_ticket
 from app.conversation.fallback import handle_unclear_request
@@ -143,11 +145,18 @@ def _asgi_request(body: bytes, headers: dict[str, str] | None = None) -> Request
 
 
 def _dashboard_request(workshop_id: str = "demo-werkstatt", role: str = "owner") -> Request:
+    init_db()
+    user = {"email": f"fixture-{role}-{workshop_id}@example.test", "workshop_id": workshop_id, "role": role}
+    with get_conn() as conn:
+        conn.execute("INSERT INTO users (email, password_hash, workshop_id, role) VALUES (?, ?, ?, ?) ON CONFLICT(email) DO NOTHING",
+                     (user["email"], "test-only-unused-password-hash", workshop_id, role))
+        conn.commit()
+    token = create_session_token(user)
     scope = {
         "type": "http",
         "method": "POST",
         "path": "/dashboard/whatsapp/reply",
-        "headers": [],
+        "headers": [(b"cookie", f"werkstattai_session={token}".encode())],
         "query_string": b"",
         "server": ("testserver", 80),
         "scheme": "http",
@@ -158,11 +167,6 @@ def _dashboard_request(workshop_id: str = "demo-werkstatt", role: str = "owner")
         return {"type": "http.request", "body": b"", "more_body": False}
 
     request = Request(scope, receive)
-    request.state.user = {
-        "email": "admin@werkstatt.local",
-        "workshop_id": workshop_id,
-        "role": role,
-    }
     return request
 
 
@@ -475,7 +479,7 @@ class WhatsAppWebhookTests(unittest.TestCase):
                                 {
                                     "from": "4917612345678",
                                     "id": "wamid.test-message-1",
-                                    "timestamp": "1710000000",
+                                    "timestamp": str(int(datetime.now(timezone.utc).timestamp())),
                                     "type": "text",
                                     "text": {"body": "Hallo"},
                                 }
@@ -736,7 +740,7 @@ class WhatsAppWebhookTests(unittest.TestCase):
                 DELETE FROM conversation_sessions
                 WHERE session_id = ?
                 """,
-                ("demo-werkstatt:whatsapp:4917612345678",),
+                (_storage_session_id("whatsapp:4917612345678", "demo-werkstatt", "whatsapp"),),
             )
             conn.execute(
                 """
@@ -826,7 +830,7 @@ class WhatsAppWebhookTests(unittest.TestCase):
                 DELETE FROM conversation_sessions
                 WHERE session_id = ?
                 """,
-                ("demo-werkstatt:whatsapp:4917612345678",),
+                (_storage_session_id("whatsapp:4917612345678", "demo-werkstatt", "whatsapp"),),
             )
             conn.execute(
                 """
@@ -903,7 +907,7 @@ class WhatsAppWebhookTests(unittest.TestCase):
                 DELETE FROM conversation_sessions
                 WHERE session_id = ?
                 """,
-                ("demo-werkstatt:whatsapp:4917612345678",),
+                (_storage_session_id("whatsapp:4917612345678", "demo-werkstatt", "whatsapp"),),
             )
             conn.execute(
                 """
@@ -1839,6 +1843,9 @@ class WhatsAppWebhookTests(unittest.TestCase):
 
 
 class AuthTests(unittest.TestCase):
+    def setUp(self):
+        init_db()
+
     def test_default_dashboard_admin_can_authenticate(self) -> None:
         init_db()
 
@@ -1854,7 +1861,7 @@ class AuthTests(unittest.TestCase):
         user = {
             "email": "admin@werkstatt.local",
             "workshop_id": "demo-werkstatt",
-            "role": "owner",
+            "role": settings.dashboard_admin_role,
         }
 
         token = create_session_token(user)
@@ -1869,7 +1876,7 @@ class AuthTests(unittest.TestCase):
         user = {
             "email": "admin@werkstatt.local",
             "workshop_id": "demo-werkstatt",
-            "role": "owner",
+            "role": settings.dashboard_admin_role,
         }
 
         token = create_session_token(user)
@@ -1884,7 +1891,7 @@ class AuthTests(unittest.TestCase):
             {
                 "email": "admin@werkstatt.local",
                 "workshop_id": "demo-werkstatt",
-                "role": "owner",
+                "role": settings.dashboard_admin_role,
             },
             request=_request_with_scheme("https"),
         )
@@ -1905,7 +1912,7 @@ class AuthTests(unittest.TestCase):
             {
                 "email": "admin@werkstatt.local",
                 "workshop_id": "demo-werkstatt",
-                "role": "owner",
+                "role": settings.dashboard_admin_role,
             },
             request=_request_with_scheme("http"),
         )
@@ -2158,7 +2165,7 @@ class SubscriptionTests(unittest.TestCase):
                     workshop_id="demo-werkstatt",
                     session_id="test-inactive-subscription",
                     message="Hallo",
-                    channel="test",
+                    channel="web_chat",
                 )
 
             self.assertEqual(ctx.exception.status_code, 402)
@@ -2186,6 +2193,7 @@ class ExistingTicketTests(unittest.TestCase):
     def test_internal_note_is_not_shown_to_customer(self) -> None:
         ticket = {
             "ticket_id": "WS-20260505-0005",
+            "workshop_id": "demo-werkstatt",
             "status": "offen",
             "priority": "normal",
             "request_type": "diagnose",
@@ -2208,8 +2216,9 @@ class ExistingTicketTests(unittest.TestCase):
             "app.conversation.existing_ticket.add_ticket_note"
         ):
             _, reply, done = handle_existing_ticket(
-                IntakeState(),
+                IntakeState(workshop_id="demo-werkstatt"),
                 "Gibt es eine Notiz? Ticket WS-20260505-0005",
+                customer_access=CustomerAccess("demo-werkstatt", frozenset({"WS-20260505-0005"})),
             )
 
         self.assertFalse(done)
@@ -2219,6 +2228,7 @@ class ExistingTicketTests(unittest.TestCase):
     def test_existing_ticket_message_is_recorded_as_customer_message(self) -> None:
         ticket = {
             "ticket_id": "WS-20260505-0005",
+            "workshop_id": "demo-werkstatt",
             "status": "offen",
             "priority": "normal",
             "request_type": "diagnose",
@@ -2235,8 +2245,9 @@ class ExistingTicketTests(unittest.TestCase):
             "app.conversation.existing_ticket.add_ticket_note"
         ) as add_note:
             state, reply, done = handle_existing_ticket(
-                IntakeState(),
+                IntakeState(workshop_id="demo-werkstatt"),
                 "Ist mein Auto fertig? Ticket WS-20260505-0005",
+                customer_access=CustomerAccess("demo-werkstatt", frozenset({"WS-20260505-0005"})),
             )
 
         self.assertFalse(done)
@@ -2275,6 +2286,7 @@ class ExistingTicketTests(unittest.TestCase):
             _, reply, done = handle_existing_ticket(
                 IntakeState(workshop_id="demo-werkstatt"),
                 "Meine Nummer ist 0151 99988877",
+                customer_access=CustomerAccess("demo-werkstatt", frozenset({ticket_a, ticket_b})),
             )
 
             self.assertFalse(done)
@@ -2600,7 +2612,7 @@ class EndToEndConversationTests(unittest.TestCase):
             workshop_id=self.WORKSHOP_ID,
             session_id=session_id,
             message=message,
-            channel="test",
+            channel="web_chat",
         )
 
     def _cleanup(self, session_ids: list[str], ticket_ids: list[str]) -> None:
@@ -2608,7 +2620,7 @@ class EndToEndConversationTests(unittest.TestCase):
             for session_id in session_ids:
                 conn.execute(
                     "DELETE FROM conversation_sessions WHERE session_id = ?",
-                    (f"{self.WORKSHOP_ID}:{session_id}",),
+                    (_storage_session_id(session_id, self.WORKSHOP_ID),),
                 )
             for ticket_id in ticket_ids:
                 conn.execute("DELETE FROM tickets WHERE ticket_id = ?", (ticket_id,))
@@ -3219,7 +3231,7 @@ class WhatsAppConversationControlTests(unittest.TestCase):
                                     {
                                         "from": customer_phone,
                                         "id": message_id,
-                                        "timestamp": "1789128000",
+                                        "timestamp": str(int(datetime.now(timezone.utc).timestamp())),
                                         "type": "text",
                                         "text": {"body": "Hallo Werkstatt"},
                                     }
@@ -4092,7 +4104,7 @@ class StartupDataIsolationTests(unittest.TestCase):
             self.assertIsNone(find_ticket_by_id(created[settings.demo_workshop_id], settings.default_workshop_id))
             self.assertIsNone(find_ticket_by_id(created[settings.default_workshop_id], settings.demo_workshop_id))
             client.cookies.set(SESSION_COOKIE, create_session_token({
-                "email": settings.dashboard_admin_email, "workshop_id": settings.default_workshop_id, "role": "owner",
+                "email": settings.dashboard_admin_email, "workshop_id": settings.default_workshop_id, "role": settings.dashboard_admin_role,
             }))
             dashboard = client.get("/dashboard")
             self.assertIn(created[settings.default_workshop_id], dashboard.text)
