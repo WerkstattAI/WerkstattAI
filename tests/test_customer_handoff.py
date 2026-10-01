@@ -77,6 +77,42 @@ class CustomerHandoffScenarios:
         self.assertIsNone(pending_workshop_question(self.ticket()))
         self.assertEqual(self.ticket()["conversation_state"], "workshop_active")
 
+    def test_answer_classification_with_pending_workshop_question(self):
+        examples = [
+            ("Sollen wir die Bremsen wechseln?", "Ja, bitte.", False),
+            ("Sollen wir die Reparatur durchführen?", "Ja, bitte die Reparatur durchführen.", False),
+            ("Bestätigen Sie den Termin?", "Den Termin bestätige ich.", False),
+            ("Sind Sie mit 400 Euro einverstanden?", "Mit den Kosten von 400 Euro bin ich einverstanden.", False),
+            ("Sollen wir die Bremsen wechseln?", "Ja, bitte. Was kostet das insgesamt?", True),
+            ("Sollen wir die Reparatur durchführen?", "Ja, bitte die Reparatur durchführen. Wann ist das Auto fertig?", True),
+            ("Bestätigen Sie den Termin?", "Den Termin bestätige ich. Welche Unterlagen soll ich mitbringen?", True),
+            ("Sollen wir die Bremsen wechseln?", "Ja, bitte. Was kostet das insgesamt", True),
+            ("Bestätigen Sie den Termin?", "Ja, bitte. Welche Unterlagen soll ich mitbringen", True),
+            ("Bringen Sie den Fahrzeugschein mit?", "Ja! Wo soll ich ihn abgeben", True),
+            ("Bringen Sie den Fahrzeugschein mit?", "Ja; kann ich ihn vorher vorbeibringen", True),
+        ]
+        for index, (question, text, expected_question) in enumerate(examples):
+            with self.subTest(text=text):
+                self.seed_ticket(channel=self.channel, stale_intake=True)
+                target = f"workshop-question-{index}"
+                self.note(question, "workshop_question", target)
+                note = self.receive(text, f"customer-answer-{index}")
+                self.assertEqual(note["reply_to_message_id"], target)
+                self.assertEqual(note["purpose"], "customer_question" if expected_question else "customer_information")
+                self.assertEqual(open_customer_questions(self.ticket()), [note] if expected_question else [])
+                self.assertIsNone(pending_workshop_question(self.ticket()))
+                self.assert_panel_target(note["message_id"], present=expected_question)
+
+    def test_decision_terms_without_pending_question_keep_existing_handoff(self):
+        for index, text in enumerate(("Reparatur", "Termin", "Kosten", "Welche Unterlagen soll ich mitbringen")):
+            with self.subTest(text=text):
+                self.seed_ticket(channel=self.channel, stale_intake=True)
+                set_ticket_conversation_state(self.ticket_id, "workshop_active", self.wid)
+                note = self.receive(text, f"standalone-question-{index}")
+                self.assertEqual(note["purpose"], "customer_question")
+                self.assertIsNone(note["reply_to_message_id"])
+                self.assertEqual(open_customer_questions(self.ticket()), [note])
+
     def test_mixed_answer_is_one_linked_open_question_and_panel_target(self):
         self.note("Sollen wir die Bremsen wechseln?", "workshop_question", "workshop-question")
         text = "Ja, bitte. Was kostet das insgesamt?"
