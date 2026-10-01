@@ -592,6 +592,11 @@ def _send_ticket_customer_whatsapp(
     if len(text) > 4096:
         return False, "Die WhatsApp-Nachricht darf höchstens 4096 Zeichen lang sein.", ""
 
+    try:
+        validate_workshop_message(ticket, purpose, reply_to_message_id, require_explicit_target=True)
+    except ValueError as exc:
+        return False, str(exc), ""
+
     recipient = _ticket_whatsapp_phone(
         workshop_id=workshop_id,
         ticket_id=ticket_id,
@@ -1628,11 +1633,11 @@ def dashboard_whatsapp_reply(
     reply_text: str = Form(..., max_length=4096),
     ticket_id: str | None = Form(None, max_length=128),
     workshop_id: str | None = Form(None, max_length=128),
-    purpose: str = Form("workshop_notification", max_length=64),
+    purpose: str = Form("", max_length=64),
     reply_to_message_id: str | None = Form(None, max_length=256),
     message_id: str | None = Form(None, max_length=128),
 ):
-    purpose = purpose if isinstance(purpose, str) else "workshop_notification"
+    purpose = purpose if isinstance(purpose, str) else ""
     reply_to_message_id = reply_to_message_id.strip() or None if isinstance(reply_to_message_id, str) else None
     message_id = message_id.strip() or None if isinstance(message_id, str) else None
     wid = _workshop_id_for_request(request, workshop_id)
@@ -1711,6 +1716,7 @@ def dashboard_whatsapp_reply(
         if window_error:
             return redirect("failed", window_error)
 
+        validate_workshop_message({}, purpose, reply_to_message_id, require_explicit_target=True)
         send_result = send_workshop_message(workshop_id=wid, customer_phone=phone, phone_number_id=phone_number_id,
             text=text, ticket_id=None, purpose=purpose, reply_to_message_id=reply_to_message_id,
             message_id=message_id, source="dashboard", user=(get_current_user(request) or {}).get("email"),
@@ -2304,11 +2310,11 @@ def ticket_send_customer_message(
     ticket_id: str,
     message_text: str = Form(..., max_length=4096),
     workshop_id: str | None = Form(None, max_length=128),
-    purpose: str = Form("workshop_notification", max_length=64),
+    purpose: str = Form("", max_length=64),
     reply_to_message_id: str | None = Form(None, max_length=256),
     message_id: str | None = Form(None, max_length=128),
 ):
-    purpose = purpose if isinstance(purpose, str) else "workshop_notification"
+    purpose = purpose if isinstance(purpose, str) else ""
     reply_to_message_id = reply_to_message_id.strip() or None if isinstance(reply_to_message_id, str) else None
     message_id = message_id.strip() or None if isinstance(message_id, str) else None
     wid = _workshop_id_for_request(request, workshop_id)
@@ -2360,11 +2366,11 @@ def ticket_add_note(
     note_text: str = Form(..., max_length=4096),
     note_type: str = Form("internal_note", max_length=128),
     workshop_id: str | None = Form(None, max_length=128),
-    purpose: str = Form("workshop_notification", max_length=64),
+    purpose: str = Form("", max_length=64),
     reply_to_message_id: str | None = Form(None, max_length=256),
     message_id: str | None = Form(None, max_length=128),
 ):
-    purpose = purpose if isinstance(purpose, str) else "workshop_notification"
+    purpose = purpose if isinstance(purpose, str) else ""
     reply_to_message_id = reply_to_message_id.strip() or None if isinstance(reply_to_message_id, str) else None
     message_id = message_id.strip() or None if isinstance(message_id, str) else None
     wid = _workshop_id_for_request(request, workshop_id)
@@ -2410,6 +2416,7 @@ def ticket_add_note(
                 )
                 return redirect_reply(_human_send_redirect_status(sent, detail), detail)
 
+            validate_workshop_message(ticket, purpose, reply_to_message_id, require_explicit_target=True)
             add_ticket_note(
                 ticket_id,
                 text,

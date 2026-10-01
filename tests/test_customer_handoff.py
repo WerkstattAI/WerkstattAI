@@ -66,7 +66,8 @@ class CustomerHandoffScenarios:
             values = [option["value"] for option in target["options"]]
             self.assertEqual(values.count(message_id), 1 if present else 0)
             if present:
-                self.assertNotIn("disabled", target["attributes"])
+                # JavaScript enables the picker only after choosing "Antwort".
+                self.assertNotIn("disabled", next(option for option in target["options"] if option["value"] == message_id))
 
     def test_pure_answer_keeps_reference_without_opening_question(self):
         self.note("Sollen wir die Bremsen wechseln?", "workshop_question", "workshop-question")

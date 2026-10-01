@@ -1174,6 +1174,7 @@ class WhatsAppWebhookTests(unittest.TestCase):
                     customer_phone="4917622222222",
                     reply_text="Wir melden uns gleich mit einer Einschaetzung.",
                     workshop_id="ignored-by-authenticated-user",
+                    purpose="workshop_notification",
                 )
 
             self.assertEqual(response.status_code, 303)
@@ -1233,6 +1234,7 @@ class WhatsAppWebhookTests(unittest.TestCase):
                     customer_phone="4917633333333",
                     reply_text="Ihr Fahrzeug ist fertig.",
                     workshop_id="ignored-by-authenticated-user",
+                    purpose="workshop_notification",
                 )
 
             self.assertEqual(response.status_code, 303)
@@ -1303,6 +1305,7 @@ class WhatsAppWebhookTests(unittest.TestCase):
                     reply_text="Heute um 16 Uhr.",
                     ticket_id=ticket_id,
                     workshop_id=None,
+                    purpose="workshop_notification",
                 )
 
             self.assertEqual(response.status_code, 303)
@@ -1377,6 +1380,7 @@ class WhatsAppWebhookTests(unittest.TestCase):
                     ticket_id=ticket_id,
                     message_text="Ihr Kostenvoranschlag ist vorbereitet.",
                     workshop_id="ignored-by-authenticated-user",
+                    purpose="workshop_notification",
                 )
 
             self.assertEqual(response.status_code, 303)
@@ -1428,6 +1432,7 @@ class WhatsAppWebhookTests(unittest.TestCase):
                     ticket_id=ticket_id,
                     message_text="Ihr Fahrzeug ist fertig.",
                     workshop_id=None,
+                    purpose="workshop_notification",
                 )
 
             self.assertEqual(response.status_code, 303)
@@ -1470,6 +1475,7 @@ class WhatsAppWebhookTests(unittest.TestCase):
                 ticket_id=ticket_id,
                 message_text="Nicht senden",
                 workshop_id="tenant-b",
+                purpose="workshop_notification",
             )
 
         self.assertEqual(response.status_code, 303)
@@ -1547,6 +1553,7 @@ class WhatsAppWebhookTests(unittest.TestCase):
                     note_text="Bitte kommen Sie morgen um 10 Uhr vorbei.",
                     note_type="customer_reply",
                     workshop_id="ignored-by-authenticated-user",
+                    purpose="workshop_notification",
                 )
 
             self.assertEqual(response.status_code, 303)
@@ -1604,6 +1611,7 @@ class WhatsAppWebhookTests(unittest.TestCase):
                 note_text="Antwort für die nächste Ticket-Abfrage.",
                 note_type="customer_reply",
                 workshop_id=None,
+                purpose="workshop_notification",
             )
 
         self.assertEqual(response.status_code, 303)
@@ -1682,6 +1690,7 @@ class WhatsAppWebhookTests(unittest.TestCase):
                     note_text="Diese Nachricht darf nicht als gesendet gelten.",
                     note_type="customer_reply",
                     workshop_id=None,
+                    purpose="workshop_notification",
                 )
 
             self.assertEqual(response.status_code, 303)
@@ -3599,6 +3608,7 @@ class WhatsAppConversationControlTests(unittest.TestCase):
                     reply_text="Darf nicht rausgehen",
                     ticket_id=None,
                     workshop_id=None,
+                    purpose="workshop_notification",
                 )
         finally:
             object.__setattr__(settings, "whatsapp_access_token", old_token)
@@ -3637,6 +3647,7 @@ class WhatsAppConversationControlTests(unittest.TestCase):
                     reply_text="Werkstatt antwortet",
                     ticket_id=None,
                     workshop_id=None,
+                    purpose="workshop_notification",
                 )
         finally:
             object.__setattr__(settings, "whatsapp_access_token", old_token)
@@ -3804,6 +3815,7 @@ class WhatsAppConversationControlTests(unittest.TestCase):
                 reply_text="Nicht senden",
                 ticket_id=ticket_id,
                 workshop_id=None,
+                purpose="workshop_notification",
             )
 
         self.assertIn("reply_status=failed", response.headers["location"])
@@ -3865,6 +3877,7 @@ class WhatsAppConversationControlTests(unittest.TestCase):
                     reply_text="Möglicherweise angenommen",
                     ticket_id=None,
                     workshop_id=None,
+                    purpose="workshop_notification",
                 )
         finally:
             object.__setattr__(settings, "whatsapp_access_token", old_token)

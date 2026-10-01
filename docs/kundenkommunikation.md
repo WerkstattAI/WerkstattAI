@@ -37,9 +37,16 @@ Gesprächszustand gespeichert.
   Diese Eingänge und automatischen Antworten erzeugen keine offene Kundenfrage.
 - Preis, Diagnose, Fertigstellung, Dauer, Termine, Teile und unklare Entscheidungen
   werden der Werkstatt übergeben. Eine einmalige Bestätigung wird protokolliert.
-- Eine Werkstattantwort benötigt ein konkretes offenes Frageziel. Genau eine
-  offene Frage kann vorausgewählt werden; mehrere Ziele benötigen eine Auswahl.
-  Nur das gewählte Ziel erhält `resolved_at`.
+- Frische manuelle Nachrichten beginnen mit „Zweck auswählen …“. Eine
+  Werkstattantwort benötigt eine bewusst gewählte offene Kundenfrage, auch wenn
+  nur eine offen ist. Die Formularpfade weisen fehlende oder ungültige Auswahlen
+  vor Speicherung beziehungsweise Versand ab; nur das gewählte Ziel erhält
+  `resolved_at`. Bei WhatsApp geschieht dies nach erfolgreichem Versand, beim
+  Web-Chat bereits beim Speichern der Antwort, ohne einen Lesenachweis.
+- Neue Browserentwürfe speichern, ob Zweck und Ziel bewusst gewählt wurden.
+  Gültige Auswahlen und fehlgeschlagene Versuche bleiben erhalten. Alte Entwürfe
+  ohne diesen Nachweis behalten ihren Text, benötigen aber eine erneute Auswahl.
+  Ein inzwischen geschlossenes Antwortziel wird nicht automatisch ersetzt.
 - Werkstattinformationen schließen keine Fragen und verändern keinen Ticketstatus.
 - Werkstattfragen pausieren die Automatik. Die nächste Kundenantwort erhält
   deren Nachrichten-ID als Antwortbezug und wird nicht als Intake-Antwort behandelt.

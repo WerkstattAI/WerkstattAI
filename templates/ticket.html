@@ -2103,7 +2103,7 @@
             <form class="note-form customer-reply-form" method="post" action="/dashboard/ticket/{{ ticket.ticket_view_id }}/notes">
               <input type="hidden" name="workshop_id" value="{{ workshop_id }}" />
               <input type="hidden" name="note_type" value="customer_reply">
-              {{ communication.purpose_controls('ticketMessage', ticket.open_customer_questions|default([])) }}
+              {{ communication.purpose_controls('ticketMessage', ticket.open_customer_questions|default([]), ticket.has_whatsapp_conversation or ticket.source == 'whatsapp') }}
               <div class="note-form-row">
                 <textarea
                   id="ticketCustomerReplyText"

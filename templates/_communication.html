@@ -14,28 +14,29 @@
 <span class="communication-state {{ state }}">{{ state_label(state) }}</span>
 {%- endmacro %}
 
-{% macro purpose_controls(prefix, questions=[]) %}
+{% macro purpose_controls(prefix, questions=[], uses_whatsapp=true) %}
+{% set answer_help = 'Diese Antwort schließt die ausgewählte Kundenfrage nach erfolgreichem Versand.' if uses_whatsapp else 'Diese Antwort schließt die ausgewählte Kundenfrage beim Speichern für den Web-Chat. Das bedeutet nicht, dass der Kunde sie bereits gelesen hat.' %}
 <div class="communication-controls" data-communication-controls>
   <div class="communication-field">
     <label for="{{ prefix }}Purpose">Was möchten Sie senden?</label>
     <select id="{{ prefix }}Purpose" name="purpose" required data-message-purpose aria-describedby="{{ prefix }}PurposeHelp">
-      <option value="" disabled>Zweck auswählen …</option>
-      <option value="workshop_answer" {% if questions %}selected{% else %}disabled{% endif %}>Auf Kundenfrage antworten</option>
+      <option value="" disabled selected>Zweck auswählen …</option>
+      <option value="workshop_answer" {% if not questions %}disabled{% endif %}>Auf Kundenfrage antworten</option>
       <option value="workshop_question">Frage an Kunden stellen</option>
-      <option value="workshop_notification" {% if not questions %}selected{% endif %}>Information an Kunden senden</option>
+      <option value="workshop_notification">Information an Kunden senden</option>
     </select>
   </div>
-  <div class="communication-field" data-reply-target-field {% if not questions %}hidden{% endif %}>
+  <div class="communication-field" data-reply-target-field hidden>
     <label for="{{ prefix }}ReplyTarget">Welche offene Kundenfrage beantworten Sie?</label>
-    <select id="{{ prefix }}ReplyTarget" name="reply_to_message_id" data-reply-target {% if questions %}required{% else %}disabled{% endif %}>
-      <option value="">Kundenfrage auswählen …</option>
+    <select id="{{ prefix }}ReplyTarget" name="reply_to_message_id" data-reply-target disabled>
+      <option value="" selected>Kundenfrage auswählen …</option>
       {% for question in questions %}
-      <option value="{{ question.message_id }}" {% if questions|length == 1 %}selected{% endif %}>{{ question.created_at_display or question.created_at or '' }} · {{ question.text }}</option>
+      <option value="{{ question.message_id }}">{{ question.created_at_display or question.created_at or '' }} · {{ question.text }}</option>
       {% endfor %}
     </select>
   </div>
-  <p class="communication-help" id="{{ prefix }}PurposeHelp" data-purpose-help>
-    {% if questions %}Eine Antwort erledigt nur die ausgewählte Kundenfrage.{% else %}Eine Information ändert weder offene Kundenfragen noch den Ticketstatus.{% endif %}
+  <p class="communication-help" id="{{ prefix }}PurposeHelp" data-purpose-help data-answer-help="{{ answer_help }}">
+    Bitte wählen Sie den Zweck der Nachricht. {{ answer_help }}
   </p>
   <input type="hidden" name="message_id" value="" data-client-message-id />
 </div>

@@ -117,6 +117,7 @@ def pending_workshop_question(ticket: dict[str, Any]) -> dict[str, Any] | None:
 
 def validate_workshop_message(
     ticket: dict[str, Any], purpose: str, reply_to_message_id: str | None = None,
+    *, require_explicit_target: bool = False,
 ) -> str | None:
     if purpose not in {"workshop_answer", "workshop_question", "workshop_notification"}:
         raise ValueError("Bitte den Zweck der Nachricht auswählen.")
@@ -126,7 +127,7 @@ def validate_workshop_message(
             raise ValueError("Ein Antwortziel ist nur bei einer Antwort auf eine Kundenfrage zulässig.")
         return None
     questions = open_customer_questions(ticket)
-    if target is None and len(questions) == 1:
+    if target is None and len(questions) == 1 and not require_explicit_target:
         target = questions[0]["message_id"]
     if target is None or not any(note["message_id"] == target for note in questions):
         raise ValueError("Bitte eine konkrete offene Kundenfrage als Antwortziel auswählen.")

@@ -65,23 +65,32 @@ class CommunicationTemplateTests(unittest.TestCase):
         fields = FormFields(str(self.macros.purpose_controls("ticket", [self.question("question-1")]))).selects
         target = fields["reply_to_message_id"]
         selected = [item["value"] for item in target["options"] if "selected" in item]
-        self.assertEqual(selected, ["question-1"])
-        self.assertIn("required", target["attributes"])
-        self.assertNotIn("disabled", target["attributes"])
+        self.assertEqual(selected, [""])
+        self.assertIn("disabled", target["attributes"])
+        self.assertEqual([item["value"] for item in fields["purpose"]["options"] if "selected" in item], [""])
+        self.assertIn("required", fields["purpose"]["attributes"])
 
     def test_multiple_questions_require_a_deliberate_target(self):
         fields = FormFields(str(self.macros.purpose_controls("inbox", [self.question("one"), self.question("two")]))).selects
         target = fields["reply_to_message_id"]
         self.assertEqual([item["value"] for item in target["options"]], ["", "one", "two"])
-        self.assertFalse(any("selected" in item for item in target["options"]))
-        self.assertIn("required", target["attributes"])
+        self.assertEqual([item["value"] for item in target["options"] if "selected" in item], [""])
+        self.assertIn("disabled", target["attributes"])
 
     def test_no_open_question_cannot_be_sent_as_an_answer(self):
         fields = FormFields(str(self.macros.purpose_controls("ticket", []))).selects
         purposes = {item["value"]: item for item in fields["purpose"]["options"]}
         self.assertIn("disabled", purposes["workshop_answer"])
-        self.assertIn("selected", purposes["workshop_notification"])
+        self.assertIn("selected", purposes[""])
+        self.assertNotIn("selected", purposes["workshop_notification"])
         self.assertIn("disabled", fields["reply_to_message_id"]["attributes"])
+
+    def test_answer_help_matches_channel_completion(self):
+        whatsapp = str(self.macros.purpose_controls("inbox", [self.question("one")]))
+        web = str(self.macros.purpose_controls("ticket", [self.question("one")], False))
+        self.assertIn("Diese Antwort schließt die ausgewählte Kundenfrage nach erfolgreichem Versand.", whatsapp)
+        self.assertIn("beim Speichern für den Web-Chat", web)
+        self.assertIn("nicht, dass der Kunde sie bereits gelesen hat", web)
 
     def test_customer_question_markup_is_escaped_in_answer_picker(self):
         question = self.question('target" onclick="alert(1)')
@@ -189,6 +198,7 @@ class CommunicationPageTests(unittest.TestCase):
         markup = response.body.decode()
         self.assertIn("Automatische Antwort", markup)
         self.assertIn("<strong>Assistent</strong>", markup)
+        self.assert_fresh_selection(markup)
         targets = FormFields(markup).selects["reply_to_message_id"]["options"]
         self.assertEqual([option["value"] for option in targets], ["", "customer-0", "customer-1"])
 
@@ -197,9 +207,16 @@ class CommunicationPageTests(unittest.TestCase):
         response = dashboard_whatsapp(self.request, phone=self.phone, workshop_id=self.workshop)
         self.assertEqual(response.status_code, 200)
         markup = response.body.decode()
+        self.assert_fresh_selection(markup)
         targets = FormFields(markup).selects["reply_to_message_id"]["options"]
         self.assertEqual([option["value"] for option in targets], ["", "customer-0", "customer-1"])
         self.assertIn("Werkstatt übernimmt", markup)
+
+    def assert_fresh_selection(self, markup):
+        fields = FormFields(markup).selects
+        for name in ("purpose", "reply_to_message_id"):
+            self.assertEqual([option["value"] for option in fields[name]["options"] if "selected" in option], [""])
+        self.assertIn("Diese Antwort schließt die ausgewählte Kundenfrage nach erfolgreichem Versand.", markup)
 
     def test_dashboard_delivers_question_targets_to_contact_modal(self):
         from app.web import dashboard
