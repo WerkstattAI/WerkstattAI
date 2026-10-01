@@ -94,9 +94,45 @@ oder Fachabschluss; widersprüchliche Entscheidungen werden abgelehnt.
 
 ## Verifikation
 
-Die abschließenden tatsächlich ausgeführten Prüfergebnisse werden nach dem
-Gesamtlauf ergänzt. Sämtliche Versandaufrufe in den Regressionen sind simuliert;
-die Daten stammen ausschließlich aus temporären synthetischen Testbeständen.
+Abschließende lokale Verifikation am 1. Oktober 2026 auf
+`codex/kundenkommunikation-2026-09-26`, ausgehend von Commit `cdd76c0`:
+
+- `.\.venv\Scripts\python.exe -m unittest discover -s tests -q`
+  (Projektinterpreter für `python -m unittest discover -s tests -q`): 347 Tests in
+  149,725 Sekunden, 346 bestanden, 1 übersprungen, keine Fehler;
+  `OK (skipped=1)`, Exitcode 0.
+- `node --test tests/test_communication_composer.mjs tests/test_privacy_worker.mjs`:
+  18 Tests bestanden, keine Fehler oder übersprungenen Tests, Exitcode 0.
+- `git diff --check`: keine Whitespace-Fehler, Exitcode 0.
+
+Übersprungen blieb
+`test_communication_postgres.PostgreSQLCommunicationTests.test_fresh_schema_legacy_migration_and_targeted_delivery`,
+weil `WERKSTATTAI_TEST_POSTGRES_URL` nicht gesetzt ist. Eine ausdrücklich konfigurierte,
+entbehrliche PostgreSQL-Testdatenbank liegt nicht vor; der reale PostgreSQL-Pfad
+ist deshalb in diesem Lauf nicht verifiziert.
+
+Der bisher kombinierte Timeout-/Abbruchtest wurde in zwei unabhängige Tests mit
+jeweils frischer temporärer SQLite-Datenbank aufgeteilt. Nach dem Timeout bleibt
+die erste Reservierung korrekt `unknown/sending`; eine weitere Nachricht derselben
+Unterhaltung erhält daher HTTP 503, bevor ein simulierter `KeyboardInterrupt`
+erreicht werden könnte. Dies war die Ursache des bisherigen Testfehlers.
+
+- Der Timeout-Test prüft genau einen Transportaufruf, das Ignorieren desselben
+  Webhook-Ereignisses und die unveränderte Reservierung. Eine weitere Nachricht
+  und deren Wiederholung erhalten jeweils HTTP 503, behalten ihre Antwort als
+  `pending/pending` ohne Versandbeginn und lösen keinen zusätzlichen Transport
+  oder wiederholte fachliche Verarbeitung aus.
+- Der Abbruchtest beginnt ohne bestehende Nachrichten, prüft die bereits gespeicherte
+  Reservierung beim Transportaufruf und simuliert dann `KeyboardInterrupt`.
+  Die Reservierung bleibt nach Abbruch und Webhook-Wiederholung unverändert;
+  insgesamt erfolgt ein Transportaufruf, bei der Wiederholung keiner.
+
+Produktionscode und Produktionssperre blieben unverändert. Sämtliche Versandaufrufe
+in den Regressionen sind simuliert; die Daten stammen ausschließlich aus temporären
+synthetischen Testbeständen. Es gab keinen Merge, kein Deployment und keinen Zugriff
+auf produktive Nachrichten oder Datenbanken. Der Python-Lauf meldete weiterhin
+`ResourceWarning`- und `DeprecationWarning`-Hinweise; der protokollierte simulierte
+`RuntimeError` des Rollback-Tests ist erwartet und kein Testfehler.
 
 ## Bewusste Grenzen
 

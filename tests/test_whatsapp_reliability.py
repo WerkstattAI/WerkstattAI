@@ -158,18 +158,72 @@ class WhatsAppReliabilityTests(unittest.TestCase):
             self.assertEqual(send.call_count, 2)
         self.assertEqual(self.count("whatsapp_messages"), 2)
 
-    def test_timeout_or_crash_after_send_claim_is_never_blindly_resent(self):
+    def test_timeout_keeps_claim_and_blocks_duplicate_and_further_sends(self):
+        payload = self.payload()
         with patch.object(main, "process_chat_message", return_value=ChatResponse(reply="Saved", done=False)) as process, patch.object(main, "send_whatsapp_text_message", return_value=WhatsAppSendResult(False, None, None, {}, "timeout")) as send:
-            self.assertEqual(self.webhook(self.payload())["replies"][0]["send_status"], "unknown")
-            self.assertEqual(self.webhook(self.payload())["ignored"], 1)
+            self.assertEqual(self.webhook(payload)["replies"][0]["send_status"], "unknown")
+            self.assertEqual(send.call_count, 1)
+            with closing(db.get_conn()) as conn:
+                claim = dict(conn.execute("""SELECT * FROM whatsapp_messages WHERE workshop_id = ?
+                    AND direction = 'outbound' AND reply_to_wa_message_id = ?""",
+                    (self.wid, "wamid.reliable")).fetchone())
+            self.assertEqual((claim["status"], claim["dispatch_state"]), ("unknown", "sending"))
+            self.assertIsNotNone(claim["dispatch_started_at"])
+            self.assertEqual(self.webhook(payload)["ignored"], 1)
             self.assertEqual(process.call_count, 1)
             self.assertEqual(send.call_count, 1)
-        with patch.object(main, "process_chat_message", return_value=ChatResponse(reply="Another", done=False)), patch.object(main, "send_whatsapp_text_message", side_effect=KeyboardInterrupt):
+
+            further_payload = self.payload("wamid.blocked")
+            for _ in range(2):
+                with self.assertRaises(HTTPException) as error:
+                    self.webhook(further_payload)
+                self.assertEqual(error.exception.status_code, 503)
+                self.assertEqual(error.exception.detail, "WhatsApp delivery temporarily unavailable")
+                self.assertEqual(send.call_count, 1)
+                self.assertEqual(process.call_count, 2)
+                with closing(db.get_conn()) as conn:
+                    unchanged = dict(conn.execute("SELECT * FROM whatsapp_messages WHERE id = ?",
+                                                  (claim["id"],)).fetchone())
+                    pending = conn.execute("""SELECT status, dispatch_state, dispatch_started_at
+                        FROM whatsapp_messages WHERE workshop_id = ? AND direction = 'outbound'
+                        AND reply_to_wa_message_id = ?""", (self.wid, "wamid.blocked")).fetchone()
+                self.assertEqual(unchanged, claim)
+                self.assertEqual((pending["status"], pending["dispatch_state"]), ("pending", "pending"))
+                self.assertIsNone(pending["dispatch_started_at"])
+
+    def test_crash_after_send_claim_is_never_blindly_resent(self):
+        self.assertEqual(self.count("whatsapp_messages"), 0)
+        payload = self.payload("wamid.crash")
+        claims = []
+
+        def crash_after_reservation(**kwargs):
+            with closing(db.get_conn()) as conn:
+                claim = dict(conn.execute("""SELECT * FROM whatsapp_messages WHERE workshop_id = ?
+                    AND direction = 'outbound' AND reply_to_wa_message_id = ?""",
+                    (self.wid, "wamid.crash")).fetchone())
+            self.assertEqual((claim["status"], claim["dispatch_state"]), ("unknown", "sending"))
+            self.assertIsNotNone(claim["dispatch_started_at"])
+            claims.append(claim)
+            raise KeyboardInterrupt
+
+        with patch.object(main, "process_chat_message", return_value=ChatResponse(reply="Another", done=False)) as process, patch.object(main, "send_whatsapp_text_message", side_effect=crash_after_reservation) as send:
             with self.assertRaises(KeyboardInterrupt):
-                self.webhook(self.payload("wamid.crash"))
-        with patch.object(main, "send_whatsapp_text_message") as send:
-            self.assertEqual(self.webhook(self.payload("wamid.crash"))["ignored"], 1)
+                self.webhook(payload)
+            self.assertEqual(process.call_count, 1)
+            self.assertEqual(send.call_count, 1)
+        with closing(db.get_conn()) as conn:
+            persisted = dict(conn.execute("SELECT * FROM whatsapp_messages WHERE id = ?",
+                                          (claims[0]["id"],)).fetchone())
+        self.assertEqual(persisted, claims[0])
+        with patch.object(main, "process_chat_message") as process, patch.object(main, "send_whatsapp_text_message") as send:
+            self.assertEqual(self.webhook(payload)["ignored"], 1)
+            process.assert_not_called()
             send.assert_not_called()
+            self.assertEqual(send.call_count, 0)
+        with closing(db.get_conn()) as conn:
+            persisted = dict(conn.execute("SELECT * FROM whatsapp_messages WHERE id = ?",
+                                          (claims[0]["id"],)).fetchone())
+        self.assertEqual(persisted, claims[0])
 
     def test_employee_takeover_during_send_is_not_reversed(self):
         tid = save_ticket(IntakeState(ticket_id="WS-RELIABILITY-CONTROL", telefon=self.phone), workshop_id=self.wid)
