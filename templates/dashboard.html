@@ -3189,6 +3189,16 @@
     if (returnedMessageStatus === "sent" && returnedMessageTicket) {
       window.sessionStorage.removeItem(messageDraftKey(returnedMessageTicket));
       window.sessionStorage.removeItem(messageDraftKey(returnedMessageTicket) + ":communication");
+    } else if (returnedMessageStatus === "failed" && returnedMessageTicket) {
+      // Preserve the result even if the user leaves before reopening the modal.
+      try {
+        const key = messageDraftKey(returnedMessageTicket) + ":communication";
+        const draft = JSON.parse(window.sessionStorage.getItem(key) || "null");
+        if (draft) {
+          draft.retryAfterFailure = true;
+          window.sessionStorage.setItem(key, JSON.stringify(draft));
+        }
+      } catch (_) {}
     }
 
     function openModal() {

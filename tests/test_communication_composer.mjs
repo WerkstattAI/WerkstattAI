@@ -173,6 +173,58 @@ test("opening external WhatsApp or cancelling submission does not consume the fa
   assert.notEqual(retry.messageId.value, failedId);
 });
 
+test("failed retry survives leaving and reopening without a result query parameter", () => {
+  const first = fixture();
+  first.controller.configure(questions, "ticket:failed", false);
+  choose(first);
+  const failedId = first.messageId.value;
+  const failed = fixture(first.storage);
+  failed.controller.configure(questions, "ticket:failed", false, {resultStatus: "failed"});
+  const reopened = fixture(first.storage);
+  reopened.controller.configure(questions, "ticket:failed", false);
+  reopened.textarea.value = "Bearbeiteter Entwurf nach erneutem Öffnen";
+  reopened.textarea.change("input");
+  assert.equal(reopened.messageId.value, failedId);
+  choose(reopened, "workshop_answer", "");
+  assert.equal(reopened.submit().defaultPrevented, true);
+  assert.equal(reopened.messageId.value, failedId);
+  choose(reopened, "workshop_answer", "customer-two");
+  assert.equal(reopened.messageId.value, failedId);
+  assert.equal(reopened.submit().defaultPrevented, false);
+  assert.notEqual(reopened.messageId.value, failedId);
+  const submittedId = reopened.messageId.value;
+  const revisit = fixture(reopened.storage, reopened.textarea.value);
+  revisit.controller.configure(questions, "ticket:failed", false);
+  revisit.submit();
+  assert.equal(revisit.messageId.value, submittedId);
+});
+
+test("dashboard records a failed result before the message modal is opened again", () => {
+  const dashboard = readFileSync(new URL("../templates/dashboard.html", import.meta.url), "utf8");
+  const resultHandling = dashboard.slice(dashboard.indexOf('    if (returnedMessageStatus === "sent"'),
+                                        dashboard.indexOf("    function openModal()"));
+  const first = fixture();
+  first.controller.configure(questions, "ticket:failed", false);
+  choose(first);
+  const failedId = first.messageId.value;
+  vm.runInNewContext(resultHandling, {
+    returnedMessageStatus: "failed", returnedMessageTicket: "failed",
+    messageDraftKey: ticket => `ticket:${ticket}`,
+    window: {sessionStorage: {
+      getItem: key => first.storage.get(key),
+      setItem: (key, value) => first.storage.set(key, value),
+      removeItem: key => first.storage.delete(key),
+    }},
+  });
+  const reopened = fixture(first.storage);
+  reopened.controller.configure(questions, "ticket:failed", false);
+  reopened.textarea.value = "Bearbeiteter Dashboard-Entwurf";
+  reopened.textarea.change("input");
+  assert.equal(reopened.messageId.value, failedId);
+  assert.equal(reopened.submit().defaultPrevented, false);
+  assert.notEqual(reopened.messageId.value, failedId);
+});
+
 test("unknown, pending and sending keep identity and block submission even after text edits", () => {
   for (const status of ["unknown", "pending", "sending"]) {
     const first = fixture();

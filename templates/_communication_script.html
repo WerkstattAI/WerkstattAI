@@ -30,7 +30,7 @@
           window.sessionStorage.setItem(draftKey, JSON.stringify({
             purpose: purpose.value, reply_to_message_id: target.value,
             message_id: messageId.value, text: text.value,
-            selectionVersion: 1, purposeChosen, targetChosen
+            selectionVersion: 1, purposeChosen, targetChosen, retryAfterFailure
           }));
         } catch (_) {}
       }
@@ -93,6 +93,7 @@
             if (saved && typeof saved.text === "string" && (saved.text === text.value || !text.value)) {
               text.value = saved.text;
               messageId.value = saved.message_id || freshId();
+              retryAfterFailure = retryAfterFailure || saved.retryAfterFailure === true;
               const validPurpose = saved.selectionVersion === 1 && saved.purposeChosen === true && Array.from(purpose.options).some(option => option.value === saved.purpose && !option.disabled);
               const validTarget = saved.purpose !== "workshop_answer" || !saved.reply_to_message_id || (saved.targetChosen === true && questions.some(question => question.message_id === saved.reply_to_message_id));
               if (validPurpose && validTarget) {
