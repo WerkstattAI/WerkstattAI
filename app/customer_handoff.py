@@ -7,7 +7,8 @@ def receive_customer_message(ticket: dict, text: str, *, workshop_id: str, messa
     from app.conversation.existing_ticket import _is_customer_question
     pending = pending_workshop_question(ticket) if ticket.get("conversation_state") == "waiting_for_customer" else None
     target = pending.get("message_id") if pending else None
-    is_question = not target and _is_customer_question(text)
+    # A reply can answer the workshop and still raise a new customer question.
+    is_question = _is_customer_question(text)
     result = add_ticket_note(ticket["ticket_id"], text, workshop_id=workshop_id,
                              sender_role="customer", purpose="customer_question" if is_question else "customer_information",
                              requires_human_action=True, reply_to_message_id=target, message_id=message_id)
