@@ -575,6 +575,12 @@ def init_db() -> None:
         _add_column_if_missing(conn, "whatsapp_messages", "processing_state", "TEXT NOT NULL DEFAULT 'complete'")
         _add_column_if_missing(conn, "whatsapp_messages", "reply_to_wa_message_id", "TEXT")
         _add_column_if_missing(conn, "whatsapp_messages", "dispatch_state", "TEXT NOT NULL DEFAULT 'complete'")
+        _add_column_if_missing(conn, "whatsapp_messages", "dispatch_started_at", "TEXT")
+        # A historical in-flight row has no trustworthy start time. Start a fresh
+        # recovery grace period once, instead of treating it as immediately stale.
+        conn.execute("""UPDATE whatsapp_messages SET dispatch_started_at = ?
+                        WHERE dispatch_state = 'sending' AND dispatch_started_at IS NULL""",
+                     (datetime.now(timezone.utc).isoformat(),))
         _add_column_if_missing(conn, "whatsapp_messages", "control_revision", "INTEGER")
         conn.execute("""
             CREATE UNIQUE INDEX IF NOT EXISTS idx_whatsapp_reply_source

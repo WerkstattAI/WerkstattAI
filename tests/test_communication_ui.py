@@ -31,6 +31,26 @@ class FormFields(HTMLParser):
             self.current = None
 
 
+class RenderedForms(HTMLParser):
+    def __init__(self, markup):
+        super().__init__()
+        self.forms = []
+        self.current = None
+        self.feed(markup)
+
+    def handle_starttag(self, tag, attributes):
+        attributes = dict(attributes)
+        if tag == "form":
+            self.current = {"attributes": attributes, "inputs": [], "buttons": []}
+            self.forms.append(self.current)
+        elif self.current is not None and tag in {"input", "button"}:
+            self.current["inputs" if tag == "input" else "buttons"].append(attributes)
+
+    def handle_endtag(self, tag):
+        if tag == "form":
+            self.current = None
+
+
 class CommunicationTemplateTests(unittest.TestCase):
     @classmethod
     def setUpClass(cls):
@@ -101,6 +121,31 @@ class CommunicationTemplateTests(unittest.TestCase):
         self.assertIn("Kundeninformation", markup)
         self.assertNotIn("Offene Kundenfrage", markup)
 
+    def test_stale_dispatch_has_two_explicit_confirmed_recovery_choices(self):
+        markup = str(self.macros.dispatch_recovery(True, [{
+            "message_id": "stale-message", "text": "<script>untrusted text</script>",
+            "purpose": "workshop_answer", "created_at_display": "28.09.2026 · 12:00",
+        }], "workshop-one", "ticket-one", "491701234567", "ticket"))
+        self.assertIn("Der Versandstatus ist unklar. Prüfen Sie den tatsächlichen Status bei Meta, bevor Sie fortfahren.", markup)
+        self.assertNotIn("<script>", markup)
+        forms = RenderedForms(markup).forms
+        self.assertEqual(len(forms), 1)
+        self.assertEqual(forms[0]["attributes"]["action"], "/dashboard/whatsapp/messages/stale-message/resolve")
+        fields = {item["name"]: item for item in forms[0]["inputs"]}
+        self.assertEqual(fields["workshop_id"]["value"], "workshop-one")
+        self.assertEqual(fields["confirmed"]["type"], "checkbox")
+        self.assertIn("required", fields["confirmed"])
+        self.assertEqual(fields["confirmed"]["value"], "true")
+        self.assertEqual([button["value"] for button in forms[0]["buttons"]], ["sent", "failed"])
+        self.assertTrue(all(button.get("data-resolution-confirm") for button in forms[0]["buttons"]))
+
+    def test_recent_or_completed_dispatch_offers_no_manual_recovery(self):
+        recent = str(self.macros.dispatch_recovery(True, [], "workshop-one"))
+        self.assertIn("frühestens nach fünf Minuten", recent)
+        self.assertEqual(RenderedForms(recent).forms, [])
+        complete = str(self.macros.dispatch_recovery(False, [], "workshop-one"))
+        self.assertNotIn("Versand klären", complete)
+
 
 class CommunicationPageTests(unittest.TestCase):
     def setUp(self):
@@ -164,6 +209,50 @@ class CommunicationPageTests(unittest.TestCase):
         self.assertIn("data-open-questions=", markup)
         self.assertIn('"message_id": "customer-0"', markup)
         self.assertIn('name="purpose"', markup)
+
+    def blocked_context(self, ticket):
+        ticket["dispatch_blocked"] = True
+        ticket["service_window_open"] = False
+        ticket["stale_dispatches"] = [{"message_id": "stale-message", "text": "Veralteter Versand",
+                                        "purpose": "workshop_notification", "created_at_display": "28.09.2026 · 12:00"}]
+
+    def test_blocked_ticket_disables_message_and_template_but_exposes_recovery(self):
+        from app.web import templates, ticket_detail
+        response = ticket_detail(self.request, self.ticket, workshop_id=self.workshop)
+        context = response.context
+        self.blocked_context(context["ticket"])
+        context["whatsapp_readiness"].update(can_send=True, can_start_template=True)
+        markup = templates.get_template("ticket.html").render(context)
+        forms = RenderedForms(markup).forms
+        for form in forms:
+            action = form["attributes"].get("action", "")
+            if "customer-reply-form" in form["attributes"].get("class", "") or action == "/dashboard/whatsapp/start-template":
+                self.assertTrue(all("disabled" in button for button in form["buttons"]))
+        self.assertTrue(any(form["attributes"].get("action", "").endswith("/stale-message/resolve") for form in forms))
+
+    def test_blocked_inbox_disables_both_external_send_paths_and_template(self):
+        from app.web import dashboard_whatsapp, templates
+        response = dashboard_whatsapp(self.request, phone=self.phone, workshop_id=self.workshop)
+        context = response.context
+        self.blocked_context(context["selected_conversation"])
+        context["readiness"].update(can_send=True, can_start_template=True)
+        markup = templates.get_template("whatsapp.html").render(context)
+        forms = RenderedForms(markup).forms
+        for form in forms:
+            if form["attributes"].get("action") in {"/dashboard/whatsapp/reply", "/dashboard/whatsapp/start-template"}:
+                self.assertTrue(all("disabled" in button for button in form["buttons"]))
+        self.assertIn("Als nicht gesendet bestätigen und entsperren", markup)
+
+    def test_blocked_dashboard_modal_receives_recovery_fragment_and_lock(self):
+        from app.web import dashboard, templates
+        response = dashboard(self.request, workshop_id=self.workshop)
+        context = response.context
+        ticket = next(item for item in context["tickets"] if item["ticket_view_id"] == self.ticket)
+        self.blocked_context(ticket)
+        markup = templates.get_template("dashboard.html").render(context)
+        self.assertIn('data-message-dispatch-blocked="true"', markup)
+        self.assertIn('id="dispatchRecovery-' + self.ticket + '"', markup)
+        self.assertIn("/dashboard/whatsapp/messages/stale-message/resolve", markup)
 
 
 if __name__ == "__main__":

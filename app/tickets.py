@@ -783,6 +783,7 @@ def set_ticket_conversation_state(ticket_id: str, state: str, workshop_id: str |
 
 def finalize_ticket_message_delivery(
     ticket_id: str, message_id: str, status: str, workshop_id: str | None = None,
+    *, preserve_conversation_state: bool = False,
 ) -> dict[str, Any]:
     if status not in {"sent", "unknown", "failed"}:
         raise ValueError("Ungültiger abschließender Versandstatus")
@@ -801,6 +802,8 @@ def finalize_ticket_message_delivery(
             return ticket
         if note.get("delivery_status") == "sent":
             raise ValueError("Eine versandte Nachricht kann nicht nachträglich erneut abgeschlossen werden")
+        if note.get("delivery_status") == "failed":
+            raise ValueError("Ein fehlgeschlagener Versand bleibt abgeschlossen; ein neuer Versuch benötigt eine neue Nachrichtenkennung")
         note["delivery_status"] = status
         now = _now_iso()
         if status == "sent" and note["purpose"] == "workshop_answer":
@@ -815,7 +818,7 @@ def finalize_ticket_message_delivery(
                       now, wid, ticket_id))
         # Delivery completion never reopens waiting_for_customer: an inbound reply
         # may already have advanced the conversation while the HTTP call ran.
-        if (status == "sent" and note["purpose"] == "workshop_answer"
+        if (not preserve_conversation_state and status == "sent" and note["purpose"] == "workshop_answer"
                 and ticket["conversation_state"] == "waiting_for_workshop" and not open_customer_questions(ticket)):
             _set_ticket_state_in_transaction(conn, wid, ticket_id, "workshop_active")
         return _row_to_ticket_dict(conn.execute("SELECT * FROM tickets WHERE workshop_id = ? AND ticket_id = ?",

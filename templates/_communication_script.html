@@ -6,6 +6,8 @@
       const messageId = form.querySelector("[data-client-message-id]");
       const text = form.querySelector("textarea");
       let draftKey = "";
+      let retryAfterFailure = false;
+      let dispatchBlocked = false;
       function freshId() {
         return window.crypto && typeof window.crypto.randomUUID === "function" ? window.crypto.randomUUID() : "";
       }
@@ -30,16 +32,32 @@
         } catch (_) {}
       }
       function changed() {
-        messageId.value = freshId();
+        if (!dispatchBlocked) messageId.value = freshId();
         refreshPurpose();
         saveDraft();
       }
       purpose.addEventListener("change", changed);
       target.addEventListener("change", changed);
       text.addEventListener("input", changed);
+      form.addEventListener("submit", (event) => {
+        if (event.defaultPrevented) return;
+        if (dispatchBlocked) {
+          event.preventDefault();
+          return;
+        }
+        const alternativeAction = event.submitter && event.submitter.getAttribute("formaction");
+        if (alternativeAction) return;
+        if (retryAfterFailure) {
+          messageId.value = freshId();
+          retryAfterFailure = false;
+          saveDraft();
+        }
+      });
       return {
-        configure(questions, key, clearDraft) {
+        configure(questions, key, clearDraft, options = {}) {
           draftKey = key + ":communication";
+          retryAfterFailure = options.resultStatus === "failed";
+          dispatchBlocked = Boolean(options.dispatchBlocked) || ["unknown", "pending", "sending"].includes(options.resultStatus);
           const answerOption = purpose.querySelector("option[value='workshop_answer']");
           answerOption.disabled = questions.length === 0;
           target.replaceChildren(new Option("Kundenfrage auswählen …", ""));
@@ -68,6 +86,79 @@
           } catch (_) {}
           refreshPurpose();
           saveDraft();
+        }
+      };
+    }
+
+    function installDispatchRecovery(root) {
+      root.addEventListener("submit", (event) => {
+        const form = event.target;
+        if (!form.matches("form[data-dispatch-resolution]") || event.defaultPrevented) return;
+        const confirmation = event.submitter && event.submitter.dataset.resolutionConfirm;
+        if (!confirmation || !window.confirm(confirmation)) event.preventDefault();
+      });
+    }
+
+    function simpleDispatchAttempt(form) {
+      const messageId = form.querySelector("input[name='message_id']");
+      const phone = form.querySelector("input[name='customer_phone']");
+      const text = form.querySelector("textarea");
+      let draftKey = "";
+      let retryAfterFailure = false;
+      let uncertainResult = false;
+      let action = "";
+      function freshId() {
+        return window.crypto && typeof window.crypto.randomUUID === "function" ? window.crypto.randomUUID() : "";
+      }
+      function blocked() {
+        return uncertainResult || form.dataset.dispatchBlocked === "true";
+      }
+      function save() {
+        if (!draftKey) return;
+        try {
+          window.sessionStorage.setItem(draftKey, JSON.stringify({
+            message_id: messageId.value, phone: phone ? phone.value : "",
+            text: text ? text.value : "", action
+          }));
+        } catch (_) {}
+      }
+      function changed() {
+        if (!blocked()) messageId.value = freshId();
+        save();
+      }
+      if (phone) phone.addEventListener("input", changed);
+      if (text) text.addEventListener("input", changed);
+      form.addEventListener("submit", (event) => {
+        if (event.defaultPrevented) return;
+        if (blocked()) { event.preventDefault(); return; }
+        const nextAction = (event.submitter && event.submitter.getAttribute("formaction")) || form.getAttribute("action") || "";
+        if (retryAfterFailure || (action && nextAction !== action)) messageId.value = freshId();
+        retryAfterFailure = false;
+        action = nextAction;
+        save();
+      });
+      return {
+        configure(key, options = {}) {
+          draftKey = key + ":attempt";
+          retryAfterFailure = options.resultStatus === "failed";
+          uncertainResult = ["unknown", "pending", "sending"].includes(options.resultStatus);
+          messageId.value = freshId();
+          action = "";
+          try {
+            if (["sent", "template_sent", "success"].includes(options.resultStatus)) window.sessionStorage.removeItem(draftKey);
+            const saved = JSON.parse(window.sessionStorage.getItem(draftKey) || "null");
+            if (saved) {
+              if (options.restoreFields) {
+                if (phone) phone.value = saved.phone || "";
+                if (text) text.value = saved.text || "";
+              }
+              if ((!phone || saved.phone === phone.value) && (!text || saved.text === text.value)) {
+                messageId.value = saved.message_id || freshId();
+                action = saved.action || "";
+              }
+            }
+          } catch (_) {}
+          save();
         }
       };
     }

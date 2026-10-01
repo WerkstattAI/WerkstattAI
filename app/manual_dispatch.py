@@ -4,13 +4,13 @@ from __future__ import annotations
 import json
 import re
 import uuid
+from datetime import datetime, timezone
 from typing import Callable
 
 from app.db import atomic_database, get_whatsapp_conversation_control, set_whatsapp_conversation_control
-from app.tickets import (add_ticket_note, find_ticket_by_id, finalize_ticket_message_delivery,
-                         set_ticket_conversation_state, validate_workshop_message)
+from app.tickets import add_ticket_note, find_ticket_by_id, validate_workshop_message
 from app.whatsapp import (WhatsAppSendResult, _lock_conversation, save_whatsapp_message,
-                          whatsapp_customer_service_window_for_phone)
+                          whatsapp_customer_service_window_for_phone, finalize_whatsapp_dispatch)
 
 
 def send_workshop_message(*, workshop_id: str, customer_phone: str, phone_number_id: str,
@@ -37,7 +37,7 @@ def send_workshop_message(*, workshop_id: str, customer_phone: str, phone_number
                     (reply_to_message_id and metadata.get("reply_to_message_id") != reply_to_message_id)):
                 raise ValueError("Diese Nachrichtenkennung wurde bereits für einen anderen Inhalt verwendet.")
             return WhatsAppSendResult(old["status"] in {"sent", "delivered", "read", "sent_local"},
-                                      metadata.get("meta_status_code"), old["wa_message_id"],
+                                      metadata.get("meta_status_code") or (409 if old["status"] == "failed" else None), old["wa_message_id"],
                                       metadata.get("meta_response") or {},
                                       metadata.get("meta_error") or "Bereits reservierter Versand; nicht erneut gesendet.")
         if conn.execute("SELECT 1 FROM whatsapp_messages WHERE workshop_id = ? AND customer_phone = ? "
@@ -63,32 +63,33 @@ def send_workshop_message(*, workshop_id: str, customer_phone: str, phone_number
             set_whatsapp_conversation_control(workshop_id=workshop_id, customer_phone=customer_phone,
                                               conversation_state="waiting_for_customer", pending_workshop_question_id=mid)
         claim = get_whatsapp_conversation_control(workshop_id=workshop_id, customer_phone=customer_phone)
+        staged_ticket = find_ticket_by_id(ticket_id, workshop_id) if ticket_id else None
+        last_inbound_id = conn.execute("""SELECT MAX(id) AS latest_id FROM whatsapp_messages
+                                         WHERE workshop_id = ? AND customer_phone = ? AND direction = 'inbound'""",
+                                      (workshop_id, customer_phone)).fetchone()["latest_id"]
+        started_at = datetime.now(timezone.utc).isoformat()
         metadata = {"source": source, "user": user, "message_id": mid, "sender_role": "workshop", "purpose": purpose,
-                    "requires_human_action": False, "reply_to_message_id": target, "resolved_at": None}
+                    "requires_human_action": False, "reply_to_message_id": target, "resolved_at": None,
+                    "dispatch_claim": {"previous_control": previous, "previous_ticket_state": previous_ticket_state,
+                                       "control_revision": claim["revision"], "active_ticket_id": claim.get("active_ticket_id"),
+                                       "last_inbound_id": last_inbound_id,
+                                       "ticket_last_message_id": staged_ticket["notes"][-1]["message_id"] if staged_ticket and staged_ticket["notes"] else None}}
         metadata.update(template_metadata or {})
         save_whatsapp_message(workshop_id=workshop_id, customer_phone=customer_phone, phone_number_id=phone_number_id,
                               direction="outbound", text=text, ticket_id=ticket_id, status="unknown", message_id=mid,
-                              dispatch_state="sending", payload=metadata, message_type=message_type)
+                              dispatch_state="sending", dispatch_started_at=started_at, control_revision=claim["revision"],
+                              payload=metadata, message_type=message_type)
     try:
         result = send()
     except Exception as exc:
         result = WhatsAppSendResult(False, None, None, {}, str(exc))
     status = "sent" if result.ok else ("failed" if result.status_code is not None else "unknown")
-    with atomic_database() as conn:
-        _lock_conversation(conn, workshop_id, customer_phone)
-        current = get_whatsapp_conversation_control(workshop_id=workshop_id, customer_phone=customer_phone)
-        if ticket:
-            finalize_ticket_message_delivery(ticket_id, mid, status, workshop_id=workshop_id)
-        metadata.update(meta_status_code=result.status_code, meta_response=result.payload, meta_error=result.error)
-        conn.execute("UPDATE whatsapp_messages SET wa_message_id = ?, status = ?, dispatch_state = 'complete', payload_json = ? "
-                     "WHERE workshop_id = ? AND message_id = ?",
-                     (result.wa_message_id, status, json.dumps(metadata, ensure_ascii=False), workshop_id, mid))
-        # A failure must not undo a newer employee action or a customer response.
-        if status == "failed" and current["revision"] == claim["revision"]:
-            if ticket and previous_ticket_state:
-                set_ticket_conversation_state(ticket_id, previous_ticket_state, workshop_id)
-            set_whatsapp_conversation_control(workshop_id=workshop_id, customer_phone=customer_phone,
-                                              conversation_state=previous["conversation_state"],
-                                              active_ticket_id=previous.get("active_ticket_id"),
-                                              pending_workshop_question_id=previous.get("pending_workshop_question_id"))
-    return result
+    completed = finalize_whatsapp_dispatch(
+        workshop_id=workshop_id, message_id=mid, status=status, wa_message_id=result.wa_message_id,
+        expected_dispatch_started_at=started_at,
+        metadata_updates={"meta_status_code": result.status_code, "meta_response": result.payload, "meta_error": result.error},
+    )
+    stored = completed["payload"]
+    return WhatsAppSendResult(completed["status"] in {"sent", "delivered", "read", "sent_local"},
+                              stored.get("meta_status_code") or (409 if completed["status"] == "failed" else None), completed["wa_message_id"],
+                              stored.get("meta_response") or {}, stored.get("meta_error"))

@@ -4,6 +4,7 @@ import {test} from "node:test";
 import vm from "node:vm";
 
 const source = readFileSync(new URL("../templates/_communication_script.html", import.meta.url), "utf8");
+let generatedIds = 0;
 
 class Field {
   constructor(value = "") { this.value = value; this.listeners = new Map(); this.options = []; }
@@ -25,14 +26,20 @@ function fixture(storage = new Map(), text = "Nachricht an den Kunden") {
   const fields = {"[data-message-purpose]": purpose, "[data-reply-target]": target,
     "[data-reply-target-field]": targetField, "[data-purpose-help]": help,
     "[data-client-message-id]": messageId, textarea};
-  let sequence = 0;
   const factory = vm.runInNewContext(source + "\ncommunicationComposer", {
-    window: {crypto: {randomUUID: () => `id-${storage.size}-${++sequence}`}, sessionStorage: {
+    window: {crypto: {randomUUID: () => `id-${++generatedIds}`}, sessionStorage: {
       setItem: (key, value) => storage.set(key, value), getItem: key => storage.get(key), removeItem: key => storage.delete(key)
     }}, Option: class {constructor(text, value) {this.text = text; this.value = value;}},
   });
-  const controller = factory({querySelector: selector => fields[selector]});
-  return {purpose, target, targetField, help, messageId, textarea, controller, storage};
+  const events = new Map();
+  const controller = factory({querySelector: selector => fields[selector], addEventListener: (name, callback) => events.set(name, callback)});
+  function submit(action = null, prevented = false) {
+    const event = {defaultPrevented: prevented, submitter: {getAttribute: () => action},
+      preventDefault() { this.defaultPrevented = true; }};
+    events.get("submit")(event);
+    return event;
+  }
+  return {purpose, target, targetField, help, messageId, textarea, controller, storage, submit};
 }
 
 const questions = [{message_id: "customer-one", text: "Wie lange dauert die Reparatur?"},
@@ -109,4 +116,137 @@ test("confirmed successful sends clear prior purpose and reply-target metadata",
   form.controller.configure([], "ticket:one", true);
   assert.equal(form.purpose.value, "workshop_notification");
   assert.equal(form.target.value, "");
+});
+
+test("failed retry preserves text, purpose and question target, renewing ID only on deliberate submit", () => {
+  const first = fixture();
+  first.controller.configure(questions, "ticket:failed", false);
+  first.target.value = "customer-two";
+  first.target.change();
+  const failedId = first.messageId.value;
+  const retry = fixture(first.storage);
+  retry.controller.configure(questions, "ticket:failed", false, {resultStatus: "failed"});
+  assert.equal(retry.messageId.value, failedId, "loading must not create a new attempt");
+  assert.equal(retry.textarea.value, first.textarea.value);
+  assert.equal(retry.purpose.value, "workshop_answer");
+  assert.equal(retry.target.value, "customer-two");
+  retry.submit();
+  assert.notEqual(retry.messageId.value, failedId);
+  const newId = retry.messageId.value;
+  retry.submit();
+  assert.equal(retry.messageId.value, newId, "a repeated submit uses the same new attempt");
+});
+
+test("opening external WhatsApp or cancelling submission does not consume the failed retry", () => {
+  const first = fixture();
+  first.controller.configure(questions.slice(0, 1), "ticket:failed", false);
+  const failedId = first.messageId.value;
+  const retry = fixture(first.storage);
+  retry.controller.configure(questions.slice(0, 1), "ticket:failed", false, {resultStatus: "failed"});
+  retry.submit("/dashboard/whatsapp/open-manual");
+  retry.submit(null, true);
+  assert.equal(retry.messageId.value, failedId);
+  retry.submit();
+  assert.notEqual(retry.messageId.value, failedId);
+});
+
+test("unknown, pending and sending keep identity and block submission even after text edits", () => {
+  for (const status of ["unknown", "pending", "sending"]) {
+    const first = fixture();
+    first.controller.configure(questions.slice(0, 1), "ticket:uncertain", false);
+    const originalId = first.messageId.value;
+    const retry = fixture(first.storage);
+    retry.controller.configure(questions.slice(0, 1), "ticket:uncertain", false, {resultStatus: status});
+    retry.textarea.value = "Geänderter Entwurf während der Klärung";
+    retry.textarea.change("input");
+    assert.equal(retry.messageId.value, originalId);
+    assert.equal(retry.submit().defaultPrevented, true);
+    assert.equal(retry.messageId.value, originalId);
+  }
+});
+
+test("a server-side conversation lock takes precedence over a failed retry redirect", () => {
+  const form = fixture();
+  form.controller.configure(questions, "ticket:blocked", false, {resultStatus: "failed", dispatchBlocked: true});
+  const originalId = form.messageId.value;
+  assert.equal(form.submit().defaultPrevented, true);
+  assert.equal(form.messageId.value, originalId);
+});
+
+function simpleFixture(storage = new Map()) {
+  const messageId = new Field();
+  const phone = new Field("491701234567");
+  const textarea = new Field("Unveränderter Testtext");
+  const fields = {"input[name='message_id']": messageId, "input[name='customer_phone']": phone, textarea};
+  const events = new Map();
+  const form = {dataset: {}, querySelector: selector => fields[selector], getAttribute: () => "/dashboard/whatsapp/test",
+    addEventListener: (name, callback) => events.set(name, callback)};
+  const factory = vm.runInNewContext(source + "\nsimpleDispatchAttempt", {window: {
+    crypto: {randomUUID: () => `simple-${++generatedIds}`}, sessionStorage: {
+      setItem: (key, value) => storage.set(key, value), getItem: key => storage.get(key), removeItem: key => storage.delete(key)
+    }
+  }});
+  const controller = factory(form);
+  function submit(action = null) {
+    const event = {defaultPrevented: false, submitter: {getAttribute: () => action}, preventDefault() {this.defaultPrevented = true;}};
+    events.get("submit")(event);
+    return event;
+  }
+  return {form, messageId, phone, textarea, storage, controller, submit};
+}
+
+test("diagnostic and template failed attempts preserve their draft and obtain a new ID on click", () => {
+  for (const action of [null, "/dashboard/whatsapp/start-template"]) {
+    const first = simpleFixture();
+    first.controller.configure("test:failed");
+    first.submit(action);
+    const failedId = first.messageId.value;
+    const retry = simpleFixture(first.storage);
+    retry.phone.value = "";
+    retry.textarea.value = "";
+    retry.controller.configure("test:failed", {resultStatus: "failed", restoreFields: true});
+    assert.equal(retry.messageId.value, failedId);
+    assert.equal(retry.phone.value, first.phone.value);
+    assert.equal(retry.textarea.value, first.textarea.value);
+    retry.submit(action);
+    assert.notEqual(retry.messageId.value, failedId);
+    const retryId = retry.messageId.value;
+    retry.submit(action);
+    assert.equal(retry.messageId.value, retryId);
+  }
+});
+
+test("diagnostic and template unknown attempts stay blocked with the original ID", () => {
+  const first = simpleFixture();
+  first.controller.configure("test:unknown");
+  first.submit();
+  const originalId = first.messageId.value;
+  const revisit = simpleFixture(first.storage);
+  revisit.controller.configure("test:unknown", {resultStatus: "unknown"});
+  revisit.textarea.value = "Neuer Entwurf";
+  revisit.textarea.change("input");
+  assert.equal(revisit.submit("/dashboard/whatsapp/start-template").defaultPrevented, true);
+  assert.equal(revisit.messageId.value, originalId);
+});
+
+test("a blocked test recipient prevents both diagnostic text and template submits", () => {
+  const form = simpleFixture();
+  form.controller.configure("test:blocked");
+  form.form.dataset.dispatchBlocked = "true";
+  assert.equal(form.submit().defaultPrevented, true);
+  assert.equal(form.submit("/dashboard/whatsapp/start-template").defaultPrevented, true);
+});
+
+test("manual recovery requires its explicit confirmation dialog including dynamically inserted forms", () => {
+  for (const accepted of [false, true]) {
+    const callbacks = new Map();
+    const prompts = [];
+    const install = vm.runInNewContext(source + "\ninstallDispatchRecovery", {window: {confirm: text => {prompts.push(text); return accepted;}}});
+    install({addEventListener: (event, callback) => callbacks.set(event, callback)});
+    const event = {target: {matches: () => true}, submitter: {dataset: {resolutionConfirm: "Meta geprüft?"}},
+      defaultPrevented: false, preventDefault() {this.defaultPrevented = true;}};
+    callbacks.get("submit")(event);
+    assert.equal(event.defaultPrevented, !accepted);
+    assert.deepEqual(prompts, ["Meta geprüft?"]);
+  }
 });

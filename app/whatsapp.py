@@ -382,6 +382,7 @@ def save_whatsapp_message(
     processing_state: str = "complete",
     reply_to_wa_message_id: str | None = None,
     dispatch_state: str = "complete",
+    dispatch_started_at: str | None = None,
     control_revision: int | None = None,
     message_id: str | None = None,
 ) -> bool:
@@ -438,10 +439,11 @@ def save_whatsapp_message(
                 processing_state,
                 reply_to_wa_message_id,
                 dispatch_state,
+                dispatch_started_at,
                 control_revision,
                 message_id
             )
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
             """,
             (
                 wid,
@@ -459,6 +461,7 @@ def save_whatsapp_message(
                 processing_state,
                 reply_to_wa_message_id,
                 dispatch_state,
+                dispatch_started_at or (datetime.now(timezone.utc).isoformat() if dispatch_state == "sending" else None),
                 control_revision,
                 semantic_id,
             ),
@@ -482,6 +485,118 @@ def _lock_conversation(conn: Any, workshop_id: str, customer_phone: str) -> dict
         WHERE workshop_id = ? AND customer_phone = ?
     """ + suffix, (workshop_id, customer_phone)).fetchone()
     return dict(row)
+
+
+def _dispatch_payload(row: Any) -> dict[str, Any]:
+    try:
+        payload = json.loads(row["payload_json"] or "{}")
+        return payload if isinstance(payload, dict) else {}
+    except (TypeError, ValueError):
+        return {}
+
+
+def _dispatch_result(row: Any, *, finalized: bool = False) -> dict[str, Any]:
+    return {"finalized": finalized, "status": row["status"], "dispatch_state": row["dispatch_state"],
+            "wa_message_id": row["wa_message_id"], "message_id": row["message_id"],
+            "workshop_id": row["workshop_id"], "customer_phone": row["customer_phone"], "ticket_id": row["ticket_id"],
+            "dispatch_started_at": row["dispatch_started_at"], "payload": _dispatch_payload(row)}
+
+
+def _dispatch_claim_is_current(conn: Any, row: dict[str, Any], payload: dict[str, Any]) -> bool:
+    """Revision plus message checkpoints detect activity even without a state change."""
+    from app.tickets import find_ticket_by_id
+    claim = payload.get("dispatch_claim")
+    if not isinstance(claim, dict) or not isinstance(claim.get("previous_control"), dict):
+        return False
+    current = get_whatsapp_conversation_control(workshop_id=row["workshop_id"], customer_phone=row["customer_phone"])
+    if (current["revision"] != claim.get("control_revision")
+            or current.get("active_ticket_id") != claim.get("active_ticket_id")
+            or "last_inbound_id" not in claim):
+        return False
+    latest_inbound = conn.execute("""SELECT MAX(id) AS latest_id FROM whatsapp_messages
+                                    WHERE workshop_id = ? AND customer_phone = ? AND direction = 'inbound'""",
+                                 (row["workshop_id"], row["customer_phone"])).fetchone()["latest_id"]
+    if latest_inbound != claim["last_inbound_id"]:
+        return False
+    if row["ticket_id"]:
+        ticket = find_ticket_by_id(row["ticket_id"], row["workshop_id"])
+        last_note_id = ticket["notes"][-1]["message_id"] if ticket and ticket["notes"] else None
+        if not ticket or last_note_id != claim.get("ticket_last_message_id"):
+            return False
+    return True
+
+
+def _restore_failed_dispatch(conn: Any, row: dict[str, Any], payload: dict[str, Any]) -> None:
+    """Restore only a recorded claim whose control and customer activity are unchanged."""
+    from app.db import set_whatsapp_conversation_control
+    from app.tickets import set_ticket_conversation_state
+
+    if not _dispatch_claim_is_current(conn, row, payload):
+        return
+    claim = payload["dispatch_claim"]
+    previous = claim["previous_control"]
+    if row["ticket_id"]:
+        if claim.get("previous_ticket_state"):
+            set_ticket_conversation_state(row["ticket_id"], claim["previous_ticket_state"], row["workshop_id"])
+    set_whatsapp_conversation_control(
+        workshop_id=row["workshop_id"], customer_phone=row["customer_phone"],
+        conversation_state=previous["conversation_state"], active_ticket_id=previous.get("active_ticket_id"),
+        pending_workshop_question_id=previous.get("pending_workshop_question_id"),
+    )
+
+
+def finalize_whatsapp_dispatch(
+    *, workshop_id: str, message_id: str, status: str, wa_message_id: str | None = None,
+    metadata_updates: dict[str, Any] | None = None, retry: bool = False,
+    expected_dispatch_started_at: str | None = None,
+) -> dict[str, Any]:
+    """One compare-and-set boundary for HTTP, explicit recovery and Meta receipts.
+
+    Only a still-owned sending claim may change message/ticket/control state.
+    Unknown outcomes stay reserved, never becoming permission to send again.
+    """
+    if status not in {"sent", "sent_local", "delivered", "read", "failed", "unknown"}:
+        raise ValueError("Ungültiger Versandabschluss")
+    if retry and status != "failed":
+        raise ValueError("Nur ein eindeutiger Transportfehler kann erneut eingeplant werden")
+    with atomic_database() as conn:
+        from app.db import lock_communication_scope
+        lock_communication_scope(conn, workshop_id)
+        row = conn.execute("""SELECT * FROM whatsapp_messages
+                              WHERE workshop_id = ? AND message_id = ? AND direction = 'outbound'""",
+                           (workshop_id, message_id)).fetchone()
+        if not row:
+            raise KeyError("Versandversuch wurde nicht gefunden")
+        _lock_conversation(conn, workshop_id, row["customer_phone"])
+        row = dict(row)
+        if (row["dispatch_state"] != "sending" or row["status"] in {"sent", "sent_local", "delivered", "read", "failed"}
+                or (expected_dispatch_started_at is not None and row["dispatch_started_at"] != expected_dispatch_started_at)):
+            return _dispatch_result(row)
+        payload = _dispatch_payload(row)
+        payload.update(metadata_updates or {})
+        dispatch_state = "pending" if retry else "sending" if status == "unknown" else "complete"
+        provider_id = str(wa_message_id or row["wa_message_id"] or "").strip() or None
+        timestamp_clause = "dispatch_started_at IS NULL" if row["dispatch_started_at"] is None else "dispatch_started_at = ?"
+        params = [status, dispatch_state, provider_id, json.dumps(payload, ensure_ascii=False), workshop_id, message_id]
+        if row["dispatch_started_at"] is not None:
+            params.append(row["dispatch_started_at"])
+        changed = conn.execute("""UPDATE whatsapp_messages SET status = ?, dispatch_state = ?, wa_message_id = ?, payload_json = ?
+                                  WHERE workshop_id = ? AND message_id = ? AND direction = 'outbound'
+                                    AND dispatch_state = 'sending' AND """ + timestamp_clause, params)
+        if changed.rowcount != 1:
+            current = conn.execute("SELECT * FROM whatsapp_messages WHERE workshop_id = ? AND message_id = ?",
+                                   (workshop_id, message_id)).fetchone()
+            return _dispatch_result(current)
+        if row["ticket_id"] and payload.get("sender_role") == "workshop":
+            from app.tickets import finalize_ticket_message_delivery
+            delivery_status = "sent" if status in {"sent", "sent_local", "delivered", "read"} else status
+            finalize_ticket_message_delivery(row["ticket_id"], message_id, delivery_status, workshop_id=workshop_id,
+                                              preserve_conversation_state=not _dispatch_claim_is_current(conn, row, payload))
+        if status == "failed" and not retry and payload.get("sender_role") == "workshop":
+            _restore_failed_dispatch(conn, row, payload)
+        current = conn.execute("SELECT * FROM whatsapp_messages WHERE workshop_id = ? AND message_id = ?",
+                               (workshop_id, message_id)).fetchone()
+        return _dispatch_result(current, finalized=status != "unknown")
 
 
 def prepare_whatsapp_inbound(*, workshop_id: str, message: WhatsAppInboundMessage, process_message: Any) -> dict[str, Any]:
@@ -634,8 +749,10 @@ def deliver_prepared_whatsapp_reply(*, workshop_id: str, customer_phone: str,
             return {"status": "failed", "wa_message_id": None, "retry": False, "suppressed_reason": reason}
         # A process crash after this commit is an uncertain send, not permission
         # to send twice. The inbox exposes that uncertainty for manual handling.
-        conn.execute("UPDATE whatsapp_messages SET dispatch_state = 'sending', status = 'unknown' WHERE id = ?",
-                     (reply["id"],))
+        started_at = datetime.now(timezone.utc).isoformat()
+        conn.execute("UPDATE whatsapp_messages SET dispatch_state = 'sending', status = 'unknown', dispatch_started_at = ? "
+                     "WHERE workshop_id = ? AND id = ? AND dispatch_state = 'pending'",
+                     (started_at, workshop_id, reply["id"]))
 
     try:
         send_result = send_message(reply)
@@ -647,18 +764,16 @@ def deliver_prepared_whatsapp_reply(*, workshop_id: str, customer_phone: str,
     status = "sent" if send_result.ok else ("failed" if send_result.status_code is not None else "unknown")
     if send_result.payload.get("local_only"):
         status = "sent_local"
-    with atomic_database() as conn:
-        payload = json.loads(reply["payload_json"] or "{}")
-        payload.update({"local_only": bool(send_result.payload.get("local_only")),
-                        "meta_status_code": send_result.status_code, "meta_response": send_result.payload,
-                        "meta_error": send_result.error})
-        conn.execute("""
-            UPDATE whatsapp_messages SET status = ?, dispatch_state = ?, wa_message_id = ?, payload_json = ?
-            WHERE id = ?
-        """, (status, "pending" if retry else "complete", send_result.wa_message_id,
-              json.dumps(payload, ensure_ascii=False), reply["id"]))
-    return {"status": status, "wa_message_id": send_result.wa_message_id,
-            "meta_status_code": send_result.status_code, "meta_error": send_result.error, "retry": retry}
+    completed = finalize_whatsapp_dispatch(
+        workshop_id=workshop_id, message_id=reply["message_id"], status=status, retry=retry,
+        wa_message_id=send_result.wa_message_id, expected_dispatch_started_at=started_at,
+        metadata_updates={"local_only": bool(send_result.payload.get("local_only")),
+                          "meta_status_code": send_result.status_code, "meta_response": send_result.payload,
+                          "meta_error": send_result.error},
+    )
+    return {"status": completed["status"], "wa_message_id": completed["wa_message_id"],
+            "meta_status_code": completed["payload"].get("meta_status_code"),
+            "meta_error": completed["payload"].get("meta_error"), "retry": completed["dispatch_state"] == "pending"}
 
 
 def update_whatsapp_message_status(
@@ -669,72 +784,51 @@ def update_whatsapp_message_status(
     payload: dict[str, Any] | None = None,
 ) -> bool:
     wid = str(workshop_id or "").strip()
-    message_id = str(wa_message_id or "").strip()
+    provider_id = str(wa_message_id or "").strip()
     normalized_status = str(status or "").strip().lower()
-
-    if not wid or not message_id or normalized_status not in MESSAGE_STATUSES:
+    if not wid or not provider_id or normalized_status not in MESSAGE_STATUSES:
         return False
-
     with atomic_database() as conn:
         from app.db import lock_communication_scope
         lock_communication_scope(conn, wid)
-        row = conn.execute(
-            """
-            SELECT payload_json, ticket_id, message_id
-            FROM whatsapp_messages
-            WHERE workshop_id = ?
-              AND direction = 'outbound'
-              AND wa_message_id = ?
-            LIMIT 1
-            """,
-            (wid, message_id),
-        ).fetchone()
+        row = conn.execute("""SELECT * FROM whatsapp_messages
+                              WHERE workshop_id = ? AND direction = 'outbound' AND wa_message_id = ? LIMIT 1""",
+                           (wid, provider_id)).fetchone()
         if not row:
             return False
-
-        current_payload: dict[str, Any] = {}
-        try:
-            parsed = json.loads(row["payload_json"] or "{}")
-            if isinstance(parsed, dict):
-                current_payload = parsed
-        except json.JSONDecodeError:
-            current_payload = {}
-
+        row = dict(row)
+        current_payload = _dispatch_payload(row)
         status_events = current_payload.get("status_events")
         if not isinstance(status_events, list):
             status_events = []
-        status_events.append(payload or {})
+        event = payload or {"status": normalized_status}
+        if event not in status_events:
+            status_events.append(event)
         current_payload["status_events"] = status_events[-20:]
         if normalized_status == "failed":
             delivery_error = _meta_status_error(payload)
             if delivery_error:
                 current_payload["delivery_error"] = delivery_error
-
-        conn.execute(
-            """
-            UPDATE whatsapp_messages
-            SET status = ?,
-                payload_json = ?
-            WHERE workshop_id = ?
-              AND direction = 'outbound'
-              AND wa_message_id = ?
-            """,
-            (
-                normalized_status,
-                json.dumps(current_payload, ensure_ascii=False),
-                wid,
-                message_id,
-            ),
-        )
-        conn.commit()
-
-        if normalized_status in {"sent", "delivered", "read"} and row["ticket_id"] and current_payload.get("sender_role") == "workshop":
-            from app.tickets import find_ticket_by_id, finalize_ticket_message_delivery
-            ticket = find_ticket_by_id(row["ticket_id"], wid)
-            note = next((n for n in (ticket or {}).get("notes", []) if n.get("message_id") == row["message_id"]), None)
-            if note:
-                finalize_ticket_message_delivery(row["ticket_id"], row["message_id"], "sent", workshop_id=wid)
-
+        if row["dispatch_state"] == "sending" and normalized_status in {"sent", "delivered", "read", "failed"}:
+            finalize_whatsapp_dispatch(workshop_id=wid, message_id=row["message_id"], status=normalized_status,
+                                       wa_message_id=provider_id, metadata_updates=current_payload,
+                                       expected_dispatch_started_at=row["dispatch_started_at"])
+            return True
+        # Finalization cannot run again. A receipt may only advance an already
+        # successful delivery; terminal failed/manual decisions remain immutable.
+        next_status = row["status"]
+        rank = {"sent_local": 0, "sent": 1, "delivered": 2, "read": 3}
+        if (row["dispatch_state"] == "complete" and row["status"] in rank
+                and normalized_status in rank and rank[normalized_status] > rank[row["status"]]):
+            next_status = normalized_status
+        elif (row["dispatch_state"] == "complete" and row["status"] == "sent"
+                and normalized_status == "failed" and not current_payload.get("manual_resolution")):
+            # Meta may reject delivery after accepting the HTTP request. Keep
+            # that existing transport-error display, without replaying business effects.
+            next_status = "failed"
+        conn.execute("""UPDATE whatsapp_messages SET status = ?, payload_json = ?
+                        WHERE workshop_id = ? AND message_id = ? AND direction = 'outbound'""",
+                     (next_status, json.dumps(current_payload, ensure_ascii=False), wid, row["message_id"]))
     return True
 
 

@@ -2076,7 +2076,7 @@
                   <input type="hidden" name="ticket_id" value="{{ ticket.ticket_view_id }}" />
                   <input type="hidden" name="context" value="ticket" />
                   {% if ticket.whatsapp_mode == "manual" %}
-                    <button class="conversation-mode-button assistant" type="submit" name="mode" value="assistant">Assistent übernimmt</button>
+                    <button class="conversation-mode-button assistant" type="submit" name="mode" value="assistant" {% if ticket.dispatch_blocked %}disabled title="Zuerst den offenen Versand klären"{% endif %}>Assistent übernimmt</button>
                   {% else %}
                     <button class="conversation-mode-button" type="submit" name="mode" value="manual">Werkstatt übernimmt</button>
                   {% endif %}
@@ -2093,12 +2093,13 @@
                   {% if ticket.conversation_state == "assistant_active" %}
                     <button class="conversation-mode-button" type="submit" name="state" value="workshop_active">Werkstatt übernimmt</button>
                   {% else %}
-                    <button class="conversation-mode-button assistant" type="submit" name="state" value="assistant_active">Assistent übernimmt</button>
+                    <button class="conversation-mode-button assistant" type="submit" name="state" value="assistant_active" {% if ticket.dispatch_blocked %}disabled title="Zuerst den offenen Versand klären"{% endif %}>Assistent übernimmt</button>
                   {% endif %}
                 </form>
               </div>
             {% endif %}
 
+            {{ communication.dispatch_recovery(ticket.dispatch_blocked, ticket.stale_dispatches|default([]), workshop_id, ticket.ticket_view_id, ticket.whatsapp_phone, 'ticket') }}
             <form class="note-form customer-reply-form" method="post" action="/dashboard/ticket/{{ ticket.ticket_view_id }}/notes">
               <input type="hidden" name="workshop_id" value="{{ workshop_id }}" />
               <input type="hidden" name="note_type" value="customer_reply">
@@ -2115,9 +2116,13 @@
                 <div class="note-submit">
                   <button
                     type="submit"
-                    {% if (ticket.has_whatsapp_conversation or ticket.source == 'whatsapp') and (not whatsapp_readiness.can_send or not ticket.whatsapp_phone or not ticket.service_window_open) %}disabled{% endif %}
+                    {% if ticket.dispatch_blocked or ((ticket.has_whatsapp_conversation or ticket.source == 'whatsapp') and (not whatsapp_readiness.can_send or not ticket.whatsapp_phone or not ticket.service_window_open)) %}disabled{% endif %}
                   >
-                    {% if ticket.has_whatsapp_conversation or ticket.source == "whatsapp" %}
+                    {% if ticket.dispatch_blocked %}
+                      Zuerst Versand klären
+                    {% elif reply_status == 'failed' %}
+                      Erneut senden
+                    {% elif ticket.has_whatsapp_conversation or ticket.source == "whatsapp" %}
                       Über WhatsApp senden
                     {% elif ticket.source == "web_chat" %}
                       Für Web-Chat speichern
@@ -2137,13 +2142,14 @@
                   als Vorlage versendet und bleibt in diesem Browser als Entwurf erhalten. Erst
                   die Kundenantwort öffnet das 24-Stunden-Fenster.
                 </div>
-                <form class="guarded-send-form" method="post" action="/dashboard/whatsapp/start-template">
+                <form class="guarded-send-form" method="post" action="/dashboard/whatsapp/start-template" data-dispatch-blocked="{{ 'true' if ticket.dispatch_blocked else 'false' }}">
+                  <input type="hidden" name="message_id" value="" />
                   <input type="hidden" name="workshop_id" value="{{ workshop_id }}" />
                   <input type="hidden" name="customer_phone" value="{{ ticket.whatsapp_phone }}" />
                   <input type="hidden" name="ticket_id" value="{{ ticket.ticket_view_id }}" />
                   <input type="hidden" name="context" value="ticket" />
-                  <button class="template-start-button" type="submit" {% if not whatsapp_readiness.can_start_template %}disabled title="Startvorlage oder WhatsApp-Verbindung fehlt"{% endif %}>
-                    {% if whatsapp_readiness.can_start_template %}Startvorlage senden{% else %}Startvorlage einrichten{% endif %}
+                  <button class="template-start-button" type="submit" {% if ticket.dispatch_blocked or not whatsapp_readiness.can_start_template %}disabled title="{% if ticket.dispatch_blocked %}Zuerst den offenen Versand klären{% else %}Startvorlage oder WhatsApp-Verbindung fehlt{% endif %}"{% endif %}>
+                    {% if ticket.dispatch_blocked %}Zuerst Versand klären{% elif whatsapp_readiness.can_start_template %}{% if reply_status == 'failed' %}Startvorlage erneut senden{% else %}Startvorlage senden{% endif %}{% else %}Startvorlage einrichten{% endif %}
                   </button>
                 </form>
               </div>
@@ -2325,6 +2331,7 @@
 
   <script nonce="{{ request.state.csp_nonce }}">
     {% include '_communication_script.html' %}
+    installDispatchRecovery(document);
     document.querySelectorAll('form[data-confirm]').forEach(form => {
       form.addEventListener('submit', event => {
         if (!confirm(form.dataset.confirm)) event.preventDefault();
@@ -2354,12 +2361,19 @@
     if (ticketCommunicationForm) {
       communicationComposer(ticketCommunicationForm).configure(
         {{ ticket.open_customer_questions|default([])|tojson }}, ticketDraftKey,
-        ticketReplyStatus === "sent" || (ticketReplyStatus === "saved" && !ticketReplyUsesWhatsapp)
+        ticketReplyStatus === "sent" || (ticketReplyStatus === "saved" && !ticketReplyUsesWhatsapp),
+        {resultStatus: ticketReplyStatus, dispatchBlocked: {{ ticket.dispatch_blocked|default(false)|tojson }}}
       );
     }
 
+    document.querySelectorAll("form[action='/dashboard/whatsapp/start-template']").forEach((form) => {
+      simpleDispatchAttempt(form).configure(ticketDraftKey + ":template", {resultStatus: ticketReplyStatus});
+    });
+
     document.querySelectorAll(".customer-reply-form, .guarded-send-form").forEach((form) => {
       form.addEventListener("submit", (event) => {
+        if (event.defaultPrevented) return;
+        if (form.dataset.dispatchBlocked === "true") { event.preventDefault(); return; }
         const submitButton = event.submitter;
         if (!submitButton || submitButton.disabled) return;
         submitButton.disabled = true;

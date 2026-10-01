@@ -41,6 +41,36 @@
 </div>
 {% endmacro %}
 
+{% macro dispatch_recovery(blocked, stale_dispatches, workshop_id, ticket_id='', customer_phone='', context='inbox') %}
+{% if blocked %}
+<section class="dispatch-recovery" role="alert" aria-label="Versand klären">
+  <strong>{% if stale_dispatches %}Versandstatus unklar{% else %}Versand noch nicht abgeschlossen{% endif %}</strong>
+  {% if stale_dispatches %}
+  <p>Der Versandstatus ist unklar. Prüfen Sie den tatsächlichen Status bei Meta, bevor Sie fortfahren.</p>
+  {% else %}
+  <p>Für diese Unterhaltung läuft ein Versand oder sein Ergebnis ist unklar. Weitere Nachrichten bleiben bis zur Klärung gesperrt. Ein laufender Versand kann frühestens nach fünf Minuten manuell geklärt werden.</p>
+  {% endif %}
+  {% for dispatch in stale_dispatches %}
+  <div class="dispatch-recovery-item">
+    <div class="dispatch-recovery-meta">{{ dispatch.created_at_display or dispatch.created_at or '' }} · {{ purpose_label(dispatch.purpose) }}</div>
+    <div class="dispatch-recovery-text">{{ dispatch.text or 'Nachricht ohne Textvorschau' }}</div>
+    <form method="post" action="/dashboard/whatsapp/messages/{{ dispatch.message_id|urlencode }}/resolve" data-dispatch-resolution>
+      <input type="hidden" name="workshop_id" value="{{ workshop_id }}" />
+      <input type="hidden" name="ticket_id" value="{{ ticket_id or '' }}" />
+      <input type="hidden" name="customer_phone" value="{{ customer_phone or '' }}" />
+      <input type="hidden" name="context" value="{{ context }}" />
+      <label class="dispatch-confirmation"><input type="checkbox" name="confirmed" value="true" required /> Ich habe den tatsächlichen Versandstatus bei Meta geprüft.</label>
+      <div class="dispatch-resolution-actions">
+        <button type="submit" name="resolution" value="sent" data-resolution-confirm="Als gesendet bestätigen? Eine zugeordnete Kundenfrage wird dadurch als beantwortet markiert. Bestätigen Sie nur, wenn Sie den Versand bei Meta geprüft haben.">Als gesendet bestätigen</button>
+        <button type="submit" name="resolution" value="failed" data-resolution-confirm="Als nicht gesendet bestätigen und entsperren? Bestätigen Sie nur, wenn Sie bei Meta geprüft haben, dass die Nachricht nicht gesendet wurde. Ein erneuter Versand erfolgt anschließend nur durch Ihre eigene Aktion.">Als nicht gesendet bestätigen und entsperren</button>
+      </div>
+    </form>
+  </div>
+  {% endfor %}
+</section>
+{% endif %}
+{% endmacro %}
+
 {% macro action_label(message) %}
   {% if message.requires_human_action %}
     {% if message.purpose == 'customer_question' %}
@@ -77,4 +107,15 @@
 .communication-question-status.unresolved{color:#995525}
 .communication-question-status.resolved{color:#25714f}
 .communication-message-link{font-size:12px;color:#26705c}
+.dispatch-recovery{margin:0 0 14px;padding:13px;border:1px solid #e3bd7c;border-radius:9px;background:#fff8eb;color:#78511c;font-size:13px;line-height:1.5}
+.dispatch-recovery>strong{display:block;color:#78511c}
+.dispatch-recovery p{margin:5px 0 0}
+.dispatch-recovery-item{margin-top:12px;padding-top:10px;border-top:1px solid #e9d8b8}
+.dispatch-recovery-meta{font-size:11px;color:#80653e}
+.dispatch-recovery-text{margin:5px 0 10px;white-space:pre-wrap;overflow-wrap:anywhere}
+.dispatch-confirmation{display:flex;gap:8px;align-items:flex-start;font-size:12px;font-weight:650}
+.dispatch-confirmation input{flex:0 0 auto;width:17px;height:17px;margin:1px 0 0}
+.dispatch-resolution-actions{display:flex;gap:8px;flex-wrap:wrap;margin-top:10px}
+.dispatch-resolution-actions button{min-height:40px;max-width:100%;padding:8px 10px;border:1px solid #cfa963;border-radius:7px;background:#fff;color:#71501f;font:inherit;font-size:12px;font-weight:750;white-space:normal;text-align:left}
+.dispatch-resolution-actions button:hover{background:#fff0cf}
 {% endmacro %}

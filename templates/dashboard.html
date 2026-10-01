@@ -2884,12 +2884,14 @@
                       data-message-customer="{{ t.kunde_name or 'Kunde' }}"
                       data-message-vehicle="{{ t.fahrzeug or '-' }}"
                       data-message-window-open="{% if t.service_window_open %}true{% else %}false{% endif %}"
+                      data-message-dispatch-blocked="{{ 'true' if t.dispatch_blocked else 'false' }}"
                       data-open-questions='{{ t.open_customer_questions|default([])|tojson }}'
                       {% if not t.can_message_customer %}disabled title="Keine Telefonnummer im Ticket hinterlegt"{% endif %}
                     >
                       <span class="whatsapp-mark" aria-hidden="true">W</span>
                       Kunde schreiben
                     </button>
+                    <template id="dispatchRecovery-{{ t.ticket_view_id }}">{{ communication.dispatch_recovery(t.dispatch_blocked, t.stale_dispatches|default([]), workshop_id, t.ticket_view_id, t.whatsapp_phone, 'dashboard') }}</template>
                     {% endif %}
 
                     {% if not archive_mode %}
@@ -3069,6 +3071,7 @@
       </div>
 
       <div class="modal-body">
+        <div id="messageDispatchRecovery"></div>
         <form class="message-form" id="ticketMessageForm" method="post" action="">
           <input type="hidden" name="workshop_id" value="{{ workshop_id }}" />
           <input type="hidden" name="customer_phone" id="manualMessagePhone" value="" />
@@ -3124,6 +3127,7 @@
             öffnet das 24-Stunden-Fenster.
           </div>
           <form class="guarded-send-form" method="post" action="/dashboard/whatsapp/start-template" id="ticketTemplateForm">
+            <input type="hidden" name="message_id" value="" />
             <input type="hidden" name="workshop_id" value="{{ workshop_id }}" />
             <input type="hidden" name="customer_phone" id="templateMessagePhone" value="" />
             <input type="hidden" name="ticket_id" id="templateMessageTicket" value="" />
@@ -3141,6 +3145,7 @@
 
   <script nonce="{{ request.state.csp_nonce }}">
     {% include '_communication_script.html' %}
+    installDispatchRecovery(document);
     document.querySelectorAll('form[data-confirm]').forEach(form => {
       form.addEventListener('submit', event => {
         if (!confirm(form.dataset.confirm)) event.preventDefault();
@@ -3162,14 +3167,20 @@
     const messageHelp = document.getElementById("messageHelp");
     const messageSendButton = document.getElementById("messageSendButton");
     const messageTemplateStart = document.getElementById("messageTemplateStart");
+    const messageDispatchRecovery = document.getElementById("messageDispatchRecovery");
+    const ticketTemplateForm = document.getElementById("ticketTemplateForm");
+    const dashboardTemplateAttempt = simpleDispatchAttempt(ticketTemplateForm);
+    const templateSendButton = ticketTemplateForm.querySelector("button[type='submit']");
     const templateMessagePhone = document.getElementById("templateMessagePhone");
     const templateMessageTicket = document.getElementById("templateMessageTicket");
     const automaticWhatsappReady = {{ whatsapp_readiness.can_send | tojson }};
+    const templateWhatsappReady = {{ whatsapp_readiness.can_start_template | tojson }};
     const returnedMessageStatus = {{ message_status | tojson }};
     const returnedMessageTicket = {{ message_ticket | tojson }};
     let lastDetailsTrigger = null;
     let lastMessageTrigger = null;
     let currentMessageTicket = "";
+    let currentDispatchBlocked = false;
 
     function messageDraftKey(ticketId) {
       return `werkstattai:ticket-whatsapp-draft:{{ workshop_id }}:${ticketId}`;
@@ -3202,7 +3213,7 @@
 
     function updateManualMessageLink() {
       const phone = normalizedMessagePhone(messagePhone.value);
-      if (!phone) {
+      if (!phone || currentDispatchBlocked) {
         messageManualLink.classList.add("is-disabled");
         messageManualLink.setAttribute("aria-disabled", "true");
         messageManualLink.disabled = true;
@@ -3220,6 +3231,11 @@
       const vehicle = button.dataset.messageVehicle || "-";
       const phone = button.dataset.messagePhone || "";
       const windowOpen = button.dataset.messageWindowOpen === "true";
+      currentDispatchBlocked = button.dataset.messageDispatchBlocked === "true";
+      const resultStatus = ticketId === returnedMessageTicket ? returnedMessageStatus : "";
+      const recoveryTemplate = document.getElementById("dispatchRecovery-" + ticketId);
+      messageDispatchRecovery.replaceChildren();
+      if (recoveryTemplate) messageDispatchRecovery.appendChild(recoveryTemplate.content.cloneNode(true));
 
       lastMessageTrigger = button;
       currentMessageTicket = ticketId;
@@ -3230,20 +3246,28 @@
       manualMessageTicket.value = ticketId;
       messageText.value = window.sessionStorage.getItem(messageDraftKey(ticketId)) || "";
       dashboardCommunicationComposer.configure(
-        JSON.parse(button.dataset.openQuestions || "[]"), messageDraftKey(ticketId), false
+        JSON.parse(button.dataset.openQuestions || "[]"), messageDraftKey(ticketId), false,
+        {resultStatus, dispatchBlocked: currentDispatchBlocked}
       );
       templateMessagePhone.value = normalizedMessagePhone(phone);
       templateMessageTicket.value = ticketId;
+      dashboardTemplateAttempt.configure(messageDraftKey(ticketId) + ":template", {resultStatus});
       messageTemplateStart.hidden = windowOpen;
-      messageSendButton.disabled = !automaticWhatsappReady || !windowOpen;
-      if (!automaticWhatsappReady) {
+      ticketTemplateForm.dataset.dispatchBlocked = String(currentDispatchBlocked);
+      templateSendButton.disabled = currentDispatchBlocked || !templateWhatsappReady;
+      templateSendButton.textContent = currentDispatchBlocked ? "Zuerst Versand klären" : (templateWhatsappReady ? (resultStatus === "failed" ? "Startvorlage erneut senden" : "Startvorlage senden") : "Startvorlage einrichten");
+      messageSendButton.disabled = currentDispatchBlocked || !automaticWhatsappReady || !windowOpen;
+      if (currentDispatchBlocked) {
+        messageSendButton.textContent = "Zuerst Versand klären";
+        messageSendButton.title = "Zuerst den offenen Versand klären";
+      } else if (!automaticWhatsappReady) {
         messageSendButton.textContent = "Einrichtung fehlt";
         messageSendButton.title = "WhatsApp-Einrichtung fehlt";
       } else if (!windowOpen) {
         messageSendButton.textContent = "Fenster geschlossen";
         messageSendButton.title = "Zuerst Startvorlage senden und auf die Kundenantwort warten";
       } else {
-        messageSendButton.textContent = "Nachricht senden";
+        messageSendButton.textContent = resultStatus === "failed" ? "Erneut senden" : "Nachricht senden";
         messageSendButton.removeAttribute("title");
       }
       if (automaticWhatsappReady && windowOpen) {
@@ -3285,6 +3309,7 @@
       else window.sessionStorage.removeItem(messageDraftKey(currentMessageTicket));
     });
     ticketMessageForm.addEventListener("submit", (event) => {
+      if (event.defaultPrevented) return;
       const submitButton = event.submitter;
       if (submitButton && submitButton.id === "messageManualLink") return;
       if (!submitButton) return;
@@ -3293,6 +3318,8 @@
     });
     document.querySelectorAll(".guarded-send-form").forEach((form) => {
       form.addEventListener("submit", (event) => {
+        if (event.defaultPrevented) return;
+        if (form.dataset.dispatchBlocked === "true") { event.preventDefault(); return; }
         const submitButton = event.submitter;
         if (!submitButton || submitButton.disabled) return;
         submitButton.disabled = true;

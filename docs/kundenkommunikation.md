@@ -61,6 +61,13 @@ zwischenzeitlich keine neuere Aktion oder Kundenantwort erfolgte. Bei unklarem
 Transportstatus bleibt `unknown`; es wird nicht automatisch erneut gesendet.
 Eine zuordenbare spätere Meta-Erfolgsbestätigung kann die Frageauflösung nachholen.
 
+Seit der gezielten Ergänzung vom 28. September behalten definitive Fehler ihren
+eigenen Versuch; „Erneut senden“ erzeugt erst beim bewussten Absenden eine neue ID.
+Unklare neue Versuche bleiben reserviert. Nach fünf Minuten kann ein angemeldeter
+Werkstattnutzer den tatsächlichen Meta-Status prüfen und ausdrücklich bestätigen.
+Details, Sicherheitsgrenzen und aktuelle Prüfergebnisse stehen in
+[Versandkorrekturen vom 28. September](versandkorrekturen-2026-09-28.md).
+
 Ein laufender Versand blockiert weitere Sendungen im selben Gespräch und die
 erneute Aktivierung der Automatik. SQLite schützt die Änderungen mit einer
 Transaktion; PostgreSQL nutzt zusätzlich eine kurze Transaktionssperre je
@@ -107,7 +114,7 @@ neuen semantischen Metadaten nicht kennt.
 | `tests/test_communication_*.py`, `test_communication_composer.mjs` | Neue Modell-, Migrations-, Routing-, Transport-, Formular- und Oberflächentests |
 | `tests/test_conversation_flows.py`, `test_customer_authorization.py`, `test_web_session_security.py` | Bestehende Regressionen an die geforderte Semantik angepasst |
 
-### Ausgeführte Prüfungen
+### Ausgeführte Prüfungen der ursprünglichen Kommunikationsüberarbeitung
 
 Abschluss am 26. September 2026:
 

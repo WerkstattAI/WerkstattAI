@@ -1267,6 +1267,8 @@
 
             <form class="test-form guarded-send-form" method="post" action="/dashboard/whatsapp/test">
               <input type="hidden" name="workshop_id" value="{{ workshop_id }}" />
+              <input type="hidden" name="message_id" value="" />
+              <input type="hidden" name="context" value="test" />
               <div class="field">
                 <label class="field-label" for="testPhone">Testnummer</label>
                 <input
@@ -1284,15 +1286,19 @@
                 <textarea class="test-text" id="testText" name="test_text">WerkstattAI-Testnachricht: Die WhatsApp-Verbindung funktioniert.</textarea>
               </div>
               <div class="test-actions">
-                <button class="test-btn" type="submit">Freitext im offenen Fenster testen</button>
+                <button class="test-btn" type="submit" data-test-send data-original-label="Freitext im offenen Fenster testen" data-retry-label="Freitext erneut testen">{% if test_status == 'failed' %}Freitext erneut testen{% else %}Freitext im offenen Fenster testen{% endif %}</button>
                 <button
                   class="template-button"
                   type="submit"
-                  name="context"
-                  value="test"
                   formaction="/dashboard/whatsapp/start-template"
+                  data-test-send data-original-label="Startvorlage testen" data-retry-label="Startvorlage erneut testen" data-setup-missing="{{ 'false' if readiness.can_start_template else 'true' }}"
                   {% if not readiness.can_start_template %}disabled title="Startvorlage oder WhatsApp-Verbindung fehlt"{% endif %}
                 >Startvorlage testen</button>
+              </div>
+              <div class="dispatch-recovery" id="testDispatchWarning" role="alert" hidden>
+                <strong>Versandstatus unklar</strong>
+                <p>Der Versandstatus ist unklar. Prüfen Sie den tatsächlichen Status bei Meta, bevor Sie fortfahren.</p>
+                <a id="testDispatchLink" href="#messageThread">Betroffene Unterhaltung öffnen und Versand klären</a>
               </div>
               <div class="panel-sub">
                 Beim Vorlagentest wird der Text im Feld nicht versendet. Die konfigurierte Vorlage
@@ -1304,7 +1310,7 @@
           </div>
 
           {% if test_status %}
-            <div class="test-alert {{ test_status }}">{{ test_detail or "-" }}</div>
+            <div class="test-alert {{ test_status }}">{% if test_status == 'failed' %}<strong>Nachricht nicht gesendet.</strong> {% elif test_status == 'unknown' %}<strong>Versandstatus unklar.</strong> {% endif %}{{ test_detail or "-" }}</div>
           {% endif %}
         </section>
       </div>
@@ -1388,7 +1394,7 @@
                   <input type="hidden" name="ticket_id" value="{{ selected_conversation.active_ticket_id }}" />
                 {% endif %}
                 {% if selected_conversation.mode == "manual" %}
-                  <button class="mode-button assistant" type="submit" name="mode" value="assistant">Assistent übernimmt</button>
+                  <button class="mode-button assistant" type="submit" name="mode" value="assistant" {% if selected_conversation.dispatch_blocked %}disabled title="Zuerst den offenen Versand klären"{% endif %}>Assistent übernimmt</button>
                 {% else %}
                   <button class="mode-button" type="submit" name="mode" value="manual">Werkstatt übernimmt</button>
                 {% endif %}
@@ -1449,6 +1455,7 @@
             {% endif %}
 
             {% if selected_phone %}
+              {{ communication.dispatch_recovery(selected_conversation.dispatch_blocked if selected_conversation else false, selected_conversation.stale_dispatches|default([]) if selected_conversation else [], workshop_id, selected_conversation.active_ticket_id if selected_conversation else '', selected_phone, 'inbox') }}
               <form class="reply-form" method="post" action="/dashboard/whatsapp/reply">
                 <input type="hidden" name="workshop_id" value="{{ workshop_id }}" />
                 <input type="hidden" name="customer_phone" value="{{ selected_phone }}" />
@@ -1486,14 +1493,17 @@
                       type="submit"
                       formaction="/dashboard/whatsapp/open-manual"
                       formtarget="_blank"
+                      {% if selected_conversation and selected_conversation.dispatch_blocked %}disabled title="Zuerst den offenen Versand klären"{% endif %}
                     >In WhatsApp öffnen</button>
                     <button
                       class="send-btn"
                       type="submit"
-                      {% if not readiness.can_send or not selected_conversation or not selected_conversation.service_window_open %}disabled aria-disabled="true" title="{% if not readiness.can_send %}WhatsApp-Einrichtung fehlt{% else %}24-Stunden-Fenster geschlossen{% endif %}"{% endif %}
+                      {% if (selected_conversation and selected_conversation.dispatch_blocked) or not readiness.can_send or not selected_conversation or not selected_conversation.service_window_open %}disabled aria-disabled="true" title="{% if selected_conversation and selected_conversation.dispatch_blocked %}Zuerst den offenen Versand klären{% elif not readiness.can_send %}WhatsApp-Einrichtung fehlt{% else %}24-Stunden-Fenster geschlossen{% endif %}"{% endif %}
                     >
-                      {% if not readiness.can_send %}Einrichtung fehlt
+                      {% if selected_conversation and selected_conversation.dispatch_blocked %}Zuerst Versand klären
+                      {% elif not readiness.can_send %}Einrichtung fehlt
                       {% elif not selected_conversation or not selected_conversation.service_window_open %}Fenster geschlossen
+                      {% elif reply_status == 'failed' %}Erneut senden
                       {% else %}Nachricht senden{% endif %}
                     </button>
                   </div>
@@ -1507,15 +1517,16 @@
                     nicht gesendet und bleibt in diesem Browser als Entwurf erhalten. Erst die
                     Kundenantwort erlaubt eine freie Nachricht.
                   </div>
-                  <form class="guarded-send-form" method="post" action="/dashboard/whatsapp/start-template">
+                  <form class="guarded-send-form" method="post" action="/dashboard/whatsapp/start-template" data-dispatch-blocked="{{ 'true' if selected_conversation and selected_conversation.dispatch_blocked else 'false' }}">
+                    <input type="hidden" name="message_id" value="" />
                     <input type="hidden" name="workshop_id" value="{{ workshop_id }}" />
                     <input type="hidden" name="customer_phone" value="{{ selected_phone }}" />
                     <input type="hidden" name="context" value="inbox" />
                     {% if selected_conversation and selected_conversation.active_ticket_id %}
                       <input type="hidden" name="ticket_id" value="{{ selected_conversation.active_ticket_id }}" />
                     {% endif %}
-                    <button class="template-button" type="submit" {% if not readiness.can_start_template %}disabled title="Startvorlage oder WhatsApp-Verbindung fehlt"{% endif %}>
-                      {% if readiness.can_start_template %}Startvorlage senden{% else %}Startvorlage einrichten{% endif %}
+                    <button class="template-button" type="submit" {% if (selected_conversation and selected_conversation.dispatch_blocked) or not readiness.can_start_template %}disabled title="{% if selected_conversation and selected_conversation.dispatch_blocked %}Zuerst den offenen Versand klären{% else %}Startvorlage oder WhatsApp-Verbindung fehlt{% endif %}"{% endif %}>
+                      {% if selected_conversation and selected_conversation.dispatch_blocked %}Zuerst Versand klären{% elif readiness.can_start_template %}{% if reply_status == 'failed' %}Startvorlage erneut senden{% else %}Startvorlage senden{% endif %}{% else %}Startvorlage einrichten{% endif %}
                     </button>
                   </form>
                 </div>
@@ -1531,6 +1542,7 @@
 
   <script nonce="{{ request.state.csp_nonce }}">
     {% include '_communication_script.html' %}
+    installDispatchRecovery(document);
     const whatsappWorkspace = document.querySelector(".workspace");
     const whatsappDiagnostics = document.querySelector(".diagnostics");
     if (whatsappWorkspace && whatsappDiagnostics) {
@@ -1559,9 +1571,11 @@
       }
       communicationComposer(whatsappReplyForm).configure(
         {{ (selected_conversation.open_customer_questions|default([]) if selected_conversation else [])|tojson }},
-        draftKey, replyStatus === "sent"
+        draftKey, replyStatus === "sent",
+        {resultStatus: replyStatus, dispatchBlocked: {{ (selected_conversation.dispatch_blocked|default(false) if selected_conversation else false)|tojson }}}
       );
       whatsappReplyForm.addEventListener("submit", (event) => {
+        if (event.defaultPrevented) return;
         const submitButton = event.submitter;
         if (submitButton && submitButton.id === "inboxManualLink") return;
         if (!submitButton) return;
@@ -1570,8 +1584,36 @@
       });
     }
 
+    document.querySelectorAll("form[action='/dashboard/whatsapp/start-template']").forEach((form) => {
+      simpleDispatchAttempt(form).configure("werkstattai:inbox-template:{{ workshop_id }}:" + {{ selected_phone|tojson }}, {resultStatus: {{ reply_status|tojson }}});
+    });
+    const testDispatchForm = document.querySelector(".test-form");
+    if (testDispatchForm) {
+      const testResultStatus = {{ test_status|tojson }};
+      simpleDispatchAttempt(testDispatchForm).configure("werkstattai:test-dispatch:{{ workshop_id }}", {resultStatus: testResultStatus, restoreFields: true});
+      const blockedDispatchPhones = new Set({{ blocked_dispatch_phones|default([])|tojson }});
+      const testPhone = document.getElementById("testPhone");
+      function updateTestDispatchBlock() {
+        let phone = testPhone.value.replace(/\D/g, "");
+        if (phone.startsWith("00")) phone = phone.slice(2);
+        else if (phone.startsWith("0")) phone = "49" + phone.slice(1);
+        const blocked = blockedDispatchPhones.has(phone) || ["unknown", "pending", "sending"].includes(testResultStatus);
+        testDispatchForm.dataset.dispatchBlocked = String(blocked);
+        document.getElementById("testDispatchWarning").hidden = !blocked;
+        document.getElementById("testDispatchLink").href = "/dashboard/whatsapp?workshop_id=" + encodeURIComponent({{ workshop_id|tojson }}) + "&phone=" + encodeURIComponent(phone);
+        testDispatchForm.querySelectorAll("[data-test-send]").forEach((button) => {
+          button.disabled = blocked || button.dataset.setupMissing === "true";
+          button.textContent = blocked ? "Zuerst Versand klären" : (testResultStatus === "failed" ? button.dataset.retryLabel : button.dataset.originalLabel);
+        });
+      }
+      testPhone.addEventListener("input", updateTestDispatchBlock);
+      updateTestDispatchBlock();
+    }
+
     document.querySelectorAll(".guarded-send-form").forEach((form) => {
       form.addEventListener("submit", (event) => {
+        if (event.defaultPrevented) return;
+        if (form.dataset.dispatchBlocked === "true") { event.preventDefault(); return; }
         const submitButton = event.submitter;
         if (!submitButton || submitButton.disabled) return;
         submitButton.disabled = true;

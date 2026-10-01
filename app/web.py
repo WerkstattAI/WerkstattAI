@@ -6,7 +6,7 @@ from datetime import datetime, timezone
 from typing import Any
 from urllib.parse import urlencode
 
-from fastapi import APIRouter, Form, Request
+from fastapi import APIRouter, Form, HTTPException, Request
 from fastapi.responses import HTMLResponse, RedirectResponse
 from fastapi.templating import Jinja2Templates
 
@@ -22,6 +22,7 @@ from app.config import settings
 from app.customer_sessions import browser_identity
 from app.communication import open_customer_questions
 from app.manual_dispatch import send_workshop_message
+from app.dispatch_recovery import dispatch_recovery_context, resolve_stale_dispatch
 from app.legal import provider_details
 from app.db import (
     atomic_database,
@@ -724,7 +725,7 @@ def _note_type(note: dict) -> str:
     return "customer_message" if _is_customer_question_note(note) else "internal_note"
 
 
-def _communication_context(ticket: dict) -> None:
+def _communication_context(ticket: dict, workshop_id: str) -> None:
     ticket["open_customer_questions"] = open_customer_questions(ticket)
     ticket["customer_question_open"] = bool(ticket["open_customer_questions"])
     ticket["customer_question_count"] = len(ticket["open_customer_questions"])
@@ -732,6 +733,10 @@ def _communication_context(ticket: dict) -> None:
     for note in ticket["communication_messages"]:
         note["created_at_display"] = _format_datetime_for_display(note.get("created_at"))
     ticket["has_customer_question"] = any(n.get("purpose") == "customer_question" for n in ticket.get("notes", []))
+    ticket.update(dispatch_recovery_context(
+        workshop_id=workshop_id, customer_phone=ticket.get("whatsapp_phone"),
+        ticket_id=ticket.get("ticket_view_id") or ticket.get("ticket_id"),
+    ))
 
 
 def _details_payload(t: dict) -> dict:
@@ -838,7 +843,7 @@ def _prepare_tickets(limit: int, workshop_id: str | None = None) -> list[dict]:
             t["last_note_created_at"]
         )
 
-        _communication_context(t)
+        _communication_context(t, wid)
 
         t["details_payload"] = _details_payload(t)
         t["details_json"] = json.dumps(
@@ -1490,6 +1495,7 @@ def dashboard_whatsapp(
         item["conversation_state"] = control["conversation_state"]
         active_ticket = find_ticket_by_id(item["active_ticket_id"], wid) if item["active_ticket_id"] else None
         item["open_customer_questions"] = open_customer_questions(active_ticket or {})
+        item.update(dispatch_recovery_context(workshop_id=wid, customer_phone=item["customer_phone"]))
         item["mode_label"] = (
             "Werkstatt antwortet"
             if item["mode"] == "manual"
@@ -1540,6 +1546,7 @@ def dashboard_whatsapp(
             conversations=conversations,
             selected_phone=selected_phone,
             selected_conversation=selected_conversation,
+            blocked_dispatch_phones=dispatch_recovery_context(workshop_id=wid)["blocked_dispatch_phones"],
             messages=messages,
             test_status=(test_status or "").strip(),
             test_detail=(test_detail or "").strip(),
@@ -1556,6 +1563,7 @@ def dashboard_whatsapp_test(
     customer_phone: str | None = Form(None, max_length=32),
     test_text: str = Form("WerkstattAI Testnachricht. WhatsApp Verbindung funktioniert.", max_length=4096),
     workshop_id: str | None = Form(None, max_length=128),
+    message_id: str | None = Form(None, max_length=128),
 ):
     wid = _workshop_id_for_request(request, workshop_id)
     submitted_customer_phone = customer_phone if isinstance(customer_phone, str) else ""
@@ -1599,7 +1607,8 @@ def dashboard_whatsapp_test(
 
     try:
         result = send_workshop_message(workshop_id=wid, customer_phone=phone, phone_number_id=phone_number_id,
-            ticket_id=None, text=text, purpose="workshop_notification", reply_to_message_id=None, message_id=None,
+            ticket_id=None, text=text, purpose="workshop_notification", reply_to_message_id=None,
+            message_id=message_id if isinstance(message_id, str) else None,
             source="dashboard_test", user=(get_current_user(request) or {}).get("email"),
             send=lambda: send_whatsapp_text_message(phone_number_id=phone_number_id, customer_phone=phone,
                 text=text, access_token=access_token, graph_api_version=settings.whatsapp_graph_api_version))
@@ -1763,6 +1772,46 @@ def _whatsapp_action_redirect(
     return RedirectResponse(url=f"/dashboard/whatsapp?{query}", status_code=303)
 
 
+@router.post("/dashboard/whatsapp/messages/{message_id}/resolve")
+def dashboard_resolve_dispatch(
+    request: Request,
+    message_id: str,
+    workshop_id: str | None = Form(None, max_length=128),
+    resolution: str = Form(..., max_length=16),
+    confirmed: bool = Form(False),
+    context: str = Form("inbox", max_length=16),
+    ticket_id: str | None = Form(None, max_length=128),
+    customer_phone: str | None = Form(None, max_length=32),
+):
+    # Authenticate again at the mutation boundary; the signed session is checked
+    # against today's DB identity/role by the same dashboard auth mechanism.
+    with atomic_database():
+        user = get_current_user(request)
+        if not user:
+            raise HTTPException(401, "Bitte anmelden.")
+        requested_wid = workshop_id if isinstance(workshop_id, str) else None
+        if requested_wid and requested_wid != user["workshop_id"] and user["role"] != "admin":
+            raise HTTPException(403, "Diese Nachricht gehört nicht zu Ihrer Werkstatt.")
+        wid = requested_wid or user["workshop_id"]
+        try:
+            result = resolve_stale_dispatch(
+                workshop_id=wid, message_id=message_id, resolution=resolution,
+                actor_email=user["email"], confirmed=confirmed is True,
+            )
+        except ValueError as exc:
+            raise HTTPException(409, str(exc)) from exc
+    # Return targets come from the tenant-scoped stored record, never hidden fields.
+    detail = ("Versand manuell als gesendet bestätigt."
+              if resolution == "sent" else
+              "Nachricht nicht gesendet. Der Versand ist entsperrt; Sie können bewusst erneut senden.")
+    return _whatsapp_action_redirect(
+        workshop_id=wid, customer_phone=result["customer_phone"],
+        ticket_id=result.get("ticket_id"),
+        context=context if isinstance(context, str) and context in {"ticket", "inbox", "dashboard"} else "inbox",
+        status="saved" if resolution == "sent" else "failed", detail=detail,
+    )
+
+
 @router.post("/dashboard/whatsapp/start-template")
 def dashboard_whatsapp_start_template(
     request: Request,
@@ -1770,6 +1819,7 @@ def dashboard_whatsapp_start_template(
     workshop_id: str | None = Form(None, max_length=128),
     ticket_id: str | None = Form(None, max_length=128),
     context: str = Form("inbox", max_length=128),
+    message_id: str | None = Form(None, max_length=128),
 ):
     """Start a customer conversation with the server-configured approved template."""
     wid = _workshop_id_for_request(request, workshop_id)
@@ -1839,7 +1889,8 @@ def dashboard_whatsapp_start_template(
     try:
         result = send_workshop_message(workshop_id=wid, customer_phone=phone, phone_number_id=phone_number_id,
             ticket_id=normalized_ticket_id or None, text=f"Startvorlage „{template_name}“",
-            purpose="workshop_notification", reply_to_message_id=None, message_id=None,
+            purpose="workshop_notification", reply_to_message_id=None,
+            message_id=message_id if isinstance(message_id, str) else None,
             source=f"dashboard_start_template_{normalized_context}", message_type="template",
             template_metadata={"template_name": template_name, "template_language": template_language},
             user=(get_current_user(request) or {}).get("email"),
@@ -2194,7 +2245,7 @@ def ticket_detail(
     t["customer_question_open"] = bool(t.get("customer_question_open"))
     t["has_customer_question"] = bool(t["customer_messages"])
 
-    _communication_context(t)
+    _communication_context(t, wid)
 
     t["raw_json"] = json.dumps(t, ensure_ascii=False, default=str, indent=2)
 
