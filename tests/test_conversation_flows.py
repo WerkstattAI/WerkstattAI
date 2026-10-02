@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import unittest
+import atexit
 import asyncio
 import json
 import os
@@ -9,6 +10,8 @@ from datetime import datetime, timedelta, timezone
 from unittest.mock import patch
 
 _TEST_DATABASE_DIRECTORY = tempfile.TemporaryDirectory(prefix="werkstattai-tests-")
+# Other test modules import this fixture, so its lifetime spans the whole process.
+atexit.register(_TEST_DATABASE_DIRECTORY.cleanup)
 os.environ["DATABASE_URL"] = ""
 os.environ["WERKSTATTAI_SQLITE_PATH"] = os.path.join(
     _TEST_DATABASE_DIRECTORY.name,

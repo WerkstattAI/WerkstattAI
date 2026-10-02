@@ -20,6 +20,16 @@ _UNSET_PENDING_QUESTION = object()
 _TRANSACTION_CONNECTION: ContextVar[Any] = ContextVar("werkstattai_transaction", default=None)
 
 
+class _SQLiteConnection(sqlite3.Connection):
+    """Own the connection as well as the transaction when used in a with block."""
+
+    def __exit__(self, exc_type: Any, exc: Any, tb: Any) -> bool:
+        try:
+            return super().__exit__(exc_type, exc, tb)
+        finally:
+            self.close()
+
+
 class _TransactionConnection:
     """Let existing helpers share an outer transaction without committing/closing it."""
 
@@ -136,6 +146,11 @@ def is_postgres() -> bool:
 
 
 def get_conn() -> sqlite3.Connection | PostgresConnection:
+    """Return an owned connection, or borrow the current atomic transaction.
+
+    Owned connections must be closed explicitly or through their context manager.
+    Borrowed connections are closed only by the outer atomic_database() scope.
+    """
     shared = _TRANSACTION_CONNECTION.get()
     if shared is not None:
         return shared
@@ -144,7 +159,7 @@ def get_conn() -> sqlite3.Connection | PostgresConnection:
 
     os.makedirs(os.path.dirname(_db_path()), exist_ok=True)
 
-    conn = sqlite3.connect(_db_path())
+    conn = sqlite3.connect(_db_path(), factory=_SQLiteConnection)
     conn.row_factory = sqlite3.Row
     return conn
 
