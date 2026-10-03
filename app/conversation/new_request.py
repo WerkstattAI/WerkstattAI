@@ -3,8 +3,8 @@ from __future__ import annotations
 from typing import List, Tuple, cast
 
 from app.conversation.analysis import analyze_problem
+from app.conversation.intake_fields import consume_intake_fields
 from app.conversation.constants import (
-    CANCEL_VALUES,
     NO_VALUES,
     REQUEST_TYPE_SERVICE,
     SKIP_VALUES,
@@ -21,12 +21,15 @@ from app.conversation.constants import (
     YES_VALUES,
 )
 from app.conversation.extractors import (
-    consume_inline_vehicle_year_km,
     extract_km,
     extract_name_candidate,
     extract_phone,
     extract_year,
     infer_fahrbereit_from_text,
+    is_cancel_command,
+    is_correction,
+    is_unavailable_answer,
+    strip_request_announcement,
     lower,
     normalize,
 )
@@ -50,7 +53,6 @@ from app.conversation.replies import (
     ask_vehicle_after_problem_reply,
     ask_vehicle_clarify_reply,
     build_completion_summary,
-    reset_reply,
     restart_reply,
     service_detected_reply,
     welcome_reply,
@@ -81,7 +83,7 @@ def fresh_intake_state_from(state: IntakeState, mode: str = "new") -> IntakeStat
 
 
 def is_cancel(text: str) -> bool:
-    return lower(text) in CANCEL_VALUES
+    return is_cancel_command(text)
 
 
 def is_yes(text: str) -> bool:
@@ -128,38 +130,6 @@ def prepare_followups(
     return followups
 
 
-def _is_new_request_starter(text: str) -> bool:
-    normalized = lower(text)
-    return normalized in {
-        "problem melden",
-        "ich möchte ein problem melden.",
-        "ich möchte ein problem melden",
-        "ich moechte ein problem melden.",
-        "ich moechte ein problem melden",
-    }
-
-
-def _looks_like_problem_first_message(text: str) -> bool:
-    t = lower(text)
-    analysis = analyze_problem(t)
-    flags = analysis["flags"]
-
-    if any(flags.values()):
-        return True
-
-    return any(
-        phrase in t
-        for phrase in [
-            "kaputt",
-            "geht nicht",
-            "macht komische",
-            "stinkt",
-            "ruckelt",
-            "leuchtet",
-        ]
-    )
-
-
 def _continue_after_problem_details(new_state: IntakeState) -> Tuple[IntakeState, str, bool]:
     problem = new_state.problem or ""
     analysis = update_analysis_fields(new_state, problem)
@@ -168,10 +138,9 @@ def _continue_after_problem_details(new_state: IntakeState) -> Tuple[IntakeState
         new_state.followup_questions = []
         new_state.followup_answers = []
         new_state.followup_index = 0
-        new_state.step = STEP_TELEFON
-        return new_state, service_detected_reply(), False
+        return _continue_to_contact(new_state, service=True)
 
-    inferred = infer_fahrbereit_from_text(problem)
+    inferred = new_state.fahrbereit or infer_fahrbereit_from_text(problem)
     if inferred:
         new_state.fahrbereit = inferred
         update_analysis_fields(
@@ -190,11 +159,57 @@ def _continue_after_problem_details(new_state: IntakeState) -> Tuple[IntakeState
             new_state.step = STEP_FOLLOWUP
             return new_state, followups[0], False
 
-        new_state.step = STEP_TELEFON
-        return new_state, ask_phone_reply(), False
+        return _continue_to_contact(new_state)
 
     new_state.step = STEP_FAHRBEREIT
     return new_state, ask_fahrbereit_reply(), False
+
+
+def pending_intake_question(state: IntakeState) -> str:
+    questions = {
+        STEP_FAHRZEUG: ask_vehicle_clarify_reply,
+        STEP_BAUJAHR: ask_baujahr_reply,
+        STEP_KILOMETERSTAND: ask_kilometerstand_reply,
+        STEP_PROBLEM: ask_problem_reply,
+        STEP_FAHRBEREIT: ask_fahrbereit_reply,
+        STEP_ABSCHLEPPDIENST: ask_abschleppdienst_reply,
+        STEP_TELEFON: ask_phone_reply,
+        STEP_NAME: ask_name_reply,
+    }
+    if state.step == STEP_FOLLOWUP and state.followup_index < len(state.followup_questions):
+        return state.followup_questions[state.followup_index]
+    return questions.get(state.step, ask_problem_reply)()
+
+
+def _complete_intake(state: IntakeState) -> Tuple[IntakeState, str, bool]:
+    state.step = STEP_FERTIG
+    analysis = update_analysis_fields(state, state.problem or "", state.fahrbereit, state.abschleppdienst)
+    return state, build_completion_summary(state, analysis["score"]), True
+
+
+def _continue_to_contact(state: IntakeState, *, service: bool = False) -> Tuple[IntakeState, str, bool]:
+    if not state.telefon:
+        state.step = STEP_TELEFON
+        return state, service_detected_reply() if service else ask_phone_reply(), False
+    if state.name:
+        return _complete_intake(state)
+    state.step = STEP_NAME
+    return state, ask_name_reply(), False
+
+
+def _advance_initial_details(state: IntakeState) -> Tuple[IntakeState, str, bool]:
+    for field, step, question in (
+        ("fahrzeug", STEP_FAHRZEUG, ask_vehicle_clarify_reply),
+        ("baujahr", STEP_BAUJAHR, ask_baujahr_reply),
+        ("kilometerstand", STEP_KILOMETERSTAND, ask_kilometerstand_reply),
+        ("problem", STEP_PROBLEM, ask_problem_reply),
+    ):
+        if getattr(state, field) is None:
+            state.step = step
+            if field == "fahrzeug" and state.problem:
+                return state, ask_vehicle_after_problem_reply(state.problem), False
+            return state, question(), False
+    return _continue_after_problem_details(state)
 
 
 def handle_new_request(state: IntakeState, user_message: str | None) -> Tuple[IntakeState, str, bool]:
@@ -214,9 +229,9 @@ def handle_new_request(state: IntakeState, user_message: str | None) -> Tuple[In
     msg = normalize(user_message)
 
     if is_cancel(msg):
-        return reset_state(), reset_reply(), False
+        return fresh_intake_state_from(state, mode="unknown"), "Die Aufnahme ist abgebrochen. Sie können jederzeit ein neues Anliegen melden.", False
 
-    if (getattr(state, "mode", None) or "unknown").strip().lower() != "new":
+    if state.ticket_id or state.step == STEP_FERTIG or (getattr(state, "mode", None) or "unknown").strip().lower() != "new":
         new_state = fresh_intake_state_from(state, mode="new")
     else:
         new_state = copy_state(state)
@@ -224,60 +239,65 @@ def handle_new_request(state: IntakeState, user_message: str | None) -> Tuple[In
     new_state.mode = "new"
     new_state.last_user_message = msg
 
+    content, announcement = strip_request_announcement(msg)
+    if announcement and not content:
+        return new_state, ask_problem_reply(), False
+
+    changed, correction = consume_intake_fields(
+        new_state, content, vehicle_answer=new_state.step == STEP_FAHRZEUG or is_correction(msg),
+    )
+    if correction:
+        if new_state.step in {STEP_FAHRZEUG, STEP_BAUJAHR, STEP_KILOMETERSTAND, STEP_PROBLEM}:
+            result_state, reply, done = _advance_initial_details(new_state)
+        elif new_state.step in {STEP_TELEFON, STEP_NAME}:
+            result_state, reply, done = _continue_to_contact(new_state)
+        else:
+            result_state, reply, done = new_state, pending_intake_question(new_state), False
+        prefix = "Danke, die Angaben sind korrigiert." if changed else "Welche Angabe soll ich korrigieren?"
+        return result_state, prefix + "\n" + reply, done
+
+    if is_unavailable_answer(msg) and new_state.step not in {STEP_NAME, STEP_FOLLOWUP}:
+        attempts = new_state.unavailable_attempts.get(new_state.step, 0) + 1
+        new_state.unavailable_attempts[new_state.step] = attempts
+        hint = {
+            STEP_BAUJAHR: "Das Baujahr wird noch benötigt. Sie finden es in den Fahrzeugunterlagen; falls nur die Erstzulassung bekannt ist, nennen Sie diese bitte.",
+            STEP_KILOMETERSTAND: "Der Kilometerstand wird noch benötigt. Eine ungefähre Zahl vom Tacho reicht.",
+            STEP_FAHRZEUG: "Marke und Modell werden noch benötigt. Beides steht in den Fahrzeugunterlagen.",
+            STEP_TELEFON: "Für die Rückmeldung wird eine Telefonnummer benötigt.",
+            STEP_FAHRBEREIT: "Bitte Ja oder Nein: Kann das Fahrzeug noch fahren? Wenn Sie unsicher sind, klären Sie das bitte mit der Werkstatt.",
+            STEP_ABSCHLEPPDIENST: "Bitte Ja oder Nein: Benötigen Sie einen Abschleppdienst? Bei Unsicherheit wenden Sie sich bitte an die Werkstatt.",
+        }.get(new_state.step, "Diese Angabe wird noch benötigt. Beschreiben Sie bitte kurz, was Sie wissen.")
+        if attempts == 2:
+            hint = "Sie können später hier weitermachen oder mit „abbrechen“ beenden.\n" + hint
+        elif attempts > 2:
+            hint = "Ich warte auf die fehlende Angabe. Schreiben Sie sie einfach hier, sobald sie vorliegt. Mit „abbrechen“ beenden Sie die Aufnahme."
+        return new_state, hint, False
+
     if new_state.step == STEP_FAHRZEUG:
-        if _is_new_request_starter(msg):
-            return new_state, welcome_reply(), False
-
-        consume_inline_vehicle_year_km(new_state, msg)
-
-        if not getattr(new_state, "fahrzeug", None):
-            if not getattr(new_state, "problem", None) and _looks_like_problem_first_message(msg):
-                new_state.problem = msg
-                return new_state, ask_vehicle_after_problem_reply(msg), False
-
-            return new_state, ask_vehicle_clarify_reply(), False
-
-        if not getattr(new_state, "baujahr", None):
-            new_state.step = STEP_BAUJAHR
-            return new_state, ask_baujahr_reply(new_state.fahrzeug), False
-
-        if not getattr(new_state, "kilometerstand", None):
-            new_state.step = STEP_KILOMETERSTAND
-            return new_state, ask_kilometerstand_reply(new_state.fahrzeug), False
-
-        if getattr(new_state, "problem", None):
-            return _continue_after_problem_details(new_state)
-
-        new_state.step = STEP_PROBLEM
-        return new_state, ask_problem_reply(new_state.fahrzeug), False
+        return _advance_initial_details(new_state)
 
     if new_state.step == STEP_BAUJAHR:
-        year = extract_year(msg)
+        year = new_state.baujahr or extract_year(msg)
         if not year:
             return new_state, ask_baujahr_invalid_reply(), False
 
         new_state.baujahr = year
-        new_state.step = STEP_KILOMETERSTAND
-        return new_state, ask_kilometerstand_reply(), False
+        return _advance_initial_details(new_state)
 
     if new_state.step == STEP_KILOMETERSTAND:
-        km = extract_km(msg)
-        if not km:
+        km = extract_km(msg, expected=True) or new_state.kilometerstand
+        if km is None:
             return new_state, ask_kilometerstand_invalid_reply(), False
 
         new_state.kilometerstand = km
 
-        if getattr(new_state, "problem", None):
-            return _continue_after_problem_details(new_state)
-
-        new_state.step = STEP_PROBLEM
-        return new_state, ask_problem_reply(), False
+        return _advance_initial_details(new_state)
 
     if new_state.step == STEP_PROBLEM:
-        if len(msg) < 3:
+        if len(msg) < 3 or (changed and not new_state.problem):
             return new_state, ask_problem_invalid_reply(), False
 
-        new_state.problem = msg
+        new_state.problem = new_state.problem or content
         return _continue_after_problem_details(new_state)
 
     if new_state.step == STEP_FAHRBEREIT:
@@ -303,8 +323,7 @@ def handle_new_request(state: IntakeState, user_message: str | None) -> Tuple[In
             new_state.step = STEP_FOLLOWUP
             return new_state, followups[0], False
 
-        new_state.step = STEP_TELEFON
-        return new_state, ask_phone_reply(), False
+        return _continue_to_contact(new_state)
 
     if new_state.step == STEP_ABSCHLEPPDIENST:
         if not (is_yes(msg) or is_no(msg)):
@@ -327,15 +346,14 @@ def handle_new_request(state: IntakeState, user_message: str | None) -> Tuple[In
             new_state.step = STEP_FOLLOWUP
             return new_state, followups[0], False
 
-        new_state.step = STEP_TELEFON
-        return new_state, ask_phone_with_thanks_reply(), False
+        return _continue_to_contact(new_state)
 
     if new_state.step == STEP_FOLLOWUP:
         if not msg:
             return new_state, ask_followup_invalid_reply(), False
 
         early_phone = extract_phone(msg)
-        if early_phone and not getattr(new_state, "telefon", None):
+        if early_phone:
             new_state.telefon = early_phone
             questions = list(cast(List[str], getattr(new_state, "followup_questions", []) or []))
             idx = int(getattr(new_state, "followup_index", 0) or 0)
@@ -373,25 +391,17 @@ def handle_new_request(state: IntakeState, user_message: str | None) -> Tuple[In
             return new_state, ask_phone_invalid_reply(), False
 
         new_state.telefon = phone
-        new_state.step = STEP_NAME
-        return new_state, ask_name_reply(), False
+        return _continue_to_contact(new_state)
 
     if new_state.step == STEP_NAME:
-        if lower(msg) in SKIP_VALUES:
+        if lower(msg) in SKIP_VALUES or is_unavailable_answer(msg):
             new_state.name = None
         else:
             new_state.name = extract_name_candidate(msg)
+            if not new_state.name:
+                return new_state, ask_name_reply(), False
 
-        new_state.step = STEP_FERTIG
-        analysis = update_analysis_fields(
-            new_state,
-            new_state.problem or "",
-            fahrbereit=getattr(new_state, "fahrbereit", None),
-            abschleppdienst=getattr(new_state, "abschleppdienst", None),
-        )
-
-        reply = build_completion_summary(new_state, analysis["score"])
-        return new_state, reply, True
+        return _complete_intake(new_state)
 
     new_state.step = STEP_FAHRZEUG
     return new_state, restart_reply(), False

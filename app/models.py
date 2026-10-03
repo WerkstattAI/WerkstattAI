@@ -81,3 +81,5 @@ class IntakeState(BaseModel):
     ticket_id: Optional[str] = None
     source: Optional[str] = None
     last_user_message: Optional[str] = None
+    unavailable_attempts: Dict[str, int] = Field(default_factory=dict)
+    pending_request_message: Optional[str] = None

@@ -196,9 +196,16 @@ LEAK_HINTS = [
 
 def _contains_keyword(text: str, keyword: str) -> bool:
     key = lower(keyword)
-    if len(key) <= 3 and re.match(r"^[a-z0-9]+$", key):
-        return bool(re.search(rf"\b{re.escape(key)}\b", lower(text)))
-    return key in lower(text)
+    # Word starts prevent incidental matches (e.g. smoke inside 'brauche').
+    # Suffixes keep inflections such as 'ruckelt' and 'qualmt' recognizable.
+    suffix = r"\w*" if len(key) > 3 else ""
+    t = lower(text)
+    for match in re.finditer(rf"\b{re.escape(key)}{suffix}\b", t):
+        before = re.split(r"[,.;!?]", t[:match.start()])[-1]
+        if re.search(r"\b(?:kein\w*|ohne|nicht)\s+(?:\w+\s+){0,2}$", before):
+            continue
+        return True
+    return False
 
 
 def contains_any(text: str, keywords: List[str]) -> bool:
@@ -235,7 +242,7 @@ def is_service_request(text: str) -> bool:
 
 def has_start_problem(text: str) -> bool:
     t = lower(text)
-    return any(k in t for k in START_HINTS) or (
+    return contains_any(t, START_HINTS) or (
         ("springt" in t and "nicht" in t and "an" in t)
         or ("startet" in t and "nicht" in t)
     )

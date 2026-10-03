@@ -238,10 +238,10 @@ class IntentTests(unittest.TestCase):
             INTENT_GENERAL_QUESTION,
         )
 
-    def test_phone_number_is_existing_ticket_reference(self) -> None:
+    def test_phone_number_alone_requires_intent_clarification(self) -> None:
         self.assertEqual(
             detect_intent(IntakeState(), "Meine Nummer ist 0176 1234567"),
-            INTENT_EXISTING_TICKET,
+            INTENT_UNCLEAR,
         )
 
     def test_inline_vehicle_data_starts_new_request(self) -> None:
@@ -380,7 +380,7 @@ class IntentMatrixTests(unittest.TestCase):
         # Anfrage zu einem bestehenden Ticket
         ("Wie ist der Status von Ticket WS-20260505-0005?", INTENT_EXISTING_TICKET),
         ("Ist mein Auto schon fertig? Ticket WS-20260505-0005", INTENT_EXISTING_TICKET),
-        ("Meine Telefonnummer ist 0176 1234567", INTENT_EXISTING_TICKET),
+        ("Meine Telefonnummer ist 0176 1234567", INTENT_UNCLEAR),
         ("Anfrage zu einem bestehenden Ticket", INTENT_EXISTING_TICKET),
         ("Kann ich mein Fahrzeug zu Auftrag 123 abholen?", INTENT_EXISTING_TICKET),
         # Allgemeine Frage
@@ -2469,7 +2469,7 @@ class NewRequestTests(unittest.TestCase):
         self.assertEqual(new_state.step, "fahrzeug")
         self.assertEqual(new_state.mode, "unknown")
         self.assertIsNone(new_state.fahrzeug)
-        self.assertIn("zur", reply.lower())
+        self.assertIn("abgebrochen", reply.lower())
 
     def test_german_driveable_answer_is_accepted(self) -> None:
         state = IntakeState(
@@ -2554,7 +2554,7 @@ class NewRequestTests(unittest.TestCase):
         self.assertEqual(new_state.mode, "new")
         self.assertIsNone(new_state.ticket_id)
         self.assertEqual(new_state.workshop_id, "demo-werkstatt")
-        self.assertIn("Welche Marke", reply)
+        self.assertIn("Worum geht", reply)
 
     def test_skip_name_completes_new_request_without_customer_name(self) -> None:
         state = IntakeState(

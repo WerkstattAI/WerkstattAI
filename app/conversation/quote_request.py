@@ -12,13 +12,15 @@ from app.conversation.constants import (
     SKIP_VALUES,
 )
 from app.conversation.extractors import (
-    cleanup_vehicle_text,
-    extract_year,
+    is_cancel_command,
+    is_correction,
+    is_unavailable_answer,
     extract_name_candidate,
     extract_phone,
     lower,
     normalize,
 )
+from app.conversation.intake_fields import consume_intake_fields
 from app.conversation.new_request import copy_state, fresh_intake_state_from, reset_state
 from app.models import IntakeState
 
@@ -48,6 +50,8 @@ def _is_quote_button(text: str) -> bool:
         "ich möchte einen kostenvoranschlag anfragen",
         "ich moechte einen kostenvoranschlag anfragen",
         "kostenvoranschlag anfragen",
+        "kostenvoranschlag",
+        "angebot anfragen",
     }
 
 
@@ -93,6 +97,27 @@ def _completion_reply(state: IntakeState) -> str:
     )
 
 
+def pending_quote_question(state: IntakeState) -> str:
+    return {
+        STEP_QUOTE_ANLIEGEN: _quote_welcome_reply,
+        STEP_QUOTE_FAHRZEUG: _ask_vehicle_reply,
+        STEP_QUOTE_TELEFON: _ask_phone_reply,
+        STEP_QUOTE_NAME: _ask_name_reply,
+    }.get(state.step, _quote_welcome_reply)()
+
+
+def _advance_quote(state: IntakeState) -> Tuple[IntakeState, str, bool]:
+    for field, step in (
+        ("problem", STEP_QUOTE_ANLIEGEN), ("fahrzeug", STEP_QUOTE_FAHRZEUG),
+        ("telefon", STEP_QUOTE_TELEFON), ("name", STEP_QUOTE_NAME),
+    ):
+        if not getattr(state, field):
+            state.step = step
+            return state, pending_quote_question(state), False
+    state.step = STEP_FERTIG
+    return state, _completion_reply(state), True
+
+
 def handle_quote_request(
     state: IntakeState,
     user_message: str | None,
@@ -104,7 +129,9 @@ def handle_quote_request(
         return new_state, _quote_welcome_reply(), False
 
     msg = normalize(user_message)
-    if (getattr(state, "mode", None) or "unknown").strip().lower() != "quote":
+    if is_cancel_command(msg):
+        return fresh_intake_state_from(state, mode="unknown"), "Die Aufnahme ist abgebrochen. Sie können jederzeit ein neues Anliegen melden.", False
+    if state.ticket_id or state.step == STEP_FERTIG or (getattr(state, "mode", None) or "unknown").strip().lower() != "quote":
         new_state = fresh_intake_state_from(state, mode="quote")
     else:
         new_state = copy_state(state)
@@ -122,26 +149,39 @@ def handle_quote_request(
     }:
         new_state.step = STEP_QUOTE_ANLIEGEN
 
+    changed, correction = consume_intake_fields(
+        new_state, msg, vehicle_answer=new_state.step == STEP_QUOTE_FAHRZEUG or is_correction(msg),
+    )
+    if correction:
+        result_state, reply, done = _advance_quote(new_state)
+        prefix = "Danke, die Angaben sind korrigiert." if changed else "Welche Angabe soll ich korrigieren?"
+        return result_state, prefix + "\n" + reply, done
+    if is_unavailable_answer(msg) and new_state.step != STEP_QUOTE_NAME:
+        attempts = new_state.unavailable_attempts.get(new_state.step, 0) + 1
+        new_state.unavailable_attempts[new_state.step] = attempts
+        hint = "Diese Angabe wird noch benötigt."
+        if new_state.step == STEP_QUOTE_FAHRZEUG:
+            hint += " Marke und Modell stehen in den Fahrzeugunterlagen; das Baujahr ist hier optional."
+        if attempts == 2:
+            hint = "Sie können später weitermachen oder mit „abbrechen“ beenden. " + hint
+        elif attempts > 2:
+            return new_state, "Ich warte auf die fehlende Angabe. Schreiben Sie sie hier, sobald sie vorliegt, oder beenden Sie mit „abbrechen“.", False
+        return new_state, hint + "\n" + pending_quote_question(new_state), False
+
     if new_state.step == STEP_QUOTE_ANLIEGEN:
         if _is_quote_button(msg):
             return new_state, _quote_welcome_reply(), False
 
-        if len(msg) < 3:
+        if len(msg) < 3 or (changed and not new_state.problem):
             return new_state, "Bitte beschreiben Sie kurz, wofür Sie einen Kostenvoranschlag möchten.", False
 
-        new_state.problem = msg
-        new_state.step = STEP_QUOTE_FAHRZEUG
-        return new_state, _ask_vehicle_reply(), False
+        new_state.problem = new_state.problem or msg
+        return _advance_quote(new_state)
 
     if new_state.step == STEP_QUOTE_FAHRZEUG:
-        fahrzeug = cleanup_vehicle_text(msg)
-        if len(fahrzeug) < 3:
+        if not new_state.fahrzeug:
             return new_state, "Bitte nennen Sie kurz Marke und Modell des Fahrzeugs.", False
-
-        new_state.fahrzeug = fahrzeug
-        new_state.baujahr = extract_year(msg)
-        new_state.step = STEP_QUOTE_TELEFON
-        return new_state, _ask_phone_reply(), False
+        return _advance_quote(new_state)
 
     if new_state.step == STEP_QUOTE_TELEFON:
         phone = extract_phone(msg)
@@ -149,14 +189,15 @@ def handle_quote_request(
             return new_state, _ask_phone_invalid_reply(), False
 
         new_state.telefon = phone
-        new_state.step = STEP_QUOTE_NAME
-        return new_state, _ask_name_reply(), False
+        return _advance_quote(new_state)
 
     if new_state.step == STEP_QUOTE_NAME:
-        if lower(msg) in SKIP_VALUES:
+        if lower(msg) in SKIP_VALUES or is_unavailable_answer(msg):
             new_state.name = None
         else:
             new_state.name = extract_name_candidate(msg)
+            if not new_state.name:
+                return new_state, _ask_name_reply(), False
 
         new_state.step = STEP_FERTIG
         return new_state, _completion_reply(new_state), True

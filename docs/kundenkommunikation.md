@@ -54,6 +54,63 @@ Gesprächszustand gespeichert.
   Werkstatt-Rückfragen mit `response_cancelled_at`. Offene Kundenfragen bleiben
   erhalten. Textklassifikation kann die manuelle Übernahme nicht aufheben.
 
+## Aufnahme in Webchat und WhatsApp
+
+Die Aufnahme nutzt in beiden Kanälen dieselbe Feldextraktion und Validierung.
+Meldungseinleitungen, auch mit kleinen Tippfehlern, starten die Aufnahme, ohne
+selbst als Defekt gespeichert zu werden. Enthaltene konkrete Anliegen bleiben
+erhalten. Eindeutige Fahrzeug-, Jahres-, Kilometer- und Kontaktangaben werden
+gemeinsam verarbeitet; ausdrückliche Korrekturen ersetzen die betreffenden
+Felder auch außerhalb des gerade abgefragten Schritts.
+
+Ein ausdrücklich neues Anliegen nach einer abgeschlossenen Aufnahme erhält
+einen frischen Intake-State ohne alte Ticket-ID oder Problemdaten. WhatsApp
+übernimmt eine ausdrücklich geleerte Ticket-ID auch in die Transportkontrolle,
+statt erneut die vorherige ID einzusetzen. Bei unklarer Absicht fragt der
+Assistent nach neuem Anliegen oder Ergänzung. Ergänzungen und Statusabfragen
+bleiben beim bestehenden Zugriffsschutz. Manuelle Übernahmen und ausstehende
+Werkstattfragen behalten die oben beschriebenen Regeln.
+
+Abbruchbefehle werden vor der Feldverarbeitung behandelt. Symptome, Nichtwissen
+und Befehle werden nicht als Fahrzeug oder Name gespeichert. Die
+Symptomerkennung verwendet Wortgrenzen und berücksichtigt einfache
+Verneinungen. Niedrige Kilometerstände werden im Kilometerstand-Schritt auch
+ohne Einheit akzeptiert; Jahreszahlen im Freitext werden dadurch nicht pauschal
+zu Kilometerständen. Nebenfragen zu hinterlegten Werkstattdaten lassen die
+offene Aufnahmefrage bestehen.
+
+Die Pflichtfelder der normalen Aufnahme bleiben bestehen. Bei unbekanntem
+Baujahr nennt der Assistent die Fahrzeugunterlagen und die bereits akzeptierte
+Erstzulassung als Alternative. Der Name bleibt optional; beim Kostenvoranschlag
+ist das Baujahr weiterhin optional. Ob weitere Pflichtfelder übersprungen
+werden dürfen, bleibt eine Produktentscheidung. Wiederholtes Nichtwissen führt
+zu einer Erklärung und dem Angebot, später fortzufahren oder abzubrechen.
+
+Lokale Regressionstests stehen in `tests/test_intake_regressions.py`. Sie
+prüfen gespeicherte Tickets und beide Kanalvarianten, außerdem den öffentlichen
+Webchat und signierte Meta-Webhooks mit simuliertem Versand. Bestehende
+Zugriffs-, Übergabe- und WhatsApp-Tests bleiben Teil des vollständigen Laufs:
+
+```text
+python -m unittest discover -s tests -p "test_intake_regressions.py" -q
+python -m unittest discover -s tests -p "test_*.py" -q
+```
+
+Für die Prüfung nach dem Deployment in beiden Kanälen mit eigenen Testkontakten:
+
+1. Zwei Meldungen in derselben Sitzung abschließen und beide gespeicherten
+   Datensätze prüfen: verschiedene IDs, erstes Ticket unverändert.
+2. Fahrzeug und Telefonnummer während der Aufnahme korrigieren und anschließend
+   die gespeicherten Werte kontrollieren.
+3. Kostenvoranschlag am Telefon- und Namensschritt abbrechen: kein neues Ticket.
+4. Ölwechsel mit Telefonnummer in der ersten Nachricht sowie die vier Formate
+   `8500`, `8.500`, `8500 km`, `8.500 km` testen.
+5. Öffnungszeiten als Nebenfrage, unbekanntes Baujahr und eine echte Statusfrage
+   prüfen; ein fremder Kontakt darf keine Ticketdaten erhalten.
+
+Diese lokalen Tests ersetzen keine Online-Prüfung oder Prüfung mit PostgreSQL.
+Die Gesprächskorrekturen erfordern keine Änderung des Datenbankschemas.
+
 ## Versand und gleichzeitige Bearbeitung
 
 Manuelle Nachrichten werden vor dem HTTP-Aufruf mit einer stabilen ID reserviert,

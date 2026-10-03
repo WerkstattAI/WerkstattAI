@@ -258,6 +258,31 @@ class WhatsAppReliabilityTests(unittest.TestCase):
             self.assertEqual(sum(result["processed"] for result in results), 1)
         self.assertEqual(self.count("whatsapp_messages"), 2)
 
+    def test_duplicate_webhooks_prepared_before_delivery_are_counted_once(self):
+        from threading import Barrier
+
+        barrier = Barrier(2)
+        original_prepare = prepare_whatsapp_inbound
+
+        def prepare_before_delivery(**kwargs):
+            result = original_prepare(**kwargs)
+            # Both handlers see the same durable pending reply before either
+            # claims it, making the duplicate delivery race reproducible.
+            barrier.wait(timeout=15)
+            return result
+
+        payload = self.payload("wamid.concurrent-prepared")
+        with patch("app.whatsapp.prepare_whatsapp_inbound", side_effect=prepare_before_delivery), \
+                patch.object(main, "process_chat_message", return_value=ChatResponse(reply="Once", done=False)) as process, \
+                patch.object(main, "send_whatsapp_text_message", return_value=WhatsAppSendResult(True, 200, "wamid.once", {})) as send:
+            with ThreadPoolExecutor(max_workers=2) as pool:
+                results = list(pool.map(lambda _: self.webhook(payload), range(2)))
+        self.assertEqual(process.call_count, 1)
+        self.assertEqual(send.call_count, 1)
+        self.assertEqual(sum(result["processed"] for result in results), 1)
+        self.assertEqual(sum(result["ignored"] for result in results), 1)
+        self.assertEqual(self.count("whatsapp_messages"), 2)
+
     def test_parallel_ticket_notes_are_all_preserved(self):
         ticket_id = save_ticket(IntakeState(telefon=self.phone), workshop_id=self.wid)
         with ThreadPoolExecutor(max_workers=4) as pool:

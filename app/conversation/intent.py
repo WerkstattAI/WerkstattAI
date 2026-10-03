@@ -17,7 +17,11 @@ from app.conversation.constants import (
     STEP_QUOTE_TELEFON,
     STEP_TELEFON,
 )
-from app.conversation.extractors import can_extract_vehicle, extract_km, extract_year, lower, normalize
+from app.conversation.extractors import (
+    can_extract_vehicle, extract_km, extract_year, extract_phone, lower, normalize,
+    strip_request_announcement,
+    has_problem_content,
+)
 from app.models import IntakeState
 
 
@@ -47,40 +51,6 @@ ACTIVE_QUOTE_STEPS = {
     STEP_QUOTE_NAME,
 }
 
-
-EXISTING_TICKET_KEYWORDS = [
-    "bestehendes ticket",
-    "bestehenden ticket",
-    "anfrage zu einem bestehenden ticket",
-    "ticket",
-    "ticketnr",
-    "ticket-nr",
-    "ticketnummer",
-    "status",
-    "auftrag",
-    "fall",
-    "notiz",
-    "notizen",
-    "zusammenfassung",
-    "zusammenfassen",
-    "zusammengefasst",
-    "zeige",
-    "zeig",
-    "such",
-    "suche",
-    "finden",
-    "finde",
-    "kundenname",
-    "telefonnummer",
-    "telefon",
-    "nummer",
-    "kontakt",
-    "priorität",
-    "prioritaet",
-    "fahrzeug",
-    "was war",
-    "was steht",
-]
 
 GENERAL_QUESTION_KEYWORDS = [
     "allgemeine frage",
@@ -201,14 +171,6 @@ AI_FREEFORM_HINTS = [
     "erstelle mir",
 ]
 
-EXPLICIT_NEW_REQUEST_CHOICES = [
-    "problem melden",
-    "neues problem",
-    "neue meldung",
-    "ich möchte ein problem melden",
-    "ich moechte ein problem melden",
-]
-
 EXPLICIT_GENERAL_CHOICES = [
     "allgemeine frage",
     "eine allgemeine frage",
@@ -260,50 +222,21 @@ def extract_ticket_reference(text: str) -> str | None:
 
 
 def extract_phone_reference(text: str) -> str | None:
-    """
-    Erkennt grob Telefonnummern im Text.
-    Für die Intent-Erkennung reicht das:
-    Wenn >= 7 Ziffern vorkommen, behandeln wir das als mögliche Telefonsuche.
-    """
-    t = normalize(text)
-    tl = lower(t)
-
-    has_phone_context = any(
-        keyword in tl
-        for keyword in [
-            "telefon",
-            "telefonnummer",
-            "nummer",
-            "handy",
-            "mobil",
-            "rufnummer",
-        ]
-    )
-
-    if not has_phone_context and (extract_year(t) or extract_km(t)):
-        return None
-
-    digits = re.sub(r"\D", "", t)
-
-    if len(digits) >= 7:
-        return digits
-
-    return None
+    """Extract a lookup value; intent and authorization are checked separately."""
+    phone = extract_phone(text)
+    return re.sub(r"\D", "", phone) if phone else None
 
 
 def looks_like_existing_ticket_question(text: str) -> bool:
-    t = lower(text)
+    t = _without_negated_ticket_context(text)
 
     if extract_ticket_reference(text):
         return True
 
-    if extract_phone_reference(text):
-        return True
-
-    if (extract_year(text) or extract_km(text)) and "ticket" not in t:
-        return False
-
-    return any(keyword in t for keyword in EXISTING_TICKET_KEYWORDS)
+    return bool(re.search(
+        r"\b(?:ticket\w*|status|auftrag|fall|notizen?|zusammenfassung|zusammenfassen)\b|"
+        r"\b(?:auto|wagen|fahrzeug) (?:schon )?fertig\b", t,
+    ))
 
 
 def looks_like_general_question(text: str) -> bool:
@@ -320,7 +253,7 @@ def looks_like_general_question(text: str) -> bool:
 
 def looks_like_new_request(text: str) -> bool:
     t = lower(text)
-    return any(keyword in t for keyword in NEW_REQUEST_HINTS)
+    return any(keyword in t for keyword in NEW_REQUEST_HINTS) or has_problem_content(text)
 
 
 def looks_like_quote_request(text: str) -> bool:
@@ -387,7 +320,11 @@ def looks_like_vehicle_intake_start(text: str) -> bool:
 
 def has_explicit_new_request_choice(text: str) -> bool:
     t = lower(text).rstrip(".")
-    return any(keyword in t for keyword in EXPLICIT_NEW_REQUEST_CHOICES)
+    return strip_request_announcement(text)[1] or bool(re.search(
+        r"\b(?:neues (?:problem|anliegen)|neue (?:meldung|anfrage))\b", t,
+    )) or (looks_like_new_request(text) and bool(re.search(
+        r"\banmelden\b|\bkein(?:e[nms]?)? (?:altes?|bestehendes?) ticket\b", t,
+    )))
 
 
 def has_explicit_general_choice(text: str) -> bool:
@@ -396,16 +333,20 @@ def has_explicit_general_choice(text: str) -> bool:
 
 
 def has_explicit_existing_choice(text: str) -> bool:
-    t = lower(text).rstrip(".")
+    t = _without_negated_ticket_context(text).rstrip(".")
     return any(keyword in t for keyword in EXPLICIT_EXISTING_CHOICES)
 
 
 def has_direct_ticket_reference(text: str) -> bool:
-    return bool(extract_ticket_reference(text) or extract_phone_reference(text))
+    return bool(extract_ticket_reference(text))
+
+
+def _without_negated_ticket_context(text: str) -> str:
+    return re.sub(r"\b(?:kein\w*|nicht)\s+(?:(?:alt\w*|bestehend\w*)\s+)?(?:ticket\w*|auftrag)\b", "", lower(text))
 
 
 def has_explicit_ticket_context(text: str) -> bool:
-    t = lower(text)
+    t = _without_negated_ticket_context(text)
     if has_direct_ticket_reference(text):
         return True
 
@@ -419,7 +360,7 @@ def has_explicit_ticket_context(text: str) -> bool:
         "auftrag",
         "fall",
     ]
-    return any(keyword in t for keyword in explicit_keywords)
+    return any(re.search(rf"\b{re.escape(keyword)}\b", t) for keyword in explicit_keywords)
 
 
 def detect_intent(state: IntakeState, user_message: str | None) -> str:
@@ -461,6 +402,9 @@ def detect_intent(state: IntakeState, user_message: str | None) -> str:
     if mode == "quote" and is_active_quote_step(getattr(state, "step", None)):
         return INTENT_QUOTE_REQUEST
 
+    if mode == "existing" and extract_phone_reference(msg):
+        return INTENT_EXISTING_TICKET
+
     if has_direct_ticket_reference(msg):
         return INTENT_EXISTING_TICKET
 
@@ -473,16 +417,16 @@ def detect_intent(state: IntakeState, user_message: str | None) -> str:
     if looks_like_ai_freeform_request(msg):
         return INTENT_UNCLEAR
 
-    if looks_like_general_question(msg) and not has_explicit_ticket_context(msg):
-        return INTENT_GENERAL_QUESTION
-
-    if mode == "existing" and getattr(state, "ticket_id", None):
-        return INTENT_EXISTING_TICKET
-
     if looks_like_existing_ticket_question(msg):
         return INTENT_EXISTING_TICKET
 
     if looks_like_new_request(msg) or looks_like_vehicle_intake_start(msg):
         return INTENT_NEW_REQUEST
+
+    if extract_phone_reference(msg):
+        return INTENT_UNCLEAR
+
+    if looks_like_general_question(msg) and not has_explicit_ticket_context(msg):
+        return INTENT_GENERAL_QUESTION
 
     return INTENT_UNCLEAR

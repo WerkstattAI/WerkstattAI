@@ -467,6 +467,9 @@ async def whatsapp_webhook(request: Request):
         )
         if send_info.get("retry"):
             raise HTTPException(status_code=503, detail="WhatsApp delivery temporarily unavailable")
+        if send_info.get("already_dispatched"):
+            ignored += 1
+            continue
         if send_info.get("suppressed_reason"):
             manual_pending += 1
             manual_messages.append({

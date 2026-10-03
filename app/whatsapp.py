@@ -672,13 +672,15 @@ def prepare_whatsapp_inbound(*, workshop_id: str, message: WhatsAppInboundMessag
             return {"action": "manual", "active_ticket_id": active_ticket_id, "reason": "customer_service_window_closed"}
 
         response = process_message()
-        ticket_id = str(response.data.get("ticket_id") or active_ticket_id or "").strip() or None
+        # An explicit None means a fresh/cancelled intake. Only processors that
+        # omit the field may retain the transport's current ticket reference.
+        ticket_id = str(response.data.get("ticket_id", active_ticket_id) or "").strip() or None
         current = get_whatsapp_conversation_control(workshop_id=workshop_id, customer_phone=message.from_phone)
         if current["conversation_state"] in {"workshop_active", "waiting_for_customer"}:
             complete()
             return {"action": "manual", "active_ticket_id": current.get("active_ticket_id"),
                     "reason": "manual_takeover_before_assistant_reply"}
-        if ticket_id:
+        if ticket_id or "ticket_id" in response.data:
             conn.execute("UPDATE whatsapp_conversation_controls SET active_ticket_id = ? WHERE workshop_id = ? AND customer_phone = ?",
                          (ticket_id, workshop_id, message.from_phone))
         current = get_whatsapp_conversation_control(workshop_id=workshop_id, customer_phone=message.from_phone)
@@ -727,7 +729,8 @@ def deliver_prepared_whatsapp_reply(*, workshop_id: str, customer_phone: str,
             return {"status": "failed", "wa_message_id": None, "retry": False, "meta_error": "Prepared reply is missing"}
         reply = dict(result)
         if reply["dispatch_state"] != "pending":
-            return {"status": reply["status"], "wa_message_id": reply["wa_message_id"], "retry": False}
+            return {"status": reply["status"], "wa_message_id": reply["wa_message_id"], "retry": False,
+                    "already_dispatched": True}
         if conn.execute("SELECT 1 FROM whatsapp_messages WHERE workshop_id = ? AND customer_phone = ? "
                         "AND direction = 'outbound' AND dispatch_state = 'sending' AND id <> ? LIMIT 1",
                         (workshop_id, customer_phone, reply["id"])).fetchone():
