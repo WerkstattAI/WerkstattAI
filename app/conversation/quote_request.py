@@ -149,12 +149,16 @@ def handle_quote_request(
     }:
         new_state.step = STEP_QUOTE_ANLIEGEN
 
-    changed, correction = consume_intake_fields(
+    update = consume_intake_fields(
         new_state, msg, vehicle_answer=new_state.step == STEP_QUOTE_FAHRZEUG or is_correction(msg),
     )
-    if correction:
+    if update.correction:
+        if new_state.pending_vehicle_correction:
+            return new_state, "Welches Fahrzeug ist richtig? Bitte nennen Sie Marke und Modell.", False
         result_state, reply, done = _advance_quote(new_state)
-        prefix = "Danke, die Angaben sind korrigiert." if changed else "Welche Angabe soll ich korrigieren?"
+        prefix = ("Danke, die Angaben sind korrigiert." if update.changed else
+                  "Diese Angaben sind bereits gespeichert." if update.recognized else
+                  "Welche Angabe soll ich korrigieren?")
         return result_state, prefix + "\n" + reply, done
     if is_unavailable_answer(msg) and new_state.step != STEP_QUOTE_NAME:
         attempts = new_state.unavailable_attempts.get(new_state.step, 0) + 1
@@ -172,7 +176,7 @@ def handle_quote_request(
         if _is_quote_button(msg):
             return new_state, _quote_welcome_reply(), False
 
-        if len(msg) < 3 or (changed and not new_state.problem):
+        if len(msg) < 3 or (update.recognized and not new_state.problem):
             return new_state, "Bitte beschreiben Sie kurz, wofür Sie einen Kostenvoranschlag möchten.", False
 
         new_state.problem = new_state.problem or msg

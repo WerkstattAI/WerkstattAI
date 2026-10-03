@@ -83,3 +83,4 @@ class IntakeState(BaseModel):
     last_user_message: Optional[str] = None
     unavailable_attempts: Dict[str, int] = Field(default_factory=dict)
     pending_request_message: Optional[str] = None
+    pending_vehicle_correction: bool = False

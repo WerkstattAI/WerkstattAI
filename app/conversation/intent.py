@@ -277,12 +277,17 @@ def looks_like_price_overview_question(text: str) -> bool:
 
 def looks_like_ai_freeform_request(text: str) -> bool:
     t = lower(text)
-    return any(keyword in t for keyword in AI_FREEFORM_HINTS)
+    # The abbreviation must not match vehicle data such as 'Kilometerstand'.
+    return any(bool(re.search(r"\bki\b", t)) if keyword == "ki" else keyword in t
+               for keyword in AI_FREEFORM_HINTS)
 
 
 def looks_like_vehicle_intake_start(text: str) -> bool:
     if not can_extract_vehicle(text):
-        return False
+        # Labelled inline facts are not themselves a plain vehicle name.
+        # Let the shared extractor separate them before rejecting the entry.
+        from app.conversation.intake_fields import extract_intake_fields
+        return bool(extract_intake_fields(text).get("fahrzeug"))
 
     if extract_year(text) or extract_km(text):
         return True

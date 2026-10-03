@@ -52,12 +52,52 @@ def is_correction(text: str) -> bool:
     return bool(re.search(
         r"\b(?:sorry|entschuldigung|meinte|korrektur|korrigier\w*|falsch\w*|statt|richtigstellung)\b",
         lower(text),
+    ) or is_vehicle_correction(text))
+
+
+def is_vehicle_correction(text: str) -> bool:
+    return bool(re.match(
+        r"^nein[, :]\s*(?:es ist|das ist|ich fahre|mein (?:auto|fahrzeug) ist)\b",
+        lower(text),
     ))
 
 
+def find_year(text: str) -> re.Match | None:
+    """Prefer a labelled year, otherwise the last year in vehicle facts.
+
+    Earlier numbers can belong to the model (e.g. a four-digit model followed
+    by a year). Callers retain the match span rather than deleting all years.
+    """
+    labelled = list(re.finditer(
+        r"\b(?:bj|baujahr|erstzulassung|ez)\b\s*(?:ist|lautet)?\s*[:=.]?\s*(19\d{2}|20\d{2})\b",
+        text, re.I,
+    ))
+    if labelled:
+        return labelled[0] if len({m[1] for m in labelled}) == 1 else None
+    km = extract_km_fact(text)
+    years = [m for m in re.finditer(r"\b(19\d{2}|20\d{2})\b", text)
+             if not km or not (km[1][0] <= m.start() < km[1][1])]
+    return years[-1] if years else None
+
+
 def extract_year(text: str) -> str | None:
-    m = re.search(r"\b(19\d{2}|20\d{2})\b", text)
-    return m.group(1) if m else None
+    match = find_year(text)
+    return match[1] if match else None
+
+
+def extract_km_fact(text: str) -> tuple[str, tuple[int, int]] | None:
+    """Return the value and just its numeric/unit span, preserving model digits."""
+    for pattern, multiplier in (
+        (r"\b(\d{2,3})\s*(?:k|tkm)\b", 1000),
+        (r"\b(\d{1,3}(?:[.\s]\d{3})+|\d{1,7})\s*km\b", 1),
+        (r"\b(\d{1,3}(?:\.\d{3})+)\b", 1),
+        (r"\b(\d{5,7})\b", 1),
+    ):
+        for match in re.finditer(pattern, text, re.I):
+            digits = re.sub(r"\D", "", match[1])
+            if len(digits) <= 7:
+                return str(int(digits) * multiplier), match.span()
+    return None
 
 
 def extract_km(text: str, *, expected: bool = False) -> str | None:
@@ -79,26 +119,8 @@ def extract_km(text: str, *, expected: bool = False) -> str | None:
     if expected and re.fullmatch(r"\d{1,7}|\d{1,3}(?:[.\s]\d{3})+", t):
         return str(int(re.sub(r"\D", "", t)))
 
-    m = re.search(r"\b(\d{2,3})\s*(k|tkm)\b", t)
-    if m:
-        return str(int(m.group(1)) * 1000)
-
-    m = re.search(r"\b(\d{1,3}(?:[.\s]\d{3})+|\d{1,7})\s*km\b", t)
-    if m:
-        raw = m.group(1)
-        digits = re.sub(r"\D", "", raw)
-        if 1 <= len(digits) <= 7:
-            return str(int(digits))
-
-    m = re.search(r"\b\d{1,3}(?:\.\d{3})+\b", t)
-    if m:
-        return str(int(m[0].replace(".", "")))
-
-    m = re.search(r"\b\d{5,7}\b", t)
-    if m:
-        return m.group(0)
-
-    return None
+    fact = extract_km_fact(t)
+    return fact[0] if fact else None
 
 
 def extract_phone(text: str) -> str | None:
@@ -108,8 +130,10 @@ def extract_phone(text: str) -> str | None:
     if label:
         raw = raw[label.end():]
     elif not re.fullmatch(r"\+?[\d ()/.-]+", raw):
-        raw = re.sub(r"\b(?:19|20)\d{2}\b", " ", raw)
-        raw = re.sub(r"\b\d[\d. ]*\s*(?:km|tkm|k)\b", " ", raw, flags=re.I)
+        km = extract_km_fact(raw)
+        if km and re.search(r"(?:km|tkm|k)\b", raw[km[1][0]:km[1][1]], re.I):
+            raw = raw[:km[1][0]] + " _ " + raw[km[1][1]:]
+        raw = re.sub(r"\b(?:19|20)\d{2}\b", " _ ", raw)
     for match in re.finditer(r"(?<!\w)\+?\d[\d ()/.-]*\d(?!\w)", raw):
         candidate = re.sub(r"[^\d+]", "", match[0])
         digits = re.sub(r"\D", "", candidate)

@@ -243,17 +243,21 @@ def handle_new_request(state: IntakeState, user_message: str | None) -> Tuple[In
     if announcement and not content:
         return new_state, ask_problem_reply(), False
 
-    changed, correction = consume_intake_fields(
+    update = consume_intake_fields(
         new_state, content, vehicle_answer=new_state.step == STEP_FAHRZEUG or is_correction(msg),
     )
-    if correction:
+    if update.correction:
+        if new_state.pending_vehicle_correction:
+            return new_state, "Welches Fahrzeug ist richtig? Bitte nennen Sie Marke und Modell.", False
         if new_state.step in {STEP_FAHRZEUG, STEP_BAUJAHR, STEP_KILOMETERSTAND, STEP_PROBLEM}:
             result_state, reply, done = _advance_initial_details(new_state)
         elif new_state.step in {STEP_TELEFON, STEP_NAME}:
             result_state, reply, done = _continue_to_contact(new_state)
         else:
             result_state, reply, done = new_state, pending_intake_question(new_state), False
-        prefix = "Danke, die Angaben sind korrigiert." if changed else "Welche Angabe soll ich korrigieren?"
+        prefix = ("Danke, die Angaben sind korrigiert." if update.changed else
+                  "Diese Angaben sind bereits gespeichert." if update.recognized else
+                  "Welche Angabe soll ich korrigieren?")
         return result_state, prefix + "\n" + reply, done
 
     if is_unavailable_answer(msg) and new_state.step not in {STEP_NAME, STEP_FOLLOWUP}:
@@ -294,7 +298,7 @@ def handle_new_request(state: IntakeState, user_message: str | None) -> Tuple[In
         return _advance_initial_details(new_state)
 
     if new_state.step == STEP_PROBLEM:
-        if len(msg) < 3 or (changed and not new_state.problem):
+        if len(msg) < 3 or (update.recognized and not new_state.problem):
             return new_state, ask_problem_invalid_reply(), False
 
         new_state.problem = new_state.problem or content
