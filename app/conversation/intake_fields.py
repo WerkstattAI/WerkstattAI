@@ -111,6 +111,10 @@ class IntakeFieldUpdate:
 
 def consume_intake_fields(state: IntakeState, text: str, *, vehicle_answer: bool = False) -> IntakeFieldUpdate:
     fields = extract_intake_fields(text, vehicle_answer=vehicle_answer or state.pending_vehicle_correction)
+    if state.fahrzeug and normalize(text).strip(" ,.;:!?").casefold() == normalize(state.fahrzeug).strip(" ,.;:!?").casefold():
+        # Match the whole known vehicle, never a substring of a symptom.
+        # Preserve its stored spelling and mark an unchanged fact as recognized.
+        fields["fahrzeug"] = state.fahrzeug
     if state.step in {"telefon", "quote_telefon"} and "telefon" not in fields:
         # At the contact step a valid phone is the expected answer, including
         # a short apology/preamble that is not itself a correction target.

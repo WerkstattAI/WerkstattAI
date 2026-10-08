@@ -52,7 +52,12 @@ def is_correction(text: str) -> bool:
     return bool(re.search(
         r"\b(?:sorry|entschuldigung|meinte|korrektur|korrigier\w*|falsch\w*|statt|richtigstellung)\b",
         lower(text),
-    ) or is_vehicle_correction(text))
+    ) or is_vehicle_correction(text) or (
+        re.match(
+            r"^nein[, :]+\s*(?:meine?\s+)?(?:telefonnummer|telefon|tel|handy|mobil|rufnummer|nummer)\s+"
+            r"(?:ist|lautet)\b", lower(text),
+        ) and extract_phone(text)
+    ))
 
 
 def is_vehicle_correction(text: str) -> bool:
