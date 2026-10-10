@@ -33,6 +33,7 @@ from app.models import (
     WhatsAppWebhookRequest,
     WhatsAppWebhookResponse,
 )
+from app.security_config import MAX_ID_LENGTH
 from app.tickets import (
     find_ticket_by_id,
     list_latest_tickets,
@@ -589,6 +590,32 @@ def chat(payload: ChatRequest, request: Request, response: Response) -> ChatResp
     # The browser needs only workflow status, not the complete persisted state.
     return ChatResponse(reply=result.reply, done=result.done, data={
         key: result.data.get(key) for key in ("step", "mode", "workshop_id", "ticket_id", "request_type", "priority", "conversation_state", "workshop_messages")
+    })
+
+
+@app.get("/chat/messages", response_model=ChatResponse)
+def chat_messages(request: Request, response: Response,
+                  session_id: str = Query(..., min_length=1, max_length=MAX_ID_LENGTH, pattern=r"\S"),
+                  workshop_id: str | None = Query(None, max_length=MAX_ID_LENGTH)) -> ChatResponse:
+    """Read only the browser-owned conversation; polling never appends messages."""
+    wid = demo_workshop_id() if workshop_id is None else workshop_id.strip()
+    if not wid:
+        raise HTTPException(status_code=404, detail="Werkstatt wurde nicht gefunden.")
+    sid = bound_web_session(request, response, wid, session_id)
+    state = load_session_state(sid, workshop_id=wid, channel="web_chat")
+    ticket = find_ticket_by_id(state.ticket_id, wid) if state.ticket_id else None
+    access = CustomerAccess(wid, frozenset({state.ticket_id}) if state.ticket_id else frozenset())
+    if not access.allows(ticket):
+        ticket = None
+    messages = [{key: note.get(key) for key in ("message_id", "text", "purpose", "created_at")}
+                for note in (ticket or {}).get("notes", [])
+                if note.get("sender_role") == "workshop"
+                and note.get("purpose") in {"workshop_answer", "workshop_question", "workshop_notification"}
+                and note.get("delivery_status") in {None, "sent"}]
+    return ChatResponse(reply="", done=False, data={
+        "ticket_id": (ticket or {}).get("ticket_id"),
+        "conversation_state": (ticket or {}).get("conversation_state", "assistant_active"),
+        "workshop_messages": messages,
     })
 
 

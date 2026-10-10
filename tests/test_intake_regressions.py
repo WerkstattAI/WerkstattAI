@@ -26,7 +26,252 @@ from app.tickets import find_ticket_by_id
 from app.whatsapp import WhatsAppSendResult, list_whatsapp_messages
 
 
+L01_CANCEL_COMMANDS = (
+    "ich würde gerne abbrechen", "ich möchte die Anfrage jetzt abbrechen",
+    "ich möchte bitte abbrechen", "ich würde gern abbrechen",
+    "bitte die Anfrage jetzt abbrechen!",
+)
+
+
 class IntakeScenarios:
+    def test_l01_polite_cancellation_preserves_previous_ticket_and_restarts(self):
+        first = self.finish(("VW Golf 2016 120000 km", "Ölwechsel", "0000000000", "Erster Kunde"))
+        for quote in (False, True):
+            for name in (False, True):
+                for command in L01_CANCEL_COMMANDS:
+                    with self.subTest(quote=quote, name=name, command=command):
+                        self.send("Problem melden")
+                        if quote:
+                            # A fresh quote, without an existing new-intake mode.
+                            self.send("abbrechen")
+                        self.start_contact(quote, name)
+                        count = self.ticket_count()
+                        with patch("app.main.save_ticket", side_effect=AssertionError("Unexpected completion")) as save:
+                            result = self.send(command)
+                            save.assert_not_called()
+                        self.assert_open_without_completion(result, count)
+                        self.assertEqual(result.data["mode"], "unknown")
+                        self.assertIn("abgebrochen", result.reply)
+                        for field in ("fahrzeug", "baujahr", "kilometerstand", "problem", "telefon", "name",
+                                      "fahrbereit", "abschleppdienst", "pending_request_message"):
+                            self.assertIsNone(result.data[field], field)
+                        self.assertEqual(find_ticket_by_id(first["ticket_id"], self.wid), first)
+        ticket = self.finish(("Audi A4 2018 90000 km", "Reifenwechsel", "0000000001", "Neuer Kunde"))
+        self.assert_saved_intake(ticket, vehicle="Audi A4", year="2018", km="90000",
+                                 problem="Reifenwechsel", phone="0000000001")
+        self.assertEqual(self.ticket_count(), self.count_before + 2)
+        self.assertEqual(find_ticket_by_id(first["ticket_id"], self.wid), first)
+
+    def test_l02_compact_vehicle_facts_and_repeated_mileage_are_saved(self):
+        for message in ("VW Golf 2016,120000 km", "VW Golf,2016,120000 km", "VW Golf 2016:120000 km"):
+            for repeat in (False, True):
+                with self.subTest(message=message, repeat=repeat):
+                    self.sid = uuid.uuid4().hex
+                    count = self.ticket_count()
+                    result = self.send(message)
+                    self.assertEqual(result.data["fahrzeug"], "VW Golf")
+                    self.assertEqual(result.data["baujahr"], "2016")
+                    self.assertEqual(result.data["kilometerstand"], "120000")
+                    self.assertEqual(result.data["step"], "problem")
+                    self.assertIn("Anliegen", result.reply)
+                    if repeat:
+                        result = self.send("120000 km")
+                        self.assertEqual(result.data["step"], "problem")
+                        self.assertIsNone(result.data["problem"])
+                    self.assert_open_without_completion(result, count)
+                    ticket = self.finish(("Ölwechsel", "0000000000", "Testkunde"))
+                    self.assert_saved_intake(ticket)
+                    self.assertEqual(self.ticket_count(), count + 1)
+
+    def test_l02_compact_facts_preserve_numeric_and_unknown_models(self):
+        for vehicle in ("BMW 320", "Mercedes E 220", "Peugeot 2008", "Fiat 500", "Tesla Model 3", "Testmarke Q 170"):
+            self.sid = uuid.uuid4().hex
+            result = self.send(vehicle + ",2020,8500 km")
+            self.assertEqual(result.data["fahrzeug"], vehicle)
+            self.assertEqual(result.data["step"], "problem")
+            ticket = self.finish(("Ölwechsel", "0000000000", "Testkunde"))
+            self.assert_saved_intake(ticket, vehicle=vehicle, year="2020", km="8500")
+
+    def start_contact(self, quote=False, name=True):
+        if quote:
+            self.send("was kostet Ölwechsel")
+        self.send("VW Golf 2016 120000 km")
+        if not quote:
+            self.send("Ölwechsel")
+        if name:
+            self.send("0000000000")
+
+    def assert_open_without_completion(self, result, count):
+        self.assertFalse(result.done)
+        self.assertIsNone(result.data["ticket_id"])
+        self.assertEqual(self.ticket_count(), count)
+        self.assertEqual(result.data["workshop_messages"], [])
+        self.assertNotIn("Ticket-Nr.", result.reply)
+
+    def test_b01_natural_cancellation_and_fresh_restart(self):
+        for quote in (False, True):
+            for name in (False, True):
+                for command in ("ich möchte abbrechen", "bitte die Anfrage abbrechen!", "doch abbrechen."):
+                    with self.subTest(quote=quote, name=name, command=command):
+                        self.sid = uuid.uuid4().hex
+                        self.start_contact(quote, name)
+                        count = self.ticket_count()
+                        with patch("app.main.save_ticket", side_effect=AssertionError("Unexpected ticket completion")) as save:
+                            result = self.send(command)
+                            save.assert_not_called()
+                        self.assert_open_without_completion(result, count)
+                        self.assertEqual(result.data["mode"], "unknown")
+                        self.assertIn("abgebrochen", result.reply)
+                        for field in ("fahrzeug", "baujahr", "kilometerstand", "problem", "telefon", "name"):
+                            self.assertIsNone(result.data[field], field)
+                        ticket = self.finish(("Audi A4 2018 90000 km", "Reifenwechsel", "0000000001", "Jörg Müller"))
+                        self.assert_saved_intake(ticket, vehicle="Audi A4", year="2018", km="90000",
+                                                 problem="Reifenwechsel", phone="0000000001")
+
+    def test_b01_negation_and_broken_key_do_not_cancel(self):
+        for quote in (False, True):
+            for message in ("ich möchte nicht abbrechen", "nicht abbrechen", "der Schlüssel ist abgebrochen"):
+                with self.subTest(quote=quote, message=message):
+                    self.sid = uuid.uuid4().hex
+                    self.start_contact(quote, name=False)
+                    result = self.send(message)
+                    self.assertEqual(result.data["mode"], "quote" if quote else "new")
+                    self.assertEqual(result.data["fahrzeug"], "VW Golf")
+                    self.assertNotIn("Aufnahme ist abgebrochen", result.reply)
+                    ticket = self.finish(("0000000000", "Jörg Müller"))
+                    self.assertEqual(ticket["name"], "Jörg Müller")
+
+    def test_b02_contact_corrections_in_both_flows(self):
+        for quote in (False, True):
+            for correction in ("nein! meine nummer ist 0000000001", "nein, meine nummer: 0000000001",
+                               "meine neue nummer ist 0000000001", "nein meine Handynummer ist 0000000001",
+                               "Nein, meine Telefonnummer lautet 0000000001", "nein meine rufnummer ist 0000000001",
+                               "sorry, ich meinte 0000000001"):
+                with self.subTest(quote=quote, correction=correction):
+                    self.sid = uuid.uuid4().hex
+                    self.start_contact(quote)
+                    count = self.ticket_count()
+                    result = self.send(correction)
+                    self.assert_open_without_completion(result, count)
+                    self.assertEqual(result.data["telefon"], "0000000001")
+                    self.assertIsNone(result.data["name"])
+                    self.assertEqual(result.data["step"], "quote_name" if quote else "name")
+                    self.assertIn("ansprechen", result.reply)
+                    ticket = self.finish(("Testkunde",))
+                    self.assert_saved_intake(ticket, phone="0000000001",
+                        problem="was kostet Ölwechsel" if quote else "Ölwechsel",
+                        request_type="kostenvoranschlag" if quote else "service")
+                    self.assertEqual(self.ticket_count(), count + 1)
+
+    def test_b02_invalid_contact_corrections_preserve_phone(self):
+        for message in ("nein", "meine neue Handynummer ist 123", "nein meine nummer: ungültig",
+                        "meine neue Handynummer ist ungültig",
+                        "Baujahr 2016", "120000 km", "BMW 320"):
+            self.sid = uuid.uuid4().hex
+            self.start_contact()
+            count = self.ticket_count()
+            result = self.send(message)
+            self.assertEqual(result.data["telefon"], "0000000000", message)
+            if message != "nein":  # Existing optional-name opt-out.
+                self.assert_open_without_completion(result, count)
+
+    def test_b02_contact_correction_before_vehicle_in_both_flows(self):
+        for quote in (False, True):
+            self.sid = uuid.uuid4().hex
+            request = "was kostet Ölwechsel" if quote else "Ölwechsel"
+            self.send(request + " Telefonnummer 0000000000")
+            result = self.send("meine neue Handynummer ist 0000000001")
+            self.assertEqual(result.data["telefon"], "0000000001")
+            self.assertEqual(result.data["step"], "quote_fahrzeug" if quote else "fahrzeug")
+            ticket = self.finish(("VW Golf 2016 120000 km", "Testkunde"))
+            self.assert_saved_intake(ticket, phone="0000000001", problem=request,
+                                     request_type="kostenvoranschlag" if quote else "service")
+
+    def test_b03_known_vehicle_at_name_step(self):
+        for quote in (False, True):
+            for repeated in ("VW Golf", "vw golf!", " VW   GOLF. "):
+                with self.subTest(quote=quote, repeated=repeated):
+                    self.sid = uuid.uuid4().hex
+                    self.start_contact(quote)
+                    count = self.ticket_count()
+                    result = self.send(repeated)
+                    self.assert_open_without_completion(result, count)
+                    self.assertIsNone(result.data["name"])
+                    self.assertEqual(result.data["step"], "quote_name" if quote else "name")
+                    self.assertIn("ansprechen", result.reply)
+                    ticket = self.finish(("Jörg Müller",))
+                    self.assertEqual(ticket["name"], "Jörg Müller")
+                    self.assertEqual(ticket["fahrzeug"], "VW Golf")
+                    self.assertEqual(self.ticket_count(), count + 1)
+
+    def test_b03_explicit_introduction_is_not_a_vehicle_repeat(self):
+        for introduction, name in (("mein Name ist Golf", "Golf"), ("Anna Handy", "Anna Handy"),
+                                   ("Service Tester", "Service Tester")):
+            self.sid = uuid.uuid4().hex
+            self.start_contact()
+            ticket = self.finish((introduction,))
+            self.assertEqual(ticket["name"], name)
+
+    def test_b04_invalid_whole_mileage_requires_clarification(self):
+        for value in ("-8500 km", "-120000", "120,000 km", "120.000,5 km"):
+            for message in (value, "Kilometerstand " + value):
+                with self.subTest(message=message):
+                    self.sid = uuid.uuid4().hex
+                    self.send("VW Golf 2016")
+                    count = self.ticket_count()
+                    result = self.send(message)
+                    self.assert_open_without_completion(result, count)
+                    self.assertEqual(result.data["step"], "kilometerstand")
+                    self.assertIsNone(result.data["kilometerstand"])
+                    self.assertIn("Kilometerstand", result.reply)
+                    ticket = self.finish(("8500 km", "Ölwechsel", "0000000000", "Testkunde"))
+                    self.assert_saved_intake(ticket, km="8500")
+
+    def test_b04_invalid_mileage_correction_keeps_valid_value(self):
+        for value in ("-8500 km", "-120000", "120,000 km", "120.000,5 km"):
+            self.sid = uuid.uuid4().hex
+            self.start_contact()
+            result = self.send("Korrektur: Kilometerstand " + value)
+            self.assertEqual(result.data["kilometerstand"], "120000", value)
+            self.assertFalse(result.done)
+            ticket = self.finish(("Testkunde",))
+            self.assert_saved_intake(ticket)
+
+    def test_b05_confirmed_new_request_retains_intent(self):
+        for first_quote, second_quote in ((False, True), (True, False), (False, False)):
+            with self.subTest(first_quote=first_quote, second_quote=second_quote):
+                self.sid = uuid.uuid4().hex
+                self.start_contact(first_quote)
+                first = self.finish(("Testkunde Eins",))
+                count = self.ticket_count()
+                request = "was kostet Reifenwechsel" if second_quote else "Reifenwechsel"
+                result = self.send(request)
+                self.assertIn("Ergänzung", result.reply)
+                result = self.send("neu")
+                self.assertFalse(result.done)
+                self.assertIsNone(result.data["fahrzeug"])
+                self.assertIsNone(result.data["telefon"])
+                self.assertEqual(result.data["mode"], "quote" if second_quote else "new")
+                second = self.finish(("Audi A4 2018 90000 km", "0000000001", "Testkunde Zwei"))
+                self.assert_saved_intake(second, vehicle="Audi A4", year="2018", km="90000", phone="0000000001",
+                    problem=request, request_type="kostenvoranschlag" if second_quote else "service")
+                self.assertEqual(second["name"], "Testkunde Zwei")
+                self.assertNotEqual(first["ticket_id"], second["ticket_id"])
+                self.assertEqual(find_ticket_by_id(first["ticket_id"], self.wid), first)
+                self.assertEqual(self.ticket_count(), count + 1)
+
+    def test_b05_price_supplement_stays_with_existing_ticket(self):
+        self.start_contact()
+        first = self.finish(("Testkunde",))
+        result = self.send("was kostet Reifenwechsel")
+        self.assertIn("Ergänzung", result.reply)
+        self.send("Ergänzung")
+        ticket = find_ticket_by_id(first["ticket_id"], self.wid)
+        self.assertEqual(self.ticket_count(), self.count_before + 1)
+        self.assertTrue(any("was kostet Reifenwechsel" in note.get("text", "") for note in ticket["notes"]))
+        for field in ("fahrzeug", "problem", "telefon", "name", "request_type"):
+            self.assertEqual(ticket[field], first[field])
+
     @classmethod
     def setUpClass(cls):
         cls.directory = tempfile.TemporaryDirectory(prefix="werkstattai-intake-regressions-")
@@ -459,7 +704,9 @@ class IntakeScenarios:
                                    "abschleppdienst", "followup", "telefon", "name")),
                             ("quote", ("quote_anliegen", "quote_fahrzeug", "quote_telefon", "quote_name"))):
             for step in steps:
-                for command in ("abbrechen", "stop", "Stopp!"):
+                for command in ("abbrechen", "stop", "Stopp!", "bitte abbrechen!", "abbrechen bitte", "stop bitte",
+                                "ich möchte abbrechen", "bitte die Anfrage abbrechen", "doch abbrechen",
+                                "ich will die Anfrage abbrechen", *L01_CANCEL_COMMANDS):
                     with self.subTest(mode=mode, step=step, command=command):
                         self.seed_state(mode=mode, step=step, fahrzeug="VW Golf", baujahr="2016",
                                         kilometerstand="8500", problem="Ölwechsel", telefon="0000000000")
@@ -478,7 +725,7 @@ class IntakeScenarios:
         first = self.finish(("VW Golf 2016 8500 km", "Ölwechsel", "0000000000", "Testperson"))
         self.send("Problem melden")
         self.send("VW Passat")
-        self.send("abbrechen")
+        self.send("ich möchte abbrechen")
         self.assertEqual(self.ticket_count(), self.count_before + 1)
         self.assertEqual(find_ticket_by_id(first["ticket_id"], self.wid), first)
 
@@ -669,7 +916,63 @@ class ExtractionAndRoutingRegressions(unittest.TestCase):
             self.assertIs(existing.call_args.kwargs["customer_access"], access)
 
 
+def check_l01_l02_transport(test, send):
+    """Exercise public transports; private fields are checked in saved records."""
+    def count():
+        with closing(get_conn()) as conn:
+            return conn.execute("SELECT COUNT(*) FROM tickets").fetchone()[0]
+
+    before = count()
+    for quote in (False, True):
+        if quote:
+            send("was kostet Ölwechsel")
+        send("VW Golf 2016 120000 km")
+        if not quote:
+            send("Ölwechsel")
+        send("0000000000")
+        with patch("app.main.save_ticket", side_effect=AssertionError("Unexpected completion")) as save:
+            result = send("ich würde gerne abbrechen")
+            save.assert_not_called()
+        test.assertFalse(result["done"])
+        test.assertEqual(result["data"]["mode"], "unknown")
+        test.assertIsNone(result["data"]["ticket_id"])
+        test.assertIn("abgebrochen", result["reply"])
+        test.assertNotIn("Ticket-Nr.", result["reply"])
+        test.assertEqual(count(), before)
+
+    for message in ("VW Golf 2016,120000 km", "VW Golf,2016,120000 km", "VW Golf 2016:120000 km"):
+        send("Problem melden")
+        result = send(message)
+        test.assertEqual(result["data"]["step"], "problem")
+        result = send("120000 km")
+        test.assertEqual(result["data"]["step"], "problem")
+        test.assertFalse(result["done"])
+        for text in ("Ölwechsel", "0000000000", "Testkunde"):
+            result = send(text)
+        test.assertTrue(result["done"])
+        ticket = find_ticket_by_id(result["data"]["ticket_id"], test.wid)
+        expected = dict(fahrzeug="VW Golf", baujahr="2016", kilometerstand="120000",
+                        problem="Ölwechsel", telefon="0000000000", name="Testkunde", request_type="service")
+        test.assertEqual({key: ticket[key] for key in expected}, expected)
+    test.assertEqual(count(), before + 3)
+
+
 class BrowserEndpointIntakeRegressions(unittest.TestCase):
+    def test_l01_l02_through_public_chat(self):
+        with tempfile.TemporaryDirectory(prefix="werkstattai-l01-l02-http-") as directory:
+            with patch.dict(os.environ, {"DATABASE_URL": "", "WERKSTATTAI_SQLITE_PATH": os.path.join(directory, "http.db")}):
+                init_db()
+                self.wid = settings.default_workshop_id
+                with TestClient(app) as client, patch("app.main.send_whatsapp_text_message") as sender:
+                    def send(message):
+                        response = client.post("/chat", json={"session_id": "l01-l02-http", "message": message,
+                                                              "workshop_id": self.wid})
+                        self.assertEqual(response.status_code, 200, response.text)
+                        return response.json()
+                    check_l01_l02_transport(self, send)
+                    sender.assert_not_called()
+                gc.collect()
+
     def test_vehicle_repeat_and_phone_correction_through_public_chat(self):
         with tempfile.TemporaryDirectory(prefix="werkstattai-intake-http-") as directory:
             with patch.dict(os.environ, {"DATABASE_URL": "", "WERKSTATTAI_SQLITE_PATH": os.path.join(directory, "http.db")}):
@@ -739,6 +1042,13 @@ class SignedWhatsAppIntakeRegressions(unittest.TestCase):
     payload = whatsapp_fixture.WhatsAppReliabilityTests.payload
     request = whatsapp_fixture.WhatsAppReliabilityTests.request
     webhook = whatsapp_fixture.WhatsAppReliabilityTests.webhook
+
+    def test_l01_l02_through_signed_webhook(self):
+        def send(message):
+            result = self.send(message)
+            state = load_session_state(whatsapp_session_id(self.phone), self.wid, channel="whatsapp")
+            return {**result, "data": state.model_dump()}
+        check_l01_l02_transport(self, send)
 
     def send(self, message):
         message_id = "wamid.intake." + uuid.uuid4().hex

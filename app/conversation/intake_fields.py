@@ -7,11 +7,11 @@ from app.conversation.extractors import (
     can_extract_vehicle, extract_km, extract_name_candidate, extract_phone,
     extract_km_fact, find_year, has_problem_content, is_correction, is_vehicle_correction, normalize,
     strip_request_announcement, infer_fahrbereit_from_text,
+    PHONE_LABEL,
 )
 from app.models import IntakeState
 
 
-PHONE_LABEL = r"\b(?:meine?\s+)?(?:telefonnummer|telefon|tel|handy|mobil|rufnummer|nummer)\b"
 PROBLEM_START = (
     r"\b(?:inspektion|service|wartung|kundendienst|[oö]lwechsel|oelwechsel|"
     r"reifenwechsel|räderwechsel|raederwechsel|tüv|tuev|hu|au|"
@@ -70,7 +70,6 @@ def extract_intake_fields(text: str, *, vehicle_answer: bool = False) -> dict[st
             fields["problem"] = facts.strip(" ,.;")
             vehicle_part = ""
 
-    km_fact = extract_km_fact(vehicle_part)
     year_match = find_year(vehicle_part)
     # One year-shaped number directly after a make could be the model. Keep
     # that vehicle text and ask for the missing year instead of guessing.
@@ -80,6 +79,19 @@ def extract_intake_fields(text: str, *, vehicle_answer: bool = False) -> dict[st
             from app.conversation.intent import looks_like_vehicle_intake_start
             if looks_like_vehicle_intake_start(prefix):
                 year_match = None
+    km_source = vehicle_part
+    if year_match:
+        prefix = vehicle_part[:year_match.start()].strip(" ,.;:")
+        if year_match.start() != year_match.start(1) or can_extract_vehicle(prefix):
+            # A recognized vehicle/year field may be followed by a compact
+            # delimiter. Mask that field before parsing mileage, preserving
+            # offsets and the strict rejection of separators inside a number.
+            end = year_match.end()
+            separator = re.match(r"[\s,:;]+", vehicle_part[end:])
+            if separator:
+                end += separator.end()
+            km_source = vehicle_part[:year_match.start()] + " " * (end - year_match.start()) + vehicle_part[end:]
+    km_fact = extract_km_fact(km_source)
     spans = []
     if year_match:
         fields["baujahr"] = year_match[1]
@@ -94,7 +106,7 @@ def extract_intake_fields(text: str, *, vehicle_answer: bool = False) -> dict[st
     vehicle_part = re.sub(r"\b(?:bj|baujahr|erstzulassung|ez|kilometerstand|km)\b\s*[:=]?", "", vehicle_part, flags=re.I)
     vehicle_part = re.sub(r"^(?:hallo|moin|guten tag|ich fahre|mein auto ist|mein fahrzeug ist|fahrzeug)\s*[:,]?\s*(?:(?:ein|eine|einen)\s+)?", "", vehicle_part, flags=re.I)
     vehicle_part = re.sub(r"\b(?:braucht|brauche|benötigt|benoetigt|bitte|und|hat|mit)\s*$", "", vehicle_part.strip(" ,.;"), flags=re.I)
-    vehicle_part = normalize(vehicle_part).strip(" ,.;")
+    vehicle_part = normalize(vehicle_part).strip(" ,.;:")
     if (vehicle_answer or year_match or km_fact) and can_extract_vehicle(vehicle_part):
         fields["fahrzeug"] = vehicle_part
     elif problem_match and "problem" in fields:

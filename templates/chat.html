@@ -633,6 +633,7 @@
   </div>
 
   <script nonce="{{ request.state.csp_nonce }}">
+    {% include '_chat_polling_script.html' %}
     const messagesEl = document.getElementById("messages");
     const formEl = document.getElementById("chatForm");
     const inputEl = document.getElementById("messageInput");
@@ -645,6 +646,7 @@
     const conversationStatus = document.getElementById("conversationStatus");
     const seenWorkshopMessages = new Set();
     let conversationState = "assistant_active";
+    let hasTicket = false;
 
     const WORKSHOP = {{ workshop | tojson }};
     const SESSION_STORAGE_KEY = "werkstattai_session_id:" + WORKSHOP.id;
@@ -810,6 +812,7 @@ Wählen Sie einen Bereich aus oder schreiben Sie direkt Ihr Anliegen.`;
 
     function renderCommunication(data) {
       const details = data?.data || {};
+      hasTicket = Boolean(details.ticket_id);
       conversationState = details.conversation_state || "assistant_active";
       conversationStatus.textContent = {
         assistant_active: "Assistent aktiv",
@@ -830,7 +833,30 @@ Wählen Sie einen Bereich aus oder schreiben Sie direkt Ihr Anliegen.`;
       }
     }
 
+    const workshopPoller = createWorkshopPoller({
+      getSession: () => sessionId,
+      isBusy: () => sendBtn.disabled || !hasTicket,
+      isVisible: () => document.visibilityState !== "hidden",
+      schedule: (callback, delay) => setTimeout(callback, delay),
+      unschedule: (timer) => clearTimeout(timer),
+      onUpdates: renderCommunication,
+      onError: () => {
+        conversationStatus.textContent = "Verbindung unterbrochen – neue Nachrichten werden später geladen";
+      },
+      fetchUpdates: async (currentSession) => {
+        const params = new URLSearchParams({workshop_id: WORKSHOP.id, session_id: currentSession});
+        const response = await fetch(`/chat/messages?${params}`, {cache: "no-store"});
+        if (!response.ok) {
+          const error = new Error("Nachrichten konnten nicht geladen werden");
+          if (response.status === 429) error.retryAfter = (Number(response.headers.get("Retry-After")) || 60) * 1000;
+          throw error;
+        }
+        return response.json();
+      },
+    });
+
     async function sendMessage(message) {
+      workshopPoller.wake();
       setLoading(true);
 
       try {
@@ -854,6 +880,7 @@ Wählen Sie einen Bereich aus oder schreiben Sie direkt Ihr Anliegen.`;
         updateCount();
       } finally {
         setLoading(false);
+        workshopPoller.wake();
       }
     }
 
@@ -861,6 +888,7 @@ Wählen Sie einen Bereich aus oder schreiben Sie direkt Ihr Anliegen.`;
       sessionId = createSessionId();
       localStorage.setItem(SESSION_STORAGE_KEY, sessionId);
       sessionIdBox.textContent = sessionId;
+      workshopPoller.wake();
 
       inputEl.value = "";
       updateCount();
@@ -908,9 +936,12 @@ Wählen Sie einen Bereich aus oder schreiben Sie direkt Ihr Anliegen.`;
     });
 
     resetBtn.addEventListener("click", resetChat);
+    document.addEventListener("visibilitychange", () => workshopPoller.wake());
+    window.addEventListener("pagehide", () => workshopPoller.stop());
+    window.addEventListener("pageshow", () => workshopPoller.start());
 
     updateCount();
-    restoreConversation();
+    restoreConversation().finally(() => workshopPoller.start());
   </script>
 </body>
 </html>

@@ -2178,6 +2178,13 @@
                   <div id="communication-{{ note.message_id }}" class="note-card {% if note.sender_role == 'customer' %}customer-question{% else %}customer-reply{% endif %}">
                     {{ communication.message_heading(note) }}
                     <div class="note-text">{{ note.text }}</div>
+                    {% if note.sender_role == 'customer' and note.purpose == 'customer_information' and note.requires_human_action and not note.resolved_at %}
+                    <form method="post" action="/dashboard/ticket/{{ ticket.ticket_view_id }}/information-resolve">
+                      <input type="hidden" name="workshop_id" value="{{ workshop_id }}" />
+                      <input type="hidden" name="message_id" value="{{ note.message_id }}" />
+                      <button type="submit">Als bearbeitet markieren</button>
+                    </form>
+                    {% endif %}
                     {% if note.reply_to_message_id %}<a class="communication-message-link" href="#communication-{{ note.reply_to_message_id }}">Bezug anzeigen</a>{% endif %}
                     <div class="note-date">{{ note.created_at_display }}</div>
                   </div>

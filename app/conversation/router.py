@@ -59,7 +59,11 @@ def next_step(
         state = copy_state(state)
         state.pending_request_message = None
         if has_explicit_new_request_choice(msg) or lower(msg).strip(" .!?") in {"neu", "neues", "neues ticket"}:
-            return handle_new_request(fresh_intake_state_from(state), pending)
+            # Classify the buffered request without the completed intake's mode.
+            fresh = fresh_intake_state_from(state, mode="unknown")
+            if detect_intent(fresh, pending) == INTENT_QUOTE_REQUEST:
+                return handle_quote_request(fresh, pending)
+            return handle_new_request(fresh, pending)
         if lower(msg).strip(" .!?") in {"ergänzung", "ergaenzung", "zum bestehenden ticket", "bestehendes ticket"}:
             return handle_existing_ticket(state, pending, customer_access=customer_access, message_id=message_id)
         state.pending_request_message = pending

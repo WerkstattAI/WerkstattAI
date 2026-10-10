@@ -398,6 +398,8 @@ def handle_new_request(state: IntakeState, user_message: str | None) -> Tuple[In
         return _continue_to_contact(new_state)
 
     if new_state.step == STEP_NAME:
+        if "fahrzeug" in update.recognized and "name" not in update.recognized:
+            return new_state, ask_name_reply(), False
         if lower(msg) in SKIP_VALUES or is_unavailable_answer(msg):
             new_state.name = None
         else:

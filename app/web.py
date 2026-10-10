@@ -43,6 +43,7 @@ from app.tickets import (
     save_ticket,
     update_ticket_status,
     set_ticket_conversation_state,
+    resolve_customer_information,
     validate_workshop_message,
 )
 from app.whatsapp import (
@@ -592,11 +593,6 @@ def _send_ticket_customer_whatsapp(
     if len(text) > 4096:
         return False, "Die WhatsApp-Nachricht darf höchstens 4096 Zeichen lang sein.", ""
 
-    try:
-        validate_workshop_message(ticket, purpose, reply_to_message_id, require_explicit_target=True)
-    except ValueError as exc:
-        return False, str(exc), ""
-
     recipient = _ticket_whatsapp_phone(
         workshop_id=workshop_id,
         ticket_id=ticket_id,
@@ -610,22 +606,18 @@ def _send_ticket_customer_whatsapp(
     workshop = get_workshop(workshop_id)
     phone_number_id = str(workshop.get("whatsapp_phone_number_id") or "").strip()
     access_token = str(settings.whatsapp_access_token or "").strip()
-    if not phone_number_id:
-        return False, "Die WhatsApp Phone Number ID fehlt in den Einstellungen.", recipient
-    if not access_token:
-        return False, "Der WhatsApp Access Token fehlt auf dem Server.", recipient
-
-    window_error = _free_text_window_error(
-        workshop_id=workshop_id,
-        customer_phone=recipient,
-    )
-    if window_error:
-        return False, window_error, recipient
+    def prepare_send() -> None:
+        # Replay is resolved by the dispatcher before fresh-send prerequisites.
+        if not phone_number_id:
+            raise ValueError("Die WhatsApp Phone Number ID fehlt in den Einstellungen.")
+        if not access_token:
+            raise ValueError("Der WhatsApp Access Token fehlt auf dem Server.")
 
     try:
         result = send_workshop_message(workshop_id=workshop_id, customer_phone=recipient,
             phone_number_id=phone_number_id, ticket_id=ticket_id, text=text, purpose=purpose,
             reply_to_message_id=reply_to_message_id, message_id=message_id, source=source,
+            require_explicit_target=True, prepare_send=prepare_send,
             user=(get_current_user(request) or {}).get("email"),
             send=lambda: send_whatsapp_text_message(phone_number_id=phone_number_id, customer_phone=recipient,
                 text=text, access_token=access_token, graph_api_version=settings.whatsapp_graph_api_version))
@@ -2438,6 +2430,21 @@ def ticket_add_note(
         return HTMLResponse("Notiz konnte nicht gespeichert werden", status_code=400)
 
     return RedirectResponse(url=f"/dashboard/ticket/{ticket_id}?workshop_id={wid}", status_code=303)
+
+
+@router.post("/dashboard/ticket/{ticket_id}/information-resolve")
+def ticket_resolve_information(request: Request, ticket_id: str,
+                               message_id: str = Form(..., min_length=1, max_length=256),
+                               workshop_id: str | None = Form(None, max_length=128)):
+    wid = _workshop_id_for_request(request, workshop_id)
+    try:
+        resolve_customer_information(ticket_id, message_id, wid,
+                                     user=(get_current_user(request) or {}).get("email"))
+    except KeyError:
+        return HTMLResponse("Ticket nicht gefunden", status_code=404)
+    except ValueError as exc:
+        return HTMLResponse(str(exc), status_code=400)
+    return RedirectResponse(url=f"/dashboard/ticket/{ticket_id}?" + urlencode({"workshop_id": wid}), status_code=303)
 
 
 @router.post("/dashboard/ticket/{ticket_id}/conversation-control")

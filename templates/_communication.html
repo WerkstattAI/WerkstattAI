@@ -77,7 +77,7 @@
     {% if message.purpose == 'customer_question' %}
     <span class="communication-question-status {% if message.resolved_at or message.legacy_closed %}resolved{% else %}unresolved{% endif %}">{% if message.legacy_closed %}Früher als erledigt markiert{% elif message.resolved_at %}Beantwortet{% else %}Offene Kundenfrage{% endif %}</span>
     {% else %}
-    <span class="communication-question-status unresolved">Zur Bearbeitung</span>
+    <span class="communication-question-status {% if message.resolved_at %}resolved{% else %}unresolved{% endif %}">{% if message.resolved_at %}Bearbeitet{% else %}Zur Bearbeitung{% endif %}</span>
     {% endif %}
   {% endif %}
 {% endmacro %}

@@ -18,7 +18,9 @@ def send_workshop_message(*, workshop_id: str, customer_phone: str, phone_number
                          message_id: str | None, ticket_id: str | None,
                          send: Callable[[], WhatsAppSendResult], source: str,
                          user: str | None = None, message_type: str = "text",
-                         template_metadata: dict | None = None) -> WhatsAppSendResult:
+                         template_metadata: dict | None = None,
+                         require_explicit_target: bool = False,
+                         prepare_send: Callable[[], None] | None = None) -> WhatsAppSendResult:
     mid = message_id or str(uuid.uuid4())
     if not re.fullmatch(r"[A-Za-z0-9:_-]{8,128}", mid):
         raise ValueError("Ungültige Nachrichtenkennung. Bitte das Formular neu öffnen.")
@@ -34,7 +36,8 @@ def send_workshop_message(*, workshop_id: str, customer_phone: str, phone_number
             metadata = json.loads(old["payload_json"] or "{}")
             if (old["customer_phone"] != customer_phone or old["ticket_id"] != ticket_id or
                     old["text"] != text or metadata.get("purpose") != purpose or
-                    (reply_to_message_id and metadata.get("reply_to_message_id") != reply_to_message_id)):
+                    ((require_explicit_target or reply_to_message_id is not None)
+                     and metadata.get("reply_to_message_id") != (reply_to_message_id or None))):
                 raise ValueError("Diese Nachrichtenkennung wurde bereits für einen anderen Inhalt verwendet.")
             return WhatsAppSendResult(old["status"] in {"sent", "delivered", "read", "sent_local"},
                                       metadata.get("meta_status_code") or (409 if old["status"] == "failed" else None), old["wa_message_id"],
@@ -49,9 +52,12 @@ def send_workshop_message(*, workshop_id: str, customer_phone: str, phone_number
         ticket = find_ticket_by_id(ticket_id, workshop_id) if ticket_id else None
         if ticket_id and not ticket:
             raise ValueError("Ticket wurde nicht gefunden.")
-        target = validate_workshop_message(ticket, purpose=purpose, reply_to_message_id=reply_to_message_id) if ticket else None
+        target = validate_workshop_message(ticket, purpose=purpose, reply_to_message_id=reply_to_message_id,
+                                          require_explicit_target=require_explicit_target) if ticket else None
         if not ticket and purpose == "workshop_answer":
             raise ValueError("Eine Antwort benötigt eine konkrete offene Kundenfrage in einem Ticket.")
+        if prepare_send is not None:
+            prepare_send()
         previous = get_whatsapp_conversation_control(workshop_id=workshop_id, customer_phone=customer_phone)
         previous_ticket_state = ticket.get("conversation_state") if ticket else None
         set_whatsapp_conversation_control(workshop_id=workshop_id, customer_phone=customer_phone,

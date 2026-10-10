@@ -1,0 +1,56 @@
+function createWorkshopPoller({fetchUpdates, onUpdates, onError = () => {}, getSession,
+                               isBusy, isVisible, schedule, unschedule}) {
+  const interval = 10000;
+  let timer = null;
+  let running = false;
+  let inFlight = false;
+  let generation = 0;
+  let delay = interval;
+
+  function queue(wait) {
+    if (!running) return;
+    if (timer !== null) unschedule(timer);
+    timer = schedule(async () => {
+      timer = null;
+      await poll();
+    }, wait);
+  }
+
+  async function poll() {
+    if (!running) return;
+    if (inFlight || isBusy() || !isVisible()) {
+      queue(interval);
+      return;
+    }
+    const session = getSession();
+    const version = generation;
+    inFlight = true;
+    try {
+      const data = await fetchUpdates(session);
+      if (running && generation === version && session === getSession() && !isBusy()) {
+        onUpdates(data);
+        delay = interval;
+      }
+    } catch (error) {
+      if (running && generation === version && session === getSession()) {
+        delay = Math.max(Math.min(delay * 2, 60000), Number(error.retryAfter) || 0);
+        onError(error);
+      }
+    } finally {
+      inFlight = false;
+      if (generation === version) queue(delay);
+      else if (timer === null) queue(0);
+    }
+  }
+
+  return {
+    start() { running = true; queue(0); },
+    wake() { generation += 1; delay = interval; queue(0); },
+    stop() {
+      running = false;
+      generation += 1;
+      if (timer !== null) unschedule(timer);
+      timer = null;
+    },
+  };
+}

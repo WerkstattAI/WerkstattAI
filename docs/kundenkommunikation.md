@@ -48,8 +48,14 @@ Gesprächszustand gespeichert.
   ohne diesen Nachweis behalten ihren Text, benötigen aber eine erneute Auswahl.
   Ein inzwischen geschlossenes Antwortziel wird nicht automatisch ersetzt.
 - Werkstattinformationen schließen keine Fragen und verändern keinen Ticketstatus.
-- Werkstattfragen pausieren die Automatik. Die nächste Kundenantwort erhält
+- Werkstattfragen pausieren die Automatik. Eine inhaltliche Kundenantwort erhält
   deren Nachrichten-ID als Antwortbezug und wird nicht als Intake-Antwort behandelt.
+  Ein reines Empfangszeichen wie „Danke“ beantwortet die Frage nicht: sie bleibt
+  offen, der Zustand bleibt `waiting_for_customer`, und es entsteht keine neue
+  Bearbeitungsaufgabe. Daraus wird keine Reparaturfreigabe abgeleitet.
+- Im Ticket kann die Werkstatt eine prüfbedürftige Kundeninformation ausdrücklich
+  „Als bearbeitet markieren“. Nur diese Information erhält `resolved_at`; offene
+  Fragen, Gesprächsübernahme und Reparaturstatus bleiben unverändert.
 - Die bewusste Rückgabe „Assistent übernimmt“ beendet noch ausstehende
   Werkstatt-Rückfragen mit `response_cancelled_at`. Offene Kundenfragen bleiben
   erhalten. Textklassifikation kann die manuelle Übernahme nicht aufheben.
@@ -115,7 +121,12 @@ Die Gesprächskorrekturen erfordern keine Änderung des Datenbankschemas.
 
 Manuelle Nachrichten werden vor dem HTTP-Aufruf mit einer stabilen ID reserviert,
 im Ticket als `pending` protokolliert und die Automatik wird pausiert. Der gleiche
-Versuch mit gleicher ID sendet nicht doppelt. Aufträge an Meta verwenden weiterhin
+Versuch mit gleicher ID sendet nicht doppelt. Ein identischer bereits erfolgreicher
+Formularversuch zeigt seinen gespeicherten Erfolg auch dann, wenn seine Frage
+inzwischen geschlossen oder das Sendefenster abgelaufen ist. Geänderter Inhalt,
+Empfänger, Zweck oder explizites Antwortziel mit derselben ID werden abgewiesen.
+Die Auswahl einer offenen Frage bleibt für neue Antworten verpflichtend.
+Aufträge an Meta verwenden weiterhin
 die serverseitige 24-Stunden-Prüfung; genehmigte Startvorlagen bleiben ausgenommen.
 
 Bei Erfolg wird die Nachricht `sent`; erst dann löst eine Werkstattantwort ihre
@@ -206,6 +217,11 @@ Die Klassifikation ist bewusst regelbasiert: Unklare Fragen gehen an die Werksta
 Ein nach Prozessabbruch unklarer Versand muss anhand des tatsächlichen Zustellstands
 geprüft werden; ohne diesen Nachweis gibt es keine automatische Wiederholung oder
 Freigabe einer hängen gebliebenen Versandreservierung. Der Kundenwebchat lädt
-Werkstattnachrichten beim Öffnen oder bei der nächsten Interaktion, ohne Live-Polling.
+Werkstattnachrichten zusätzlich etwa alle zehn Sekunden über `/chat/messages`.
+Die Abfrage ist an die signierte Browseridentität und die zugehörige Sitzung
+gebunden, gibt keine internen Notizen zurück und erzeugt keine Gesprächseinträge.
+Ausgeblendete Seiten und laufende Sendungen pausieren das Polling; Fehler und
+Rate-Limits führen zu längeren Wiederholungsabständen. Nachrichten-IDs verhindern
+doppelte Anzeige. Antworten einer alten Sitzung werden nach „Neu starten“ verworfen.
 Reale Meta-Sendungen, eine Migration der Produktivdatenbank und ein Live-Deployment
 sind nicht Teil dieser lokalen Verifikation.

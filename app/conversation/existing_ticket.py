@@ -249,8 +249,9 @@ def _stored_ticket_answer(ticket: dict[str, Any], user_message: str) -> str | No
     question = _question_text(user_message)
     ticket_id = ticket.get("ticket_id") or "-"
     if re.fullmatch(
-        r"(?:(?:wie|was) (?:ist|lautet) (?:der |mein |aktuelle |aktueller )*status|"
-        r"(?:aktueller? )?status|wie ist der (?:aktuelle )?stand(?: (?:meines|des) (?:tickets|auftrags))?)",
+        r"(?:(?:(?:wie|was) (?:ist|lautet) (?:der |mein |aktuelle |aktueller )*status|"
+        r"(?:aktueller? )?status)(?: (?:meines|des) (?:tickets|auftrags))?|"
+        r"wie ist der (?:aktuelle )?stand(?: (?:meines|des) (?:tickets|auftrags))?)",
         question,
     ):
         return f"Der gespeicherte Status von Ticket **{ticket_id}** ist: **{ticket.get('status') or '-'}**."

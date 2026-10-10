@@ -768,6 +768,29 @@ def _set_ticket_state_in_transaction(conn, workshop_id: str, ticket_id: str, sta
                  (state, conversation_mode(state), workshop_id, ticket_id))
 
 
+def resolve_customer_information(ticket_id: str, message_id: str, workshop_id: str,
+                                 *, user: str | None = None) -> dict[str, Any]:
+    """Mark one reviewed customer information item, never a question or repair."""
+    with atomic_database() as conn:
+        lock_communication_scope(conn, workshop_id)
+        row = conn.execute("SELECT * FROM tickets WHERE workshop_id = ? AND ticket_id = ?"
+                           + (" FOR UPDATE" if is_postgres() else ""), (workshop_id, ticket_id)).fetchone()
+        if not row:
+            raise KeyError("Ticket nicht gefunden")
+        ticket = _row_to_ticket_dict(row)
+        note = next((note for note in ticket["notes"] if note["message_id"] == message_id), None)
+        if (not note or note.get("sender_role") != "customer"
+                or note.get("purpose") != "customer_information" or not note.get("requires_human_action")):
+            raise ValueError("Nur eine Kundeninformation zur Bearbeitung kann bestätigt werden.")
+        if not note.get("resolved_at"):
+            now = _now_iso()
+            note["resolved_at"] = now
+            note["resolved_by"] = user
+            conn.execute("UPDATE tickets SET notes_json = ?, updated_at = ? WHERE workshop_id = ? AND ticket_id = ?",
+                         (json.dumps(ticket["notes"], ensure_ascii=False), now, workshop_id, ticket_id))
+    return find_ticket_by_id(ticket_id, workshop_id)
+
+
 def set_ticket_conversation_state(ticket_id: str, state: str, workshop_id: str | None = None) -> dict[str, Any]:
     wid = str(workshop_id or default_workshop_id()).strip()
     with atomic_database() as conn:

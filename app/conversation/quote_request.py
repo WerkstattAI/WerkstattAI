@@ -196,6 +196,8 @@ def handle_quote_request(
         return _advance_quote(new_state)
 
     if new_state.step == STEP_QUOTE_NAME:
+        if "fahrzeug" in update.recognized and "name" not in update.recognized:
+            return new_state, _ask_name_reply(), False
         if lower(msg) in SKIP_VALUES or is_unavailable_answer(msg):
             new_state.name = None
         else:

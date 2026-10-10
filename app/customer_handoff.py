@@ -15,15 +15,16 @@ def _contains_followup_question(text: str) -> bool:
 
 
 def receive_customer_message(ticket: dict, text: str, *, workshop_id: str, message_id: str | None = None) -> dict:
-    from app.conversation.existing_ticket import _is_customer_question
+    from app.conversation.existing_ticket import _is_acknowledgement, _is_customer_question
     pending = pending_workshop_question(ticket) if ticket.get("conversation_state") == "waiting_for_customer" else None
-    target = pending.get("message_id") if pending else None
+    acknowledgement = _is_acknowledgement(text)
+    target = pending.get("message_id") if pending and not acknowledgement else None
     # Keep broad handoff rules for unlinked input; decision words alone in a
     # linked reply (e.g. a confirmation) do not constitute an additional question.
-    is_question = _contains_followup_question(text) if target else _is_customer_question(text)
+    is_question = not acknowledgement and (_contains_followup_question(text) if target else _is_customer_question(text))
     result = add_ticket_note(ticket["ticket_id"], text, workshop_id=workshop_id,
                              sender_role="customer", purpose="customer_question" if is_question else "customer_information",
-                             requires_human_action=True, reply_to_message_id=target, message_id=message_id)
+                             requires_human_action=not acknowledgement, reply_to_message_id=target, message_id=message_id)
     if target:
         result = set_ticket_conversation_state(ticket["ticket_id"],
                                                "waiting_for_workshop" if open_customer_questions(result) else "workshop_active",

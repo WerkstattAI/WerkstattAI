@@ -7,6 +7,9 @@ from app.conversation.constants import CANCEL_VALUES, SKIP_VALUES
 from app.models import IntakeState
 
 
+PHONE_LABEL = r"\b(?:meine?\s+)?(?:neue\s+)?(?:telefonnummer|handynummer|mobilnummer|telefon|tel|handy|mobil|rufnummer|nummer)\b"
+
+
 def normalize(text: str) -> str:
     return " ".join((text or "").strip().split())
 
@@ -16,8 +19,14 @@ def lower(text: str) -> str:
 
 
 def is_cancel_command(text: str) -> bool:
-    t = lower(text).strip(" .!?")
-    return t in CANCEL_VALUES or bool(re.fullmatch(r"(?:bitte )?(?:abbrechen|stop|stopp|stoppen)(?: bitte)?", t))
+    t = lower(text).strip(" ,.;:!?")
+    return t in CANCEL_VALUES or bool(re.fullmatch(
+        r"(?:ich (?:möchte|moechte|will|würde|wuerde)[, ]+)?"
+        r"(?:(?:bitte|doch|jetzt|gerne?)[, ]+)*"
+        r"(?:(?:die|meine|diese) (?:anfrage|aufnahme) )?"
+        r"(?:(?:bitte|doch|jetzt|gerne?)[, ]+)*"
+        r"(?:abbrechen|stop|stopp|stoppen)(?:[, ]+bitte)?", t,
+    ))
 
 
 def is_unavailable_answer(text: str) -> bool:
@@ -54,9 +63,9 @@ def is_correction(text: str) -> bool:
         lower(text),
     ) or is_vehicle_correction(text) or (
         re.match(
-            r"^nein[, :]+\s*(?:meine?\s+)?(?:telefonnummer|telefon|tel|handy|mobil|rufnummer|nummer)\s+"
-            r"(?:ist|lautet)\b", lower(text),
-        ) and extract_phone(text)
+            r"^(?:nein[\s,.:;!?]+|(?=meine? neue\b))" + PHONE_LABEL,
+            lower(text),
+        )
     ))
 
 
@@ -99,6 +108,12 @@ def extract_km_fact(text: str) -> tuple[str, tuple[int, int]] | None:
         (r"\b(\d{5,7})\b", 1),
     ):
         for match in re.finditer(pattern, text, re.I):
+            # A match must not be a positive fragment of a signed or decimal
+            # number. Check both edges even for numbers embedded in prose.
+            before, after = text[:match.start(1)], text[match.end(1):]
+            if (re.search(r"[\d.,+\-−]$|[+\-−]\s+$", before)
+                    or re.match(r"\d|[.,]\d", after)):
+                continue
             digits = re.sub(r"\D", "", match[1])
             if len(digits) <= 7:
                 return str(int(digits) * multiplier), match.span()
@@ -131,7 +146,7 @@ def extract_km(text: str, *, expected: bool = False) -> str | None:
 def extract_phone(text: str) -> str | None:
     """Extract one phone span, without joining vehicle numbers to it."""
     raw = normalize(text)
-    label = re.search(r"\b(?:telefonnummer|telefon|tel|handy|mobil|rufnummer|nummer)\b\s*(?:ist|lautet)?\s*[:=.]?\s*", raw, re.I)
+    label = re.search(PHONE_LABEL + r"\s*(?:ist|lautet)?\s*[:=.]?\s*", raw, re.I)
     if label:
         raw = raw[label.end():]
     elif not re.fullmatch(r"\+?[\d ()/.-]+", raw):
