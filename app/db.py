@@ -214,6 +214,10 @@ def init_db() -> None:
     ticket_pk = "BIGSERIAL PRIMARY KEY" if is_postgres() else "INTEGER PRIMARY KEY AUTOINCREMENT"
 
     with get_conn() as conn:
+        conn.execute(f"""CREATE TABLE IF NOT EXISTS dashboard_events (
+            id {ticket_pk}, workshop_id TEXT NOT NULL, ticket_id TEXT NOT NULL,
+            message_id TEXT NOT NULL, UNIQUE(workshop_id, ticket_id, message_id))""")
+        conn.execute("CREATE INDEX IF NOT EXISTS idx_dashboard_events_scope ON dashboard_events(workshop_id, id)")
         conn.execute(
             """
             CREATE TABLE IF NOT EXISTS workshops (

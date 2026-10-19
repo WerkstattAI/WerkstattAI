@@ -1,13 +1,14 @@
 from __future__ import annotations
 
 import json
+import hashlib
 import logging
 from datetime import datetime, timezone
 from typing import Any
 from urllib.parse import urlencode
 
-from fastapi import APIRouter, Form, HTTPException, Request
-from fastapi.responses import HTMLResponse, RedirectResponse
+from fastapi import APIRouter, Form, HTTPException, Request, Query
+from fastapi.responses import HTMLResponse, RedirectResponse, JSONResponse, Response
 from fastapi.templating import Jinja2Templates
 
 from app.admin import (
@@ -20,7 +21,8 @@ from app.admin import (
 from app.auth import authenticate_user, clear_session_cookie, get_current_user, set_session_cookie
 from app.config import settings
 from app.customer_sessions import browser_identity
-from app.communication import open_customer_questions
+from app.communication import open_customer_questions, open_customer_tasks, customer_task_label
+from app.dashboard import overview, list_context, events as dashboard_events
 from app.manual_dispatch import send_workshop_message
 from app.dispatch_recovery import dispatch_recovery_context, resolve_stale_dispatch
 from app.legal import provider_details
@@ -55,6 +57,7 @@ from app.whatsapp import (
     whatsapp_customer_service_window_for_phone,
 )
 from app.workshops import get_workshop, get_workshop_identity, update_workshop
+from app.whatsapp_medien import MedienFehler, BILD_TYPEN, lade_bild, medienangaben
 
 router = APIRouter()
 templates = Jinja2Templates(directory="templates")
@@ -84,6 +87,7 @@ def _template_context(request: Request, **extra: Any) -> dict[str, Any]:
         "request": request,
         "current_user": user,
         "subscription": subscription,
+        "event_scope": hashlib.sha256((str((user or {}).get("email") or "") + ":" + str(extra.get("workshop_id") or "")).encode()).hexdigest()[:24],
         **extra,
     }
 
@@ -358,6 +362,11 @@ def _decorate_whatsapp_messages(messages: list[dict[str, Any]]) -> list[dict[str
             else ""
         )
         item["created_at_display"] = _format_datetime_for_display(item.get("created_at"))
+        bild = medienangaben(item)
+        item["bild_url"] = (
+            f"/dashboard/whatsapp/medien/{item['id']}?" + urlencode({"workshop_id": item["workshop_id"]})
+            if bild else None
+        )
         item["sender_label"] = "Kunde"
         if str(item.get("direction") or "").strip().lower() == "outbound":
             source = ""
@@ -731,7 +740,7 @@ def _communication_context(ticket: dict, workshop_id: str) -> None:
         note["created_at_display"] = _format_datetime_for_display(note.get("created_at"))
     ticket["has_customer_question"] = any(n.get("purpose") == "customer_question" for n in ticket.get("notes", []))
     ticket.update(dispatch_recovery_context(
-        workshop_id=workshop_id, customer_phone=ticket.get("whatsapp_phone"),
+        workshop_id=workshop_id, customer_phone=ticket.get("whatsapp_phone") if ticket.get("has_whatsapp_conversation") or ticket.get("source") == "whatsapp" else None,
         ticket_id=ticket.get("ticket_view_id") or ticket.get("ticket_id"),
     ))
 
@@ -744,16 +753,10 @@ def _details_payload(t: dict) -> dict:
     return safe
 
 
-def _prepare_tickets(limit: int, workshop_id: str | None = None) -> list[dict]:
+def _prepare_tickets(limit: int, workshop_id: str | None = None, *, raw=None, lightweight=False) -> list[dict]:
     wid = _normalize_workshop_id(workshop_id)
-    raw = list_latest_tickets(limit=limit, workshop_id=wid)
+    raw = list_latest_tickets(limit=limit, workshop_id=wid) if raw is None else raw
     tickets = [_as_dict(t) for t in raw]
-    whatsapp_phone_by_ticket: dict[str, str] = {}
-    for message in list_whatsapp_messages(workshop_id=wid, limit=500):
-        linked_ticket_id = str(message.get("ticket_id") or "").strip()
-        linked_phone = _normalize_whatsapp_recipient(message.get("customer_phone"))
-        if linked_ticket_id and linked_phone:
-            whatsapp_phone_by_ticket[linked_ticket_id] = linked_phone
 
     for t in tickets:
         t["ticket_view_id"] = _ticket_id(t)
@@ -772,13 +775,13 @@ def _prepare_tickets(limit: int, workshop_id: str | None = None) -> list[dict]:
         t["updated_at_display"] = _format_datetime_for_display(t.get("updated_at"))
         t["is_new"] = (t.get("created_at") == t.get("updated_at"))
         t["kunde_name"] = _extract_name(t)
-        linked_whatsapp_phone = whatsapp_phone_by_ticket.get(t["ticket_view_id"], "")
+        linked_whatsapp_phone = "" if lightweight else _linked_ticket_whatsapp_phone(workshop_id=wid, ticket_id=t["ticket_view_id"])
         t["has_whatsapp_conversation"] = bool(linked_whatsapp_phone)
         t["whatsapp_phone"] = linked_whatsapp_phone or _normalize_whatsapp_recipient(
             t.get("telefon")
         )
         t["can_message_customer"] = bool(t["whatsapp_phone"])
-        if t["whatsapp_phone"]:
+        if t["whatsapp_phone"] and not lightweight and (t["has_whatsapp_conversation"] or t["source"] == "whatsapp"):
             t.update(
                 whatsapp_customer_service_window_for_phone(
                     workshop_id=wid,
@@ -840,8 +843,23 @@ def _prepare_tickets(limit: int, workshop_id: str | None = None) -> list[dict]:
             t["last_note_created_at"]
         )
 
-        _communication_context(t, wid)
+        if not lightweight:
+            _communication_context(t, wid)
+        t["open_customer_questions"] = open_customer_questions(t)
+        t["customer_question_count"] = len(t["open_customer_questions"])
+        t["customer_question_open"] = bool(t["open_customer_questions"])
+        t["open_tasks"] = [{**note, "task_label": customer_task_label(note)} for note in open_customer_tasks(t)]
+        t["needs_attention"] = bool(t["open_tasks"]) or (
+            t["status_ui"] not in {"erledigt", "archiviert"}
+            and (t["priority"] == "hoch" or t["request_type"] in {"notfall", "kostenvoranschlag"}))
+        if t["open_customer_questions"]:
+            note = t["open_customer_questions"][0]
+            t["latest_customer_question_text"] = note["text"]
+            t["latest_customer_question_created_at"] = note["created_at"]
+            t["latest_customer_question_created_at_display"] = _format_datetime_for_display(note["created_at"])
 
+        if lightweight:
+            continue
         t["details_payload"] = _details_payload(t)
         t["details_json"] = json.dumps(
             t["details_payload"],
@@ -867,6 +885,10 @@ def _stats_for(tickets: list[dict]) -> dict:
         "kostenvoranschlag": sum(1 for t in tickets if t.get("request_type") == "kostenvoranschlag"),
         "kundenfragen": sum(1 for t in tickets if t.get("has_customer_question")),
         "kundenfragen_offen": sum(1 for t in tickets if t.get("customer_question_open")),
+        "aufgaben": sum(bool(t.get("needs_attention")) for t in tickets),
+        "nachrichten": sum(len(t.get("open_tasks", [])) for t in tickets),
+        "informationen": sum(any(n["purpose"] == "customer_information" for n in t.get("open_tasks", [])) for t in tickets),
+        "wartet": sum(t.get("conversation_state") == "waiting_for_customer" for t in tickets),
         "all": len(tickets),
     }
 
@@ -881,73 +903,31 @@ def _priority_rank(priority: str) -> int:
 
 
 def _attention_reason(t: dict) -> str:
-    if t.get("customer_question_open"):
-        count = int(t.get("customer_question_count") or 0)
-        if count > 1:
-            return f"{count} offene Kundenfragen"
-        return "Offene Kundenfrage"
-
-    if t.get("has_customer_question"):
-        count = int(t.get("customer_question_count") or 0)
-        if count > 1:
-            return f"{count} Kundenfragen"
-        return "Kundenfrage"
-
-    if t.get("request_type") == "notfall":
-        return "Notfall"
-
-    if t.get("priority") == "hoch":
-        return "Hohe Prioritaet"
-
-    if t.get("request_type") == "kostenvoranschlag":
-        return "Kostenvoranschlag"
-
-    return "Wichtig"
+    if t.get("status_ui") not in {"erledigt", "archiviert"}:
+        if t.get("request_type") == "notfall":
+            return "Notfall prüfen"
+        if t.get("priority") == "hoch":
+            return "Hohe Priorität prüfen"
+    if t.get("open_tasks"):
+        return customer_task_label(t["open_tasks"][0])
+    return "Kostenvoranschlag bearbeiten"
 
 
-def _attention_rank(t: dict) -> tuple[int, float]:
-    if t.get("customer_question_open"):
-        rank = 0
-    elif t.get("has_customer_question"):
-        rank = 1
-    elif t.get("request_type") == "notfall":
-        rank = 2
-    elif t.get("priority") == "hoch":
-        rank = 3
-    elif t.get("request_type") == "kostenvoranschlag":
-        rank = 4
-    else:
-        rank = 9
-
-    updated = t.get("updated_dt")
-    timestamp = (
-        updated.timestamp()
-        if isinstance(updated, datetime) and updated != datetime.min.replace(tzinfo=timezone.utc)
-        else 0
-    )
-    return rank, -timestamp
+def _attention_rank(t: dict) -> tuple:
+    active = t.get("status_ui") not in {"erledigt", "archiviert"}
+    rank = 0 if active and t.get("request_type") == "notfall" else 1 if active and t.get("priority") == "hoch" else 2 if t.get("open_tasks") else 3
+    return rank, t.get("created_at") or "", t.get("ticket_view_id") or ""
 
 
 def _attention_tickets(tickets: list[dict], limit: int = 5) -> list[dict]:
-    important = [
-        t
-        for t in tickets
-        if t.get("status_ui") not in {"erledigt", "archiviert"}
-        and (
-            t.get("has_customer_question")
-            or t.get("priority") == "hoch"
-            or t.get("request_type") in {"notfall", "kostenvoranschlag"}
-        )
-    ]
-
-    important.sort(key=_attention_rank)
-
     result = []
-    for ticket in important[:limit]:
-        item = dict(ticket)
-        item["attention_reason"] = _attention_reason(ticket)
+    for t in sorted((t for t in tickets if t.get("needs_attention")), key=_attention_rank)[:limit]:
+        item = dict(t)
+        item["attention_reason"] = _attention_reason(t)
+        note = (t.get("open_tasks") or [{}])[0]
+        item["attention_text"] = note.get("text") or t.get("problem") or ""
+        item["attention_anchor"] = "communication-" + note["message_id"] if note else ""
         result.append(item)
-
     return result
 
 
@@ -968,52 +948,26 @@ def _render_dashboard(
 ):
     wid = _normalize_workshop_id(workshop_id)
     workshop = get_workshop(wid)
-    tickets = _prepare_tickets(limit=limit, workshop_id=wid)
-
-    if archive_mode:
-        tickets = [t for t in tickets if t.get("status_ui") == "archiviert"]
-    else:
-        tickets = [t for t in tickets if t.get("status_ui") != "archiviert"]
-
-    stats = _stats_for(tickets)
-    attention_tickets = _attention_tickets(tickets)
-
-    normalized_filter_status = _normalize_status(status) if status and status != "all" else "all"
-    normalized_filter_source = _normalize_filter_source(source)
-    normalized_filter_question_state = _normalize_filter_question_state(question_state)
-
-    if normalized_filter_status != "all":
-        tickets = [t for t in tickets if t.get("status_ui") == normalized_filter_status]
-
-    if normalized_filter_source != "all":
-        tickets = [t for t in tickets if t.get("source") == normalized_filter_source]
-
-    if normalized_filter_question_state == "open":
-        tickets = [t for t in tickets if t.get("customer_question_open")]
-    elif normalized_filter_question_state == "answered":
-        tickets = [
-            t for t in tickets
-            if t.get("has_customer_question") and not t.get("customer_question_open")
-        ]
-
-    if q and q.strip():
-        tickets = [t for t in tickets if _matches_query(t, q)]
-
-    if sort == "oldest":
-        tickets.sort(key=lambda t: t["created_dt"])
-    elif sort == "updated":
-        tickets.sort(key=lambda t: t["updated_dt"], reverse=True)
-    elif sort == "priority":
-        tickets.sort(
-            key=lambda t: (
-                _priority_rank(t.get("priority", "")),
-                -t["created_dt"].timestamp()
-                if t["created_dt"] != datetime.min.replace(tzinfo=timezone.utc)
-                else 0,
-            )
-        )
-    else:
-        tickets.sort(key=lambda t: t["created_dt"], reverse=True)
+    params = request.query_params
+    filters = dict(status=_normalize_status(status) if status and status != "all" else "all",
+                   source=_normalize_filter_source(source), question_state=_normalize_filter_question_state(question_state),
+                   task_state=params.get("task_state", "all"), metric=params.get("metric", ""), q=q or "",
+                   sort=sort or "newest", limit=max(1, min(limit, 100)), workshop_id=wid)
+    try:
+        filters["page"] = max(1, min(int(params.get("page", "1")), 1000000))
+    except ValueError:
+        filters["page"] = 1
+    data = overview(wid, archive_mode, filters,
+                    lambda raw: _prepare_tickets(1, wid, raw=[raw], lightweight=True)[0],
+                    _stats_for, _matches_query, _attention_tickets)
+    filters["page"] = data["page"]
+    tickets = _prepare_tickets(len(data["tickets"]), wid, raw=data["tickets"])
+    stats, attention_tickets = data["stats"], data["attention_tickets"]
+    path = "/dashboard/archive" if archive_mode else "/dashboard"
+    list_url = path + "?" + urlencode(filters)
+    kpi_links = {key: path + "?" + urlencode({"workshop_id": wid, "metric": key, "limit": filters["limit"], "sort": "priority"}) for key in stats}
+    pagination = {"previous": path + "?" + urlencode({**filters, "page": data["page"] - 1}),
+                  "next": path + "?" + urlencode({**filters, "page": data["page"] + 1})}
 
     return templates.TemplateResponse(
         request,
@@ -1025,15 +979,9 @@ def _render_dashboard(
             tickets=tickets,
             attention_tickets=attention_tickets,
             stats=stats,
-            filters={
-                "status": normalized_filter_status,
-                "source": normalized_filter_source,
-                "question_state": normalized_filter_question_state,
-                "q": q or "",
-                "sort": sort or "newest",
-                "limit": limit,
-                "workshop_id": wid,
-            },
+            filters=filters,
+            kpi_links=kpi_links, total=data["total"], pages=data["pages"], page=data["page"],
+            pagination=pagination, list_url=list_url, event_cursor=dashboard_events(wid)["cursor"],
             archive_mode=archive_mode,
             workshop_id=wid,
             message_status=(message_status or "").strip(),
@@ -1171,7 +1119,7 @@ def dashboard(
     question_state: str | None = None,
     q: str | None = None,
     sort: str | None = None,
-    limit: int = 250,
+    limit: int = 30,
     workshop_id: str | None = None,
     message_status: str | None = None,
     message_detail: str | None = None,
@@ -1194,6 +1142,15 @@ def dashboard(
     )
 
 
+@router.get("/dashboard/events")
+def dashboard_event_feed(request: Request, workshop_id: str | None = None,
+                         after: int | None = Query(None, ge=0, le=9223372036854775807)):
+    wid = _workshop_id_for_request(request, workshop_id)
+    result = dashboard_events(wid, after)
+    result["scope"] = hashlib.sha256((str((get_current_user(request) or {}).get("email") or "") + ":" + wid).encode()).hexdigest()[:24]
+    return JSONResponse(result, headers={"Cache-Control": "no-store"})
+
+
 @router.get("/dashboard/archive", response_class=HTMLResponse)
 def dashboard_archive(
     request: Request,
@@ -1202,7 +1159,7 @@ def dashboard_archive(
     question_state: str | None = None,
     q: str | None = None,
     sort: str | None = None,
-    limit: int = 250,
+    limit: int = 30,
     workshop_id: str | None = None,
 ):
     wid = _workshop_id_for_request(request, workshop_id)
@@ -1467,6 +1424,26 @@ def dashboard_admin_workshop_reset_password(
     )
 
 
+@router.get("/dashboard/whatsapp/medien/{nachrichten_id}")
+def whatsapp_bild(request: Request, nachrichten_id: int, workshop_id: str | None = None):
+    wid = _workshop_id_for_request(request, workshop_id)
+    with get_conn() as verbindung:
+        zeile = verbindung.execute("SELECT id, workshop_id, phone_number_id, direction, message_type, payload_json "
+                                   "FROM whatsapp_messages WHERE workshop_id = ? AND id = ?", (wid, nachrichten_id)).fetchone()
+    bild = medienangaben(dict(zeile)) if zeile else None
+    if not bild:
+        raise HTTPException(404, "Bild nicht gefunden")
+    try:
+        inhalt, typ = lade_bild(medien_id=bild["id"], nummer_id=str(zeile["phone_number_id"] or ""),
+                                zugang=str(settings.whatsapp_access_token or ""), version=settings.whatsapp_graph_api_version)
+    except MedienFehler as fehler:
+        return HTMLResponse("<html lang='de'><meta name='viewport' content='width=device-width'><title>Bild nicht verfügbar</title>"
+                            "<body><h1>Bild nicht verfügbar</h1><p>" + str(fehler) + "</p></body></html>",
+                            status_code=fehler.status, headers={"Cache-Control": "private, no-store"})
+    return Response(inhalt, media_type=typ, headers={"Cache-Control": "private, no-store",
+                    "X-Content-Type-Options": "nosniff", "Content-Disposition": f'inline; filename="whatsapp-bild.{BILD_TYPEN[typ]}"'})
+
+
 @router.get("/dashboard/whatsapp", response_class=HTMLResponse)
 def dashboard_whatsapp(
     request: Request,
@@ -1547,6 +1524,7 @@ def dashboard_whatsapp(
             messages=messages,
             test_status=(test_status or "").strip(),
             test_detail=(test_detail or "").strip(),
+            list_url=list_context(request.query_params.get("return_to"), wid), event_cursor=dashboard_events(wid)["cursor"],
             reply_status=(reply_status or "").strip(),
             reply_detail=(reply_detail or "").strip(),
         ),
@@ -1912,6 +1890,7 @@ def dashboard_whatsapp_control(
     workshop_id: str | None = Form(None, max_length=128),
     ticket_id: str | None = Form(None, max_length=128),
     context: str = Form("inbox", max_length=128),
+    return_to: str | None = Form(None, max_length=2048),
 ):
     """Switch one tenant-scoped conversation between assistant and workshop control."""
     wid = _workshop_id_for_request(request, workshop_id)
@@ -1921,6 +1900,9 @@ def dashboard_whatsapp_control(
     normalized_context = context.strip().lower() if isinstance(context, str) else "inbox"
 
     def redirect(status: str, detail: str) -> RedirectResponse:
+        if normalized_context == "ticket" and normalized_ticket_id:
+            return RedirectResponse(_ticket_return(normalized_ticket_id, wid, return_to,
+                anchor="communication-controls", reply_status=status, reply_detail=detail), status_code=303)
         return _whatsapp_action_redirect(
             workshop_id=wid,
             customer_phone=phone,
@@ -2210,7 +2192,7 @@ def ticket_detail(
     t["whatsapp_phone"] = linked_whatsapp_phone or _normalize_whatsapp_recipient(
         t.get("telefon")
     )
-    if t["whatsapp_phone"]:
+    if t["whatsapp_phone"] and (t["has_whatsapp_conversation"] or t["source"] == "whatsapp"):
         t.update(
             whatsapp_customer_service_window_for_phone(
                 workshop_id=wid,
@@ -2245,6 +2227,17 @@ def ticket_detail(
 
     _communication_context(t, wid)
 
+    bilder = _decorate_whatsapp_messages(list_whatsapp_messages(workshop_id=wid, ticket_id=ticket_id, limit=500))
+    vorhandene = {nachricht["message_id"]: nachricht for nachricht in t["communication_messages"]}
+    for bild in bilder:
+        if not bild.get("bild_url"):
+            continue
+        if bild["message_id"] in vorhandene:
+            vorhandene[bild["message_id"]]["bild_url"] = bild["bild_url"]
+        else:
+            t["communication_messages"].append(bild)
+    t["communication_messages"].sort(key=lambda nachricht: nachricht.get("created_at") or "")
+
     t["raw_json"] = json.dumps(t, ensure_ascii=False, default=str, indent=2)
 
     return templates.TemplateResponse(
@@ -2255,11 +2248,20 @@ def ticket_detail(
             ticket=t,
             workshop_id=wid,
             workshop=workshop,
+            list_url=list_context(request.query_params.get("return_to"), wid),
+            event_cursor=dashboard_events(wid)["cursor"],
             whatsapp_readiness=_whatsapp_readiness(request, workshop),
             reply_status=(reply_status or "").strip(),
             reply_detail=(reply_detail or "").strip(),
         ),
     )
+
+
+def _ticket_return(ticket_id, wid, return_to=None, anchor="communication-history", **params):
+    query = {"workshop_id": wid, **params}
+    if isinstance(return_to, str) and return_to:
+        query["return_to"] = list_context(return_to, wid)
+    return "/dashboard/ticket/" + ticket_id + "?" + urlencode(query) + "#" + anchor
 
 
 @router.post("/dashboard/ticket/{ticket_id}/status")
@@ -2268,6 +2270,7 @@ def ticket_set_status(
     ticket_id: str,
     status: str = Form(..., max_length=128),
     workshop_id: str | None = Form(None, max_length=128),
+    return_to: str | None = Form(None, max_length=2048),
 ):
     wid = _workshop_id_for_request(request, workshop_id)
     try:
@@ -2276,7 +2279,7 @@ def ticket_set_status(
     except Exception:
         return HTMLResponse("Status-Update fehlgeschlagen", status_code=400)
 
-    return RedirectResponse(url=f"/dashboard/ticket/{ticket_id}?workshop_id={wid}", status_code=303)
+    return RedirectResponse(url=_ticket_return(ticket_id, wid, return_to, anchor="ticket-status"), status_code=303)
 
 
 @router.post("/dashboard/ticket/{ticket_id}/status_quick")
@@ -2285,15 +2288,19 @@ def ticket_set_status_quick(
     ticket_id: str,
     status: str = Form(..., max_length=128),
     workshop_id: str | None = Form(None, max_length=128),
+    return_to: str | None = Form(None, max_length=2048),
 ):
     wid = _workshop_id_for_request(request, workshop_id)
     try:
         normalized_status = _backend_status(status)
         update_ticket_status(ticket_id, normalized_status, workshop_id=wid)
     except Exception:
-        return HTMLResponse("Status-Update fehlgeschlagen", status_code=400)
+        return JSONResponse({"ok": False, "message": "Status konnte nicht gespeichert werden. Ihre Auswahl bleibt erhalten."}, status_code=400) if "application/json" in request.headers.get("accept", "") else HTMLResponse("Status konnte nicht gespeichert werden. Bitte zurückgehen und erneut versuchen.", status_code=400)
 
-    return RedirectResponse(url=f"/dashboard?workshop_id={wid}", status_code=303)
+    target = list_context(return_to, wid) + "#ticket-" + ticket_id
+    if "application/json" in request.headers.get("accept", ""):
+        return JSONResponse({"ok": True, "message": "Status gespeichert.", "status": normalized_status, "return_url": target})
+    return RedirectResponse(url=target, status_code=303)
 
 
 @router.post("/dashboard/ticket/{ticket_id}/customer-message")
@@ -2361,6 +2368,7 @@ def ticket_add_note(
     purpose: str = Form("", max_length=64),
     reply_to_message_id: str | None = Form(None, max_length=256),
     message_id: str | None = Form(None, max_length=128),
+    return_to: str | None = Form(None, max_length=2048),
 ):
     purpose = purpose if isinstance(purpose, str) else ""
     reply_to_message_id = reply_to_message_id.strip() or None if isinstance(reply_to_message_id, str) else None
@@ -2376,7 +2384,7 @@ def ticket_add_note(
             }
         )
         return RedirectResponse(
-            url=f"/dashboard/ticket/{ticket_id}?{query}",
+            url=_ticket_return(ticket_id, wid, return_to, reply_status=status, reply_detail=detail),
             status_code=303,
         )
 
@@ -2429,13 +2437,13 @@ def ticket_add_note(
     except Exception:
         return HTMLResponse("Notiz konnte nicht gespeichert werden", status_code=400)
 
-    return RedirectResponse(url=f"/dashboard/ticket/{ticket_id}?workshop_id={wid}", status_code=303)
+    return RedirectResponse(url=_ticket_return(ticket_id, wid, return_to, anchor="communication-history"), status_code=303)
 
 
 @router.post("/dashboard/ticket/{ticket_id}/information-resolve")
 def ticket_resolve_information(request: Request, ticket_id: str,
                                message_id: str = Form(..., min_length=1, max_length=256),
-                               workshop_id: str | None = Form(None, max_length=128)):
+                               workshop_id: str | None = Form(None, max_length=128), return_to: str | None = Form(None, max_length=2048)):
     wid = _workshop_id_for_request(request, workshop_id)
     try:
         resolve_customer_information(ticket_id, message_id, wid,
@@ -2444,12 +2452,12 @@ def ticket_resolve_information(request: Request, ticket_id: str,
         return HTMLResponse("Ticket nicht gefunden", status_code=404)
     except ValueError as exc:
         return HTMLResponse(str(exc), status_code=400)
-    return RedirectResponse(url=f"/dashboard/ticket/{ticket_id}?" + urlencode({"workshop_id": wid}), status_code=303)
+    return RedirectResponse(url=_ticket_return(ticket_id, wid, return_to, anchor="communication-" + message_id + ""), status_code=303)
 
 
 @router.post("/dashboard/ticket/{ticket_id}/conversation-control")
 def ticket_conversation_control(request: Request, ticket_id: str,
-                                state: str = Form(..., max_length=64), workshop_id: str | None = Form(None)):
+                                state: str = Form(..., max_length=64), workshop_id: str | None = Form(None), return_to: str | None = Form(None, max_length=2048)):
     wid = _workshop_id_for_request(request, workshop_id)
     if state not in {"assistant_active", "workshop_active"}:
         return HTMLResponse("Ungültiger Gesprächszustand", status_code=400)
@@ -2459,7 +2467,7 @@ def ticket_conversation_control(request: Request, ticket_id: str,
         return HTMLResponse("Ticket nicht gefunden", status_code=404)
     except ValueError as exc:
         return HTMLResponse(str(exc), status_code=400)
-    return RedirectResponse(url=f"/dashboard/ticket/{ticket_id}?" + urlencode({"workshop_id": wid}), status_code=303)
+    return RedirectResponse(url=_ticket_return(ticket_id, wid, return_to, anchor="communication-controls"), status_code=303)
 
 
 @router.post("/dashboard/ticket/{ticket_id}/archive")

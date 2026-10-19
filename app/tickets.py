@@ -333,6 +333,7 @@ def save_ticket(state: IntakeState, workshop_id: str | None = None, *, verified_
     record = _normalize_ticket_record(record)
 
     with closing(get_conn()) as conn:
+        lock_communication_scope(conn, wid)
         conn.execute(
             """
             INSERT INTO tickets (
@@ -386,6 +387,7 @@ def save_ticket(state: IntakeState, workshop_id: str | None = None, *, verified_
                 verified_customer_phone,
             ),
         )
+        conn.execute("INSERT INTO dashboard_events(workshop_id, ticket_id, message_id) VALUES (?, ?, '') ON CONFLICT DO NOTHING", (wid, ticket_id))
         conn.commit()
 
     return ticket_id
@@ -432,6 +434,26 @@ def list_latest_tickets(limit: int = 50, workshop_id: str | None = None) -> list
         ).fetchall()
 
     return [_row_to_ticket_dict(row) for row in rows]
+
+
+def iter_dashboard_tickets(workshop_id: str, *, archive: bool = False, sort: str = "newest"):
+    """Scan the complete authorized scope in database order, in bounded batches.
+
+    Message filters use the canonical normalized ledger (also for legacy notes),
+    before the dashboard applies its page boundary. No latest-N preselection.
+    """
+    ordering = {
+        "oldest": "created_at ASC, id ASC", "newest": "created_at DESC, id DESC",
+        "updated": "updated_at DESC, id DESC",
+        "priority": "CASE WHEN request_type = 'notfall' THEN 0 WHEN priority IN ('hoch', 'dringend', 'notfall') THEN 1 WHEN priority = 'niedrig' THEN 3 ELSE 2 END, created_at ASC, id ASC",
+    }.get(sort, "created_at DESC, id DESC")
+    with closing(get_conn()) as conn:
+        cursor = conn.execute("SELECT * FROM tickets WHERE workshop_id = ? AND "
+                              + ("status = 'archiviert'" if archive else "status <> 'archiviert'")
+                              + " ORDER BY " + ordering, (workshop_id,))
+        while rows := cursor.fetchmany(100):
+            for row in rows:
+                yield _row_to_ticket_dict(row)
 
 
 def normalize_phone_for_search(phone: str) -> str:
@@ -710,6 +732,8 @@ def add_ticket_note(
             ),
         )
         _set_ticket_state_in_transaction(conn, wid, tid, state)
+        if sender_role == "customer" and requires_human_action:
+            conn.execute("INSERT INTO dashboard_events(workshop_id, ticket_id, message_id) VALUES (?, ?, ?) ON CONFLICT DO NOTHING", (wid, tid, mid))
         conn.commit()
 
         updated_row = conn.execute(

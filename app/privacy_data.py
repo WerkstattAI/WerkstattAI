@@ -20,6 +20,7 @@ TABLE_KEYS = {
     "whatsapp_messages": "id",
     "whatsapp_events": "id",
     "whatsapp_conversation_controls": "customer_phone",
+    "dashboard_events": "id",
 }
 MAX_EXPORT_ROWS = 10000
 MAX_EXPORT_BYTES = 20 * 1024 * 1024
@@ -131,6 +132,7 @@ def select_records(records: dict, selection: dict) -> dict:
                 ticket_ids.add(state["ticket_id"])
     result = {table: [] for table in TABLE_KEYS}
     result["tickets"] = [row for row in records["tickets"] if row["ticket_id"] in ticket_ids]
+    result["dashboard_events"] = [row for row in records["dashboard_events"] if row["ticket_id"] in ticket_ids]
     for row in records["conversation_sessions"]:
         state = _session_state(row)
         if ((phone and (normalize_phone(row["phone"]) == phone or normalize_phone(state.get("telefon")) == phone))

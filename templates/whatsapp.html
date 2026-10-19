@@ -1201,6 +1201,7 @@
     </aside>
 
     <main class="workspace">
+
       <header class="workspace-head">
         <div>
           <div class="workspace-overline">Kundenkommunikation</div>
@@ -1212,16 +1213,19 @@
 
         <div class="readiness-pill {% if readiness.is_ready %}ready{% endif %}">
           <span class="readiness-dot" aria-hidden="true"></span>
-          {% if readiness.is_ready %}WhatsApp bereit{% else %}Einrichtung unvollständig{% endif %}
+          {% if readiness.is_ready %}Konfiguration vollständig{% else %}Einrichtung unvollständig{% endif %}
         </div>
       </header>
 
+      {% include '_dashboard_events.html' %}
+      <details class="verbindungsdetails" {% if test_status %}open{% endif %}>
+        <summary>Verbindung und Testversand <span>Einrichtung prüfen</span></summary>
       <div class="diagnostics">
         <section class="panel" aria-labelledby="readiness-title">
           <div class="panel-head">
             <div class="panel-title" id="readiness-title">
               WhatsApp-Bereitschaft:
-              {% if readiness.is_ready %}bereit{% else %}nicht vollständig{% endif %}
+              {% if readiness.is_ready %}Konfiguration vollständig{% else %}nicht vollständig{% endif %}
             </div>
             <div class="panel-sub">
               Nachrichtenversand über:
@@ -1315,6 +1319,18 @@
         </section>
       </div>
 
+      </details>
+      <style nonce="{{ request.state.csp_nonce }}">
+        .verbindungsdetails{border:1px solid #d5e3dc;border-radius:12px;background:#fff;padding:12px 16px;margin:0 0 18px}
+        .verbindungsdetails>summary{font-size:13px;font-weight:650;color:#345446;cursor:pointer}
+        .verbindungsdetails>summary span{font-weight:400;color:#6c7d73;margin-left:10px;font-size:12px}
+        .verbindungsdetails .diagnostics{margin-top:15px}
+        .chat-head{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:12px}
+        .contact-title{white-space:normal;overflow:visible;text-overflow:clip}
+        .chat-stats{grid-column:1/-1;grid-row:2;justify-content:flex-start}
+        .mode-form{grid-column:2;grid-row:1}
+        @media(max-width:640px){.chat-head{display:flex;flex-direction:column;align-items:stretch}}
+      </style>
       <div class="inbox">
         <aside class="panel conversation-panel" aria-labelledby="conversation-title">
           <div class="panel-head">
@@ -1369,7 +1385,7 @@
 
             <div class="chat-stats">
               {% if selected_conversation %}
-                <span class="stat-pill">{{ selected_conversation.message_count }} Nachrichten</span>
+                <span class="stat-pill">{{ selected_conversation.message_count }} {% if selected_conversation.message_count == 1 %}Nachricht{% else %}Nachrichten{% endif %}</span>
                 <span class="stat-pill">{{ selected_conversation.inbound_count }} vom Kunden</span>
                 <span class="stat-pill">{{ selected_conversation.outbound_count }} ausgehend</span>
                 {{ communication.state_badge(selected_conversation.conversation_state) }}
@@ -1402,6 +1418,7 @@
             {% endif %}
           </div>
 
+          {% include '_whatsapp_bild_stil.html' %}
           <div class="thread" id="messageThread">
             {% for m in messages %}
               <div id="communication-{{ m.message_id }}" class="bubble {{ m.direction }}">
@@ -1414,6 +1431,7 @@
                   {{ communication.action_label(m) }}
                 </div>
                 <div class="message-text">{{ m.text or "-" }}</div>
+                {% with nachricht=m %}{% include '_whatsapp_bild.html' %}{% endwith %}
                 {% if m.reply_to_message_id %}<a class="communication-message-link" href="#communication-{{ m.reply_to_message_id }}">Bezug anzeigen</a>{% endif %}
                 {% if m.message_error %}
                   <div class="message-error">{{ m.message_error }}</div>
@@ -1544,7 +1562,7 @@
     {% include '_communication_script.html' %}
     installDispatchRecovery(document);
     const whatsappWorkspace = document.querySelector(".workspace");
-    const whatsappDiagnostics = document.querySelector(".diagnostics");
+    const whatsappDiagnostics = document.querySelector(".verbindungsdetails");
     if (whatsappWorkspace && whatsappDiagnostics) {
       whatsappWorkspace.appendChild(whatsappDiagnostics);
     }
@@ -1636,14 +1654,8 @@
       });
     });
 
-    window.setInterval(() => {
-      if (document.hidden) return;
-      const replyText = document.getElementById("replyText");
-      if (replyText && replyText.value.trim()) return;
-      const activeTag = document.activeElement ? document.activeElement.tagName : "";
-      if (["INPUT", "TEXTAREA", "SELECT", "BUTTON"].includes(activeTag)) return;
-      window.location.reload();
-    }, 15000);
+    {% include '_dashboard_live_script.html' %}
+    installDashboardLive({initialCursor: {{ event_cursor|tojson }}, workshopId: {{ workshop_id|tojson }}, scope: {{ event_scope|tojson }}, list: false});
   </script>
 </body>
 </html>

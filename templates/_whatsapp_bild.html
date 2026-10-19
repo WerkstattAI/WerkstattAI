@@ -1,0 +1,8 @@
+{% if nachricht.bild_url %}
+<figure class="kundenfoto">
+  <a href="{{ nachricht.bild_url }}" target="_blank" rel="noopener noreferrer" aria-label="Kundenfoto in voller Größe öffnen">
+    <img src="{{ nachricht.bild_url }}" alt="Vom Kunden gesendetes Foto" loading="lazy" width="320" height="200" />
+  </a>
+  <figcaption><a href="{{ nachricht.bild_url }}" target="_blank" rel="noopener noreferrer">Bild öffnen</a> · Nur für Ihre Werkstatt sichtbar</figcaption>
+</figure>
+{% endif %}

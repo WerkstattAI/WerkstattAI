@@ -18,7 +18,7 @@ router = APIRouter()
 templates = Jinja2Templates(directory="templates")
 LABELS = {"tickets": "Tickets einschließlich Notizen", "conversation_sessions": "Gesprächsstände",
           "whatsapp_messages": "WhatsApp-Nachrichten", "whatsapp_events": "WhatsApp-Ereignisse",
-          "whatsapp_conversation_controls": "WhatsApp-Zuordnungen"}
+          "whatsapp_conversation_controls": "WhatsApp-Zuordnungen", "dashboard_events": "Hinweise auf neue Eingänge"}
 
 
 def identity(request: Request, workshop_id: str | None):

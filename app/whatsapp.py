@@ -109,6 +109,9 @@ def parse_meta_messages(payload: dict[str, Any]) -> list[WhatsAppInboundMessage]
                 if message_type == "text":
                     text_payload = message.get("text") if isinstance(message.get("text"), dict) else {}
                     text = str(text_payload.get("body") or "").strip() or None
+                elif message_type == "image":
+                    bild = message.get("image") if isinstance(message.get("image"), dict) else {}
+                    text = str(bild.get("caption") or "").strip() or None
 
                 from_phone = str(message.get("from") or "").strip()
                 message_id = str(message.get("id") or "").strip()
@@ -643,6 +646,26 @@ def prepare_whatsapp_inbound(*, workshop_id: str, message: WhatsAppInboundMessag
                 WHERE workshop_id = ? AND direction = 'inbound' AND wa_message_id = ?
             """, (workshop_id, message.message_id))
 
+        if message.message_type == "image":
+            from app.tickets import add_ticket_note, find_ticket_by_id
+            from app.db import set_whatsapp_conversation_control
+            beschreibung = "Foto erhalten." + (" " + message.text if message.text else "")
+            metadata = dict(message.raw)
+            metadata.update(message_id="wa:" + message.message_id, sender_role="customer",
+                            purpose="customer_information", requires_human_action=True)
+            ticket = find_ticket_by_id(active_ticket_id, workshop_id) if active_ticket_id else None
+            if ticket:
+                add_ticket_note(active_ticket_id, beschreibung, workshop_id=workshop_id,
+                                purpose="customer_information", requires_human_action=True,
+                                message_id="wa:" + message.message_id)
+            else:
+                set_whatsapp_conversation_control(workshop_id=workshop_id, customer_phone=message.from_phone,
+                                                  conversation_state="waiting_for_workshop")
+            conn.execute("UPDATE whatsapp_messages SET text = ?, payload_json = ? WHERE workshop_id = ? AND message_id = ?",
+                         (beschreibung, json.dumps(metadata, ensure_ascii=False), workshop_id, "wa:" + message.message_id))
+            complete()
+            return {"action": "manual", "active_ticket_id": active_ticket_id, "reason": "image_requires_workshop_review"}
+
         if control["mode"] == "manual":
             from app.tickets import find_ticket_by_id
             from app.customer_handoff import receive_customer_message
@@ -862,6 +885,7 @@ def list_whatsapp_messages(
     params.append(safe_limit)
     sql = f"""
         SELECT
+            id,
             workshop_id,
             phone_number_id,
             customer_phone,
@@ -876,7 +900,7 @@ def list_whatsapp_messages(
             created_at
         FROM whatsapp_messages
         WHERE {" AND ".join(filters)}
-        ORDER BY created_at ASC, id ASC
+        ORDER BY created_at DESC, id DESC
         LIMIT ?
     """
 
@@ -886,7 +910,7 @@ def list_whatsapp_messages(
     result = []
     from app.tickets import find_ticket_by_id
     tickets = {}
-    for row in rows:
+    for row in reversed(rows):
         item = dict(row)
         metadata = json.loads(item.get("payload_json") or "{}")
         role = metadata.get("sender_role") or ("customer" if item["direction"] == "inbound" else

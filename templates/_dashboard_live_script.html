@@ -1,0 +1,227 @@
+function createOwnerFeed({fetchPage, onPage, onError, visible, schedule, cancel, cursor = 0}) {
+  let timer = null, active = false, busy = false, delay = 15000;
+  function queue(ms) {
+    if (!active) return;
+    if (timer !== null) cancel(timer);
+    timer = schedule(tick, ms);
+  }
+  async function tick() {
+    timer = null;
+    if (!active) return;
+    if (busy || !visible()) { queue(15000); return; }
+    busy = true;
+    try {
+      const page = await fetchPage(cursor);
+      if (!active) return;
+      onPage(page);
+      cursor = page.cursor;
+      delay = page.more ? 2000 : 15000;
+    } catch (error) {
+      if (active) {
+        delay = Math.max(Math.min(delay * 2, 120000), Number(error.retryAfter) || 0);
+        onError(error);
+      }
+    } finally { busy = false; queue(delay); }
+  }
+  return {
+    start() { active = true; queue(0); },
+    wake() { if (!busy) queue(0); },
+    stop() { active = false; if (timer !== null) cancel(timer); timer = null; },
+  };
+}
+
+function installDashboardLive({workshopId, scope, list, initialCursor = 0}) {
+  const storeKey = 'werkstattai:owner-events:' + scope;
+  const positionKey = url => {
+    const target = new URL(url, location.origin);
+    for (const [key,value] of [...target.searchParams]) {
+      if (!value || (['status','source','question_state','task_state'].includes(key) && value === 'all')
+          || (key === 'page' && value === '1')) target.searchParams.delete(key);
+    }
+    target.searchParams.sort();
+    return 'werkstattai:owner-position:' + scope + ':' + target.pathname + '?' + target.searchParams;
+  };
+  const read = key => { try { return JSON.parse(sessionStorage.getItem(key)); } catch (_) { return null; } };
+  const write = (key, value) => { try { sessionStorage.setItem(key, JSON.stringify(value)); } catch (_) {} };
+  const here = () => location.pathname + location.search;
+  let state = read(storeKey) || {cursor: initialCursor, items: []};
+  if (!Array.isArray(state.items) || !Number.isSafeInteger(state.cursor)) state = {cursor:initialCursor,items:[]};
+  let pendingActions = 0;
+  const status = document.getElementById('owner-events-status');
+  const eventList = document.getElementById('owner-events-list');
+  function renderEvents() {
+    if (!eventList) return;
+    const retained = new Set(state.items.map(item => String(item.id)));
+    for (const li of [...eventList.children]) if (!retained.has(li.dataset.eventId)) li.remove();
+    eventList.hidden = !state.items.length;
+    status.textContent = state.items.length ? state.items.length + ' neue Eingänge in diesem Tab.' : 'Keine neuen Eingänge seit Öffnen dieses Tabs.';
+    for (const item of state.items) {
+      if ([...eventList.children].some(li => li.dataset.eventId === String(item.id))) continue;
+      const li = document.createElement('li'), link = document.createElement('a'), dismiss = document.createElement('button');
+      li.dataset.eventId = String(item.id);
+      const target = new URL(item.url, location.origin);
+      if (list) target.searchParams.set('return_to', here());
+      link.href = target.pathname + target.search + target.hash;
+      link.textContent = item.label + ' · ' + item.ticket_id + ': ' + item.text;
+      dismiss.type = 'button'; dismiss.textContent = 'Hinweis ausblenden';
+      dismiss.addEventListener('click', () => {
+        state.items = state.items.filter(e => e.id !== item.id); write(storeKey, state); renderEvents();
+      });
+      li.append(link, dismiss); eventList.append(li);
+    }
+  }
+  renderEvents();
+  const feed = createOwnerFeed({cursor: state.cursor,
+    visible: () => !document.hidden && !pendingActions,
+    schedule: (fn, ms) => setTimeout(fn, ms), cancel: clearTimeout,
+    fetchPage: async cursor => {
+      const controller = new AbortController(), timeout = setTimeout(() => controller.abort(), 20000);
+      try {
+        const response = await fetch('/dashboard/events?' + new URLSearchParams({workshop_id:workshopId, after:cursor}), {cache:'no-store', signal:controller.signal});
+        if (!response.ok || response.redirected) {
+          const error = new Error('Eingänge konnten nicht aktualisiert werden. Die nächste Abfrage folgt automatisch.');
+          error.retryAfter = Number(response.headers.get('Retry-After')) * 1000;
+          throw error;
+        }
+        return await response.json();
+      } finally { clearTimeout(timeout); }
+    },
+    onPage: page => {
+      if (page.scope !== scope) throw new Error('Bitte erneut anmelden.');
+      const ids = new Set(state.items.map(e => e.id));
+      for (const e of page.events) if (!ids.has(e.id)) { state.items.push(e); ids.add(e.id); }
+      // At most 100 notices are displayed; every task remains reachable in the worklist.
+      if (state.items.length > 100) state.items = state.items.slice(-100);
+      state.cursor = page.cursor; write(storeKey, state); renderEvents();
+    },
+    onError: error => { if (status) status.textContent = error.name === 'AbortError' || error instanceof TypeError
+      ? 'Verbindung unterbrochen. Die nächste Abfrage folgt automatisch.'
+      : error.message || 'Verbindung unterbrochen. Erneuter Versuch folgt.'; },
+  });
+  document.addEventListener('visibilitychange', () => feed.wake());
+  window.addEventListener('pagehide', () => { feed.stop(); write(positionKey(here()), {...read(positionKey(here())), y:scrollY}); });
+  window.addEventListener('pageshow', () => feed.start());
+  feed.start();
+  const saved = read(positionKey(here()));
+  if (saved && !location.hash) requestAnimationFrame(() => {
+    const anchor = saved.anchor && document.getElementById(saved.anchor);
+    if (anchor) window.scrollBy(0, anchor.getBoundingClientRect().top - saved.top);
+    else window.scrollTo(0, saved.y);
+  });
+  document.addEventListener('click', event => {
+    const link = event.target.closest('a[href]');
+    if (!link) return;
+    const row = link.closest('tr[id]');
+    const position = {y:scrollY, anchor:row?.id, top:row?.getBoundingClientRect().top};
+    write(positionKey(here()), position);
+    const target = new URL(link.href, location.origin);
+    const back = target.searchParams.get('return_to');
+    if (list && back) write(positionKey(back), position);
+  });
+  function feedback(form, text, error = false) {
+    let node = form.querySelector('.action-feedback');
+    if (!node) { node = document.createElement('span'); node.setAttribute('role','status'); form.append(node); }
+    node.className = 'action-feedback' + (error ? ' error' : ''); node.textContent = text;
+    return node;
+  }
+  function preserveAnchor(anchor, change) {
+    const y = anchor?.getBoundingClientRect().top;
+    const scroll = window.scrollY;
+    change();
+    if (anchor?.isConnected && y !== undefined) window.scrollBy(0, anchor.getBoundingClientRect().top - y);
+    else window.scrollTo(0, scroll);
+  }
+  document.addEventListener('submit', async event => {
+    const form = event.target;
+    if (!(form instanceof HTMLFormElement) || event.defaultPrevented) return;
+    write(positionKey(here()), {y:scrollY});
+    const quick = form.matches('[data-context-action]');
+    const detail = !list && (/\/(status|information-resolve|conversation-control|notes)$/.test(new URL(form.action).pathname) || form.action.endsWith('/whatsapp/control'))
+      && !form.matches('.customer-reply-form');
+    if (!quick && !detail) return; // Existing message composer owns delivery and retry state.
+    event.preventDefault();
+    if (form.dataset.saving) return;
+    form.dataset.saving = 'true'; pendingActions++;
+    const body = new FormData(form);
+    if (event.submitter?.name) body.set(event.submitter.name, event.submitter.value);
+    const buttons = [...form.querySelectorAll('button')];
+    const disabled = buttons.map(b => b.disabled); buttons.forEach(b => b.disabled = true);
+    feedback(form, 'Wird gespeichert …');
+    let committed = false;
+    const controller = new AbortController(), timeout = setTimeout(() => controller.abort(), 20000);
+    try {
+      const response = await fetch(form.action, {method:'POST',body,signal:controller.signal,headers:quick ? {'Accept':'application/json'} : {}});
+      if (!response.ok || new URL(response.url).pathname === '/login') throw new Error('Speichern fehlgeschlagen. Ihre Eingabe bleibt erhalten. Bitte erneut versuchen oder anmelden.');
+      if (new URL(response.url).searchParams.get('reply_status') === 'failed') throw new Error(new URL(response.url).searchParams.get('reply_detail') || 'Speichern fehlgeschlagen.');
+      if (quick) {
+        const result = await response.json();
+        if (!result.ok) throw new Error(result.message);
+        committed = true;
+        const fresh = await fetch(here(), {cache:'no-store', signal:controller.signal});
+        if (!fresh.ok || fresh.redirected) throw new Error('Status gespeichert. Die Anzeige konnte nicht aktualisiert werden. Bitte die Liste erneut öffnen.');
+        const doc = new DOMParser().parseFromString(await fresh.text(), 'text/html');
+        const row = form.closest('tr'), replacement = doc.getElementById(row.id);
+        const neighbor = row.nextElementSibling || row.previousElementSibling;
+        preserveAnchor(neighbor, () => {
+          document.querySelectorAll('[data-kpi]').forEach(kpi => {
+            const updated = doc.querySelector('[data-kpi="' + kpi.dataset.kpi + '"] .value');
+            if (updated) kpi.querySelector('.value').textContent = updated.textContent;
+          });
+          for (const selector of ['#attention-region', '.table-count', '#work-summary', '.pagination']) {
+            const old = document.querySelector(selector), next = doc.querySelector(selector);
+            if (old && next) old.replaceWith(next);
+          }
+          if (replacement) {
+            row.replaceWith(replacement);
+            const nextForm = replacement.querySelector('form.quick');
+            feedback(nextForm, 'Status gespeichert.');
+            nextForm.querySelector('button')?.focus({preventScroll:true});
+          } else {
+            row.replaceChildren();
+            const cell = document.createElement('td'); cell.colSpan = 7;
+            cell.textContent = 'Status gespeichert. Dieses Ticket passt nicht mehr zu den aktuellen Filtern oder zur aktuellen Seite.';
+            cell.setAttribute('role','status'); cell.tabIndex = -1; row.append(cell); cell.focus({preventScroll:true});
+          }
+        });
+      } else {
+        committed = true;
+        const doc = new DOMParser().parseFromString(await response.text(), 'text/html');
+        const anchor = form;
+        preserveAnchor(anchor, () => {
+          for (const id of ['communication-history']) {
+            const old = document.getElementById(id), next = doc.getElementById(id);
+            if (old && next && !old.contains(form)) old.replaceWith(next);
+          }
+          if (form.action.endsWith('/information-resolve')) {
+            const card = form.closest('.note-card'), next = doc.getElementById(card.id);
+            if (next) { card.replaceWith(next); next.tabIndex = -1; next.focus({preventScroll:true}); }
+          } else if (form.action.endsWith('/conversation-control') || form.action.endsWith('/whatsapp/control')) {
+            const bar = form.closest('.conversation-control-bar'), next = doc.querySelector('.conversation-control-bar');
+            if (next) { bar.replaceWith(next); next.querySelector('button')?.focus({preventScroll:true}); }
+          } else if (form.action.endsWith('/status')) {
+            const next = doc.querySelector('.status-value');
+            if (next) document.querySelector('.status-value').replaceWith(next);
+            feedback(form, 'Status gespeichert.');
+          } else {
+            const panel = form.closest('#internal-notes');
+            if (panel) {
+              panel.querySelector('[data-empty-notes]')?.remove();
+              panel.querySelector('.note-stack')?.remove();
+              const next = doc.querySelector('#internal-notes .note-stack');
+              if (next) panel.append(next);
+            }
+            form.querySelector('textarea').value = ''; feedback(form, 'Notiz gespeichert.');
+          }
+        });
+      }
+    } catch (error) {
+      const message = error.name === 'AbortError' || error instanceof TypeError
+        ? 'Verbindung unterbrochen. Ihre Eingabe bleibt erhalten. Bitte vor einem erneuten Speichern den aktuellen Stand prüfen.' : error.message;
+      feedback(form, committed ? 'Gespeichert, aber die Anzeige konnte nicht vollständig aktualisiert werden. Bitte die Ansicht erneut öffnen.' : message, true);
+    } finally {
+      clearTimeout(timeout);
+      delete form.dataset.saving; pendingActions--;
+      buttons.forEach((b,i) => b.disabled = disabled[i]);
+    }
+  });
+}

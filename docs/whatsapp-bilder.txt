@@ -1,0 +1,47 @@
+WhatsApp-Bilder — Stand 19. Oktober 2026
+
+Empfangene JPEG- und PNG-Fotos erscheinen im WhatsApp-Posteingang und bei
+vorhandener Zuordnung im Gesprächsverlauf des Tickets. Eine Bildnachricht
+wird als Kundeninformation zur Prüfung durch die Werkstatt markiert.
+Die Bildbeschriftung wird nicht als Reparaturfreigabe oder als automatisch
+erkannte Fahrzeugangabe behandelt. Es findet keine OCR-Auswertung statt.
+
+Ohne bestehendes Ticket bleibt das Foto im WhatsApp-Posteingang erreichbar.
+Die Unterhaltung wartet auf die Werkstatt; die automatische Annahme setzt
+die Bearbeitung nicht unbemerkt fort. Ein Ticket wird allein durch ein Foto
+nicht automatisch angelegt. Doppelte Webhooks erzeugen keine doppelte Aufgabe.
+
+Bildabruf
+- Anmeldung und Werkstattzuordnung werden vor jedem Abruf geprüft.
+- Der Browser erhält nur eine lokale, geschützte Nachrichtenadresse.
+- Der Server ruft für die gespeicherte Medien-ID einen aktuellen Meta-Link ab;
+  phone_number_id beschränkt diesen Abruf auf die zugehörige WhatsApp-Nummer.
+- Der Zugriffstoken bleibt auf dem Server. Er steht weder im Bildlink noch
+  im HTML. Weiterleitungen werden nicht verfolgt.
+- Nur festgelegte Meta-Medienhosts, HTTPS sowie JPEG/PNG bis 5 MiB sind erlaubt.
+  Content-Type, Dateigröße und Dateisignatur werden zusätzlich kontrolliert.
+- Bildantworten werden nicht zwischengespeichert. Es entstehen keine lokalen
+  Dateikopien und keine neue dauerhafte Bildablage.
+
+Verfügbarkeit und Löschung
+Diese Umsetzung ist keine dauerhafte Dokumentenablage. Wenn Meta das Bild
+nicht mehr bereitstellt oder Zugriffsrechte fehlen, zeigt „Bild öffnen“ eine
+verständliche Fehlermeldung. Bei Bedarf muss der Kunde es erneut senden.
+Für eine spätere dauerhafte Archivierung sind Speicherort, Zugriffsrechte,
+Aufbewahrung, Backup und Löschung als eigenes Arbeitspaket festzulegen.
+
+Die vorhandene Kundendatenlöschung entfernt die zugeordneten Nachrichten
+und damit deren lokale Bildverweise; danach liefert der Bildendpunkt 404.
+Bestände bei Meta und bereits vom Benutzer heruntergeladene Dateien sind
+gesondert zu behandeln. PDF-Dokumente, Video, Sprachnachrichten und versendete
+Bildanhänge sind nicht Bestandteil dieser Bildvorschau.
+
+Prüfung
+tests/test_whatsapp_medien.py prüft Empfang, Idempotenz, offene Aufgaben,
+Ticket-/Posteingangsvorschau, Mandantentrennung, Anmeldung, authentifizierten
+Abruf, fremde Medienhosts, Weiterleitungen, Größen- und Dateiformatgrenzen.
+Die Browserprüfung verwendet ausschließlich synthetische Daten und ein
+lokales Prüfbild. Ein echter Kunden-Fahrzeugschein wurde nicht verwendet.
+
+Meta-Referenz:
+https://www.postman.com/meta/whatsapp-business-platform/request/fpj02x0/retrieve-media-url

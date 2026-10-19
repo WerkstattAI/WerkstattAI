@@ -103,6 +103,21 @@ def open_customer_questions(ticket: dict[str, Any]) -> list[dict[str, Any]]:
             and not note.get("legacy_closed")]
 
 
+def open_customer_tasks(ticket: dict[str, Any]) -> list[dict[str, Any]]:
+    """Reading and repair status never resolve a customer's communication task."""
+    return [note for note in ticket.get("notes", []) if isinstance(note, dict)
+            and note.get("sender_role") == "customer"
+            and note.get("purpose") in {"customer_question", "customer_information"}
+            and note.get("requires_human_action") and not note.get("resolved_at")
+            and not note.get("legacy_closed")]
+
+
+def customer_task_label(note: dict[str, Any]) -> str:
+    if note.get("purpose") == "customer_question":
+        return "Kunden warten auf Antwort"
+    return "Kundenantwort prüfen" if note.get("reply_to_message_id") else "Kundeninformation prüfen"
+
+
 def pending_workshop_question(ticket: dict[str, Any]) -> dict[str, Any] | None:
     notes = ticket.get("notes") or []
     answered = {note.get("reply_to_message_id") for note in notes if isinstance(note, dict)

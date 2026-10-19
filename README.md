@@ -14,10 +14,11 @@ Sicherheits- und Betriebsfragen zu beheben.**
 - [Datenschutzfunktionen und offene Angaben](docs/recht/betrieb-und-freigabe.md)
 - [AVV-Grundlage – Entwurf](docs/recht/avv-grundlage.md)
 - [Cloudflare-Worker für WhatsApp](cloudflare/whatsapp-webhook-proxy/README.md)
+- [Geschützte WhatsApp-Bildvorschau und Betriebsgrenzen](docs/whatsapp-bilder.txt)
 
 ## Lokale Prüfungen
 
-Die Python-Tests benötigen die Anwendungsabhängigkeiten und `httpx`.
+Die Python-Tests benötigen die Abhängigkeiten aus `requirements-test.txt`.
 Sie verwenden temporäre SQLite-Datenbanken und synthetische Daten.
 
 ```text

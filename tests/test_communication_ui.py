@@ -126,7 +126,7 @@ class CommunicationTemplateTests(unittest.TestCase):
             "sender_role": "customer", "purpose": "customer_information",
             "requires_human_action": True, "resolved_at": None,
         }))
-        self.assertIn("Zur Bearbeitung", markup)
+        self.assertIn("Kundeninformation prüfen", markup)
         self.assertIn("Kundeninformation", markup)
         self.assertNotIn("Offene Kundenfrage", markup)
 
@@ -210,7 +210,7 @@ class CommunicationPageTests(unittest.TestCase):
         self.assert_fresh_selection(markup)
         targets = FormFields(markup).selects["reply_to_message_id"]["options"]
         self.assertEqual([option["value"] for option in targets], ["", "customer-0", "customer-1"])
-        self.assertIn("Werkstatt übernimmt", markup)
+        self.assertIn("Team antwortet · Assistent pausiert", markup)
 
     def assert_fresh_selection(self, markup):
         fields = FormFields(markup).selects

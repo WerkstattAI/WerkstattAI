@@ -9,3 +9,5 @@ data/
 .idea/
 .vscode/
 .DS_Store
+# Lokale Prüfberichte, Datenbanken und Vorschauen bleiben auf dem Rechner.
+artifacts/

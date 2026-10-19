@@ -1,0 +1,23 @@
+<style nonce="{{ request.state.csp_nonce }}">
+  .owner-events {padding:12px 16px;border:1px solid #cfe2db;border-radius:12px;background:#f5faf7;margin:0;color:#234d40;overflow-wrap:anywhere;font-size:13px;line-height:1.5}
+  .owner-events strong{margin-right:8px}
+  .owner-events details{display:inline-block;margin-left:8px;border:0;background:transparent;font-size:12px}
+  .owner-events summary{cursor:pointer;background:transparent;color:#536b61;font-size:12px;padding:0}
+  .owner-events details[open]{display:block;margin:8px 0 0}
+  .owner-events p{margin:6px 0 0}
+  .owner-events ul {padding-left:20px;max-height:240px;overflow:auto}
+  .owner-events li {margin:10px 0}
+  .owner-events button {margin-left:8px}
+  .action-feedback {display:block;white-space:normal;max-width:360px;padding:8px;color:#245b44}
+  .action-feedback.error {color:#9b2727}
+  #work-summary a, #attention-region a:not(.attention-card), .pagination a {color:#17685d;font-weight:600}
+  .pagination {display:flex;gap:18px;justify-content:center;flex-wrap:wrap;padding:24px}
+  .toolbar input {max-width:100%}
+  @media(max-width:640px){.toolbar input[name=q]{min-width:0!important;width:100%}.owner-events{padding:10px}.pagination{gap:10px}}
+</style>
+<aside class="owner-events" id="owner-events" aria-label="Neue Eingänge">
+  <strong>Neue Eingänge</strong>
+  <span id="owner-events-status" role="status" aria-live="polite">Keine neuen Eingänge seit Öffnen dieses Tabs.</span>
+  <ul id="owner-events-list" hidden></ul>
+  <details><summary>Hinweise zur Anzeige</summary><p>Neue Eingänge erscheinen hier, während Sie arbeiten. Ihre Eingaben und die Reihenfolge der Liste bleiben erhalten. Ausblenden erledigt keine Aufgabe. Alle offenen Aufgaben bleiben in der Aufgabenliste erreichbar.</p></details>
+</aside>

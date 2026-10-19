@@ -4,6 +4,8 @@
 .venv
 venv
 node_modules
+artifacts
+AGENTS.md
 .vscode
 .idea
 .env

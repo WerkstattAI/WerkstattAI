@@ -1782,7 +1782,7 @@
     <div class="topbar">
       <div class="topbar-left">
         <div class="ticket-nav">
-          <a class="back-link active" href="/dashboard?workshop_id={{ workshop_id }}" aria-current="location">← Aktive Tickets</a>
+          <a class="back-link active" href="{{ list_url }}" data-list-return aria-current="location">← Zurück zur Liste</a>
           <a class="back-link" href="/dashboard/whatsapp?workshop_id={{ workshop_id }}">WhatsApp</a>
           <a class="back-link" href="/dashboard/intake?workshop_id={{ workshop_id }}">+ Direktannahme</a>
           <a class="back-link" href="/dashboard/archive?workshop_id={{ workshop_id }}">Archiv</a>
@@ -1807,7 +1807,7 @@
             </div>
           </div>
 
-          <div class="muted">Vollansicht mit Statusverwaltung, Kontaktdaten und internen Systeminformationen.</div>
+          <div class="muted">Anliegen, Aufgaben und Kommunikation mit dem Kunden.</div>
         </div>
       </div>
     </div>
@@ -1845,7 +1845,7 @@
       </div>
 
       <div class="hero-side">
-        <div class="card status-card {% if ticket.priority == 'hoch' %}row-high{% endif %} {% if ticket.request_type == 'notfall' %}row-notfall{% endif %}">
+        <div id="ticket-status" class="card status-card {% if ticket.priority == 'hoch' %}row-high{% endif %} {% if ticket.request_type == 'notfall' %}row-notfall{% endif %}">
           <div class="status-head">
             <div>
               <div class="muted">Aktueller Status</div>
@@ -1879,7 +1879,7 @@
             {% if ticket.has_customer_question %}
             Kundenfragen: {% if ticket.customer_question_open %}Offen{% else %}Erledigt{% endif %}<br>
             {% endif %}
-            Backend-Status: {{ ticket.status_label or "-" }}
+            Bearbeitungsstatus: {{ ticket.status_label or "-" }}
           </div>
         </div>
       </div>
@@ -1912,8 +1912,6 @@
             {% endif %}
           </div>
 
-          <b>Session</b>
-          <div class="muted">{{ ticket.session_id or "-" }}</div>
         </div>
       </div>
 
@@ -1933,6 +1931,7 @@
         <div class="actions">
           <form method="post" action="/dashboard/ticket/{{ ticket.ticket_view_id }}/status" class="status-form">
             <input type="hidden" name="workshop_id" value="{{ workshop_id }}" />
+              <input type="hidden" name="return_to" value="{{ list_url }}" />
             <div class="field">
               <div class="muted">Status ändern</div>
               <select name="status" style="margin-top:6px; width:100%;">
@@ -1954,6 +1953,7 @@
             data-confirm="Dieses Ticket wirklich archivieren?"
           >
             <input type="hidden" name="workshop_id" value="{{ workshop_id }}" />
+              <input type="hidden" name="return_to" value="{{ list_url }}" />
             <button class="archive-btn" type="submit">Archivieren</button>
           </form>
           {% endif %}
@@ -1985,12 +1985,14 @@
 
         <div class="divider"></div>
 
+        {% include "_dashboard_events.html" %}
         <div class="communication-grid">
-          <div class="communication-panel">
+          <div class="communication-panel" id="internal-notes">
             <h3 class="section-title">Interne Notiz</h3>
 
             <form class="note-form" method="post" action="/dashboard/ticket/{{ ticket.ticket_view_id }}/notes">
               <input type="hidden" name="workshop_id" value="{{ workshop_id }}" />
+              <input type="hidden" name="return_to" value="{{ list_url }}" />
               <input type="hidden" name="note_type" value="internal_note">
               <div class="note-form-row">
                 <textarea
@@ -2016,16 +2018,16 @@
                 {% endfor %}
               </div>
             {% else %}
-              <div class="muted">Noch keine internen Notizen vorhanden.</div>
+              <div class="muted" data-empty-notes>Noch keine internen Notizen vorhanden.</div>
             {% endif %}
           </div>
 
-          <div class="communication-panel">
+          <div class="communication-panel" id="communication-controls">
             <h3 class="section-title">
               {% if ticket.has_whatsapp_conversation or ticket.source == "whatsapp" %}
-                WhatsApp an den Kunden
+                Über WhatsApp schreiben
               {% else %}
-                Nachricht an den Kunden
+                Im Webchat antworten
               {% endif %}
             </h3>
             <div style="margin-bottom:10px;">
@@ -2057,7 +2059,7 @@
                     Eine freie Textnachricht ist im 24-Stunden-Fenster möglich. Beim Senden übernimmt die Werkstatt die Unterhaltung und der Assistent pausiert. Erst „Zugestellt“ bestätigt den Empfang.
                   {% endif %}
                 {% elif ticket.source == "web_chat" %}
-                  Diese Nachricht wird für den Web-Chat gespeichert und dem Kunden beim erneuten Öffnen des Chats angezeigt.
+                  Diese Nachricht wird für den Web-Chat gespeichert und im geöffneten Webchat automatisch abgerufen (etwa alle zehn Sekunden). Das Speichern bestätigt noch nicht, dass der Kunde sie gelesen hat.
                 {% else %}
                   Diese Nachricht wird zur Dokumentation im Ticket gespeichert. Für einen direkten WhatsApp-Kontakt nutze „Kunde schreiben“ in der Übersicht Aktive Tickets.
                 {% endif %}
@@ -2072,6 +2074,7 @@
                 </div>
                 <form method="post" action="/dashboard/whatsapp/control">
                   <input type="hidden" name="workshop_id" value="{{ workshop_id }}" />
+              <input type="hidden" name="return_to" value="{{ list_url }}" />
                   <input type="hidden" name="customer_phone" value="{{ ticket.whatsapp_phone }}" />
                   <input type="hidden" name="ticket_id" value="{{ ticket.ticket_view_id }}" />
                   <input type="hidden" name="context" value="ticket" />
@@ -2090,6 +2093,7 @@
                 </div>
                 <form method="post" action="/dashboard/ticket/{{ ticket.ticket_view_id }}/conversation-control">
                   <input type="hidden" name="workshop_id" value="{{ workshop_id }}" />
+              <input type="hidden" name="return_to" value="{{ list_url }}" />
                   {% if ticket.conversation_state == "assistant_active" %}
                     <button class="conversation-mode-button" type="submit" name="state" value="workshop_active">Werkstatt übernimmt</button>
                   {% else %}
@@ -2102,6 +2106,7 @@
             {{ communication.dispatch_recovery(ticket.dispatch_blocked, ticket.stale_dispatches|default([]), workshop_id, ticket.ticket_view_id, ticket.whatsapp_phone, 'ticket') }}
             <form class="note-form customer-reply-form" method="post" action="/dashboard/ticket/{{ ticket.ticket_view_id }}/notes">
               <input type="hidden" name="workshop_id" value="{{ workshop_id }}" />
+              <input type="hidden" name="return_to" value="{{ list_url }}" />
               <input type="hidden" name="note_type" value="customer_reply">
               {{ communication.purpose_controls('ticketMessage', ticket.open_customer_questions|default([]), ticket.has_whatsapp_conversation or ticket.source == 'whatsapp') }}
               <div class="note-form-row">
@@ -2134,7 +2139,7 @@
               </div>
             </form>
 
-            {% if ticket.whatsapp_phone and not ticket.service_window_open %}
+            {% if (ticket.has_whatsapp_conversation or ticket.source == "whatsapp") and ticket.whatsapp_phone and not ticket.service_window_open %}
               <div class="template-start-card">
                 <div>
                   <strong>Gespräch mit Startvorlage öffnen</strong>
@@ -2145,6 +2150,7 @@
                 <form class="guarded-send-form" method="post" action="/dashboard/whatsapp/start-template" data-dispatch-blocked="{{ 'true' if ticket.dispatch_blocked else 'false' }}">
                   <input type="hidden" name="message_id" value="" />
                   <input type="hidden" name="workshop_id" value="{{ workshop_id }}" />
+              <input type="hidden" name="return_to" value="{{ list_url }}" />
                   <input type="hidden" name="customer_phone" value="{{ ticket.whatsapp_phone }}" />
                   <input type="hidden" name="ticket_id" value="{{ ticket.ticket_view_id }}" />
                   <input type="hidden" name="context" value="ticket" />
@@ -2157,7 +2163,7 @@
 
           </div>
 
-          <div class="communication-panel full">
+          <div class="communication-panel full" id="communication-history">
             <h3 class="section-title">Gesprächsverlauf</h3>
             <div style="margin-bottom:10px;">
               <span class="channel-badge {{ ticket.source or 'web_chat' }}">
@@ -2173,14 +2179,17 @@
             </div>
 
             {% if ticket.communication_messages %}
+              {% include '_whatsapp_bild_stil.html' %}
               <div class="note-stack">
                 {% for note in ticket.communication_messages | reverse %}
                   <div id="communication-{{ note.message_id }}" class="note-card {% if note.sender_role == 'customer' %}customer-question{% else %}customer-reply{% endif %}">
                     {{ communication.message_heading(note) }}
                     <div class="note-text">{{ note.text }}</div>
+                    {% with nachricht=note %}{% include '_whatsapp_bild.html' %}{% endwith %}
                     {% if note.sender_role == 'customer' and note.purpose == 'customer_information' and note.requires_human_action and not note.resolved_at %}
                     <form method="post" action="/dashboard/ticket/{{ ticket.ticket_view_id }}/information-resolve">
                       <input type="hidden" name="workshop_id" value="{{ workshop_id }}" />
+              <input type="hidden" name="return_to" value="{{ list_url }}" />
                       <input type="hidden" name="message_id" value="{{ note.message_id }}" />
                       <button type="submit">Als bearbeitet markieren</button>
                     </form>
@@ -2201,6 +2210,7 @@
 
         <form class="note-form" method="post" action="/dashboard/ticket/{{ ticket.ticket_view_id }}/notes">
           <input type="hidden" name="workshop_id" value="{{ workshop_id }}" />
+              <input type="hidden" name="return_to" value="{{ list_url }}" />
           <div class="note-form-row">
             <textarea
               name="note_text"
@@ -2248,10 +2258,10 @@
 
         <div class="divider"></div>
 
-        <h3 class="section-title">Interne Systemdaten</h3>
+        <details><summary>Technische Details</summary>
         <div class="debug-grid">
           <div class="debug-item">
-            <div class="debug-label">Backend Status</div>
+            <div class="debug-label">Bearbeitungsstatus</div>
             <div class="debug-value">{{ ticket.status_label or "-" }}</div>
           </div>
           <div class="debug-item">
@@ -2259,7 +2269,7 @@
             <div class="debug-value">{{ ticket.priority_label or "-" }}</div>
           </div>
           <div class="debug-item">
-            <div class="debug-label">Request Type</div>
+            <div class="debug-label">Anfragetyp</div>
             <div class="debug-value">{{ ticket.request_type_label or "-" }}</div>
           </div>
           <div class="debug-item">
@@ -2294,7 +2304,7 @@
 
         <div class="debug-grid">
           <div class="debug-item">
-            <div class="debug-label">Follow-up Fragen</div>
+            <div class="debug-label">Rückfragen</div>
             <div class="debug-value">
               {% if ticket.followup_questions %}
                 <ul class="debug-list">
@@ -2309,7 +2319,7 @@
           </div>
 
           <div class="debug-item">
-            <div class="debug-label">Follow-up Antworten</div>
+            <div class="debug-label">Antworten auf Rückfragen</div>
             <div class="debug-value">
               {% if ticket.followup_answers %}
                 <ul class="debug-list">
@@ -2330,6 +2340,7 @@
             <pre>{{ ticket.raw_json or "{}" }}</pre>
           </div>
         </details>
+      </details>
       </div>
     </div>
   </div>
@@ -2338,6 +2349,8 @@
 
   <script nonce="{{ request.state.csp_nonce }}">
     {% include '_communication_script.html' %}
+    {% include '_dashboard_live_script.html' %}
+    installDashboardLive({initialCursor: {{ event_cursor|tojson }}, workshopId: {{ workshop_id|tojson }}, scope: {{ event_scope|tojson }}, list: false});
     installDispatchRecovery(document);
     document.querySelectorAll('form[data-confirm]').forEach(form => {
       form.addEventListener('submit', event => {
