@@ -40,17 +40,40 @@ Anwendung: https://werkstattai-whatsapp.up.railway.app
 
 ### Nächste Schritte
 
-1. Das bestehende Administratorpasswort ändern; die Anmeldung mit dem bekannten
-   Standardpasswort wurde bestätigt. Eine Änderung allein der Railway-Startvariable
+Vereinbarte Reihenfolge vom 19. Oktober 2026. Alle fünf Arbeitspakete sind offen.
+Zuerst die Punkte 1 und 2 bearbeiten. Dashboard und Bildvorschau sind bereits
+veröffentlicht; der nächste Schwerpunkt liegt auf Sicherheit und dem echten
+Kommunikationsablauf.
+
+1. **Zugänge absichern und Abhängigkeiten aktualisieren.** Das Passwort des
+   bestehenden Administratorkontos ändern und Pakete mit bekannten
+   Sicherheitslücken als kompatiblen Satz aktualisieren. Anschließend die
+   betroffenen Abläufe prüfen. Eine Änderung allein der Railway-Startvariable
    setzt das Passwort eines bestehenden Benutzers nicht zurück.
-2. Tatsächliche Unternehmensdaten und erforderliche Gewerbe-/Steuerfragen klären,
-   anschließend Meta-Unternehmensverifizierung und Tech-Provider-Freigaben bearbeiten.
-   Eine Gewerbeanmeldung allein schaltet die Meta-Freigaben nicht automatisch frei.
-3. Onboarding fremder Werkstätten und ihrer WhatsApp-Konten umsetzen und mit
-   autorisierten Konten sowie echten Testnachrichten prüfen.
-4. Bekannte Sicherheitsupdates der Pakete, Anbieterangaben, Backup-/Restore-
-   Nachweise und Betriebsüberwachung abschließen. Der folgende historische
-   Prüfumfang ist keine aktuelle Freigabe dieser offenen Punkte.
+2. **Vollständigen WhatsApp-Test mit bestätigtem eigenem Empfänger durchführen.**
+   Kundennachricht, Ticketanlage, Werkstattantwort und tatsächliche Zustellung
+   prüfen. Ein synthetisches Beispielbild empfangen, im Posteingang und Ticket
+   öffnen, die Unterhaltung an einen Mitarbeiter übergeben und kontrollieren,
+   dass keine doppelten Nachrichten entstehen. Ein simulierter Transporttest
+   ersetzt diesen tatsächlichen Ablauf nicht.
+3. **Unternehmensdaten und Meta-Verifizierung abschließen.** Tatsächliche
+   Unternehmensdaten und erforderliche Gewerbe-/Steuerfragen klären, die Angaben
+   in Meta vervollständigen und Unternehmensverifizierung, Zugriffsverifizierung
+   sowie App-Review für die Tech-Provider-Nutzung bearbeiten. Eine
+   Gewerbeanmeldung allein schaltet die Meta-Freigaben nicht automatisch frei.
+4. **Nummern externer Werkstätten anbinden.** Einen vollständigen
+   Embedded-Signup-Prozess mit Zustimmung des Kontoinhabers, erforderlichem
+   Berechtigungs-/Tokenaustausch und werkstattspezifischer Zuordnung umsetzen.
+   Die getrennten Konten und Nachrichten mit autorisierten Testwerkstätten prüfen.
+5. **Erstes betreutes Werkstatt-Deployment vorbereiten.** Datensicherung und
+   tatsächliche Wiederherstellung prüfen, Fehlerüberwachung einrichten und das
+   Konto der ersten Werkstatt einschließlich Profil, Anbieterangaben und
+   abgestimmten Datenschutz-/Betriebsunterlagen vervollständigen. Erst nach
+   den erforderlichen Nachweisen echte Kundendaten aufnehmen.
+
+Der folgende historische Prüfumfang ist keine aktuelle Freigabe dieser offenen
+Punkte. Bei der nächsten Projektsitzung diese Reihenfolge als Ausgangspunkt
+verwenden und erledigte Aufgaben mit ihrem tatsächlichen Prüfnachweis aktualisieren.
 
 Die ausführlichen lokalen Nachweise und Screenshots liegen unter
 `artifacts/readiness-2026-10-19/`, insbesondere `ABSCHLUSSBERICHT.txt`,

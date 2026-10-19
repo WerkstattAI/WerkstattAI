@@ -4,3 +4,8 @@
 - Neue fachliche Bezeichnungen und Hilfsdateien verwenden deutsche Namen.
 - Bestehende technische Bezeichner, Programmiersyntax, Bibliotheksnamen und externe API-Felder behalten ihre definierten Namen, damit Schnittstellen kompatibel bleiben.
 - Kundendaten, Zugangsdaten und lokale Prüfartefakte gehören nicht in Git oder Docker-Images.
+
+# Projektfortsetzung
+
+- Der aktuelle Stand und die vereinbarte Reihenfolge der nächsten Aufgaben stehen in `docs/projektstand.md`, Abschnitt „Nächste Schritte“.
+- Bei der Fortsetzung diese Notizen berücksichtigen. Aktuell haben Zugangs-/Paketabsicherung und der vollständige reale WhatsApp-Test Vorrang.
