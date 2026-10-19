@@ -1,5 +1,67 @@
 # WerkstattAI – Projektstand und nächste Schritte
 
+## Aktueller Stand vom 19. Oktober 2026
+
+Die Dashboard-Überarbeitung und die geschützte WhatsApp-Bildvorschau sind im
+Projekt gespeichert und veröffentlicht. Anwendungsstand:
+`aa965e481f62ad34ee752d5b3cd89f365c4d30fb`, Branch
+`codex/kundenkommunikation-2026-09-26`. Das Railway-Deployment
+`e81fee99-9838-4ee3-9639-ba2674b3537b` wurde am 19. Oktober mit Status
+`SUCCESS`, laufender Instanz und acht erfolgreichen Onlinekontrollen bestätigt.
+Anwendung: https://werkstattai-whatsapp.up.railway.app
+
+- **Dashboard:** kompaktere Tagesübersicht, offene Aufgaben vor der Suche,
+  zusätzliche Filter aufklappbar, verbesserte Mobilansicht, neue Hinweise sowie
+  Statusaktionen ohne Seitenwechsel. Die vorbereiteten Korrekturen vom
+  11. Oktober sind enthalten; Entwürfe, Filter und Listenposition bleiben erhalten.
+- **WhatsApp-Fotos:** JPEG/PNG sind im Posteingang und bei vorhandener
+  Ticketzuordnung im Gesprächsverlauf sichtbar. Abruf nur nach Anmeldung und
+  innerhalb der berechtigten Werkstatt. Fotos werden als Kundeninformation zur
+  Prüfung markiert; keine OCR oder automatische Reparaturfreigabe. Es gibt noch
+  keine dauerhafte Dokumentenablage. Einzelheiten: [WhatsApp-Bilder](whatsapp-bilder.txt).
+- **Verifikation:** 526 von 526 Python-Tests unter Python 3.12 mit gepinnten
+  Abhängigkeiten und isoliertem PostgreSQL 18 bestanden; zusätzlich 35 von 35
+  JavaScript-Tests und acht Onlinekontrollen nach Veröffentlichung.
+  Ein tatsächlicher Meta-Bilddownload und eine reale WhatsApp-Unterhaltung mit
+  bestätigtem eigenen Testempfänger bleiben gesondert zu prüfen.
+- **Meta-Konto:** Cloud API technisch verbunden und App im Modus Live.
+  Direkt im angemeldeten Business-Portfolio wurde jedoch „Nicht verifiziert“
+  bestätigt; eingetragener Unternehmensname, Adresse, Telefonnummer und Website
+  fehlen. Der Tech-Provider-Prozess ist noch nicht abgeschlossen. Der
+  Informationsdialog verlangt Unternehmensverifizierung, Zugriffsverifizierung
+  und App-Review. Es wurden keine Meta-Einstellungen oder Firmenangaben geändert.
+- **Fremde Werkstattnummern:** ein vollständiger Embedded-Signup-Prozess mit
+  erforderlichem Berechtigungs-/Tokenaustausch und werkstattspezifischer
+  Kontoverwaltung ist noch zu implementieren. Eine veröffentlichte App und ein
+  gültiger Testzugang allein bestätigen diese Möglichkeit nicht.
+- **Projektsprache:** neue Oberflächentexte, Kommentare, Docstrings,
+  Fehlermeldungen und Dokumentation auf Deutsch; in [AGENTS.md](../AGENTS.md)
+  dauerhaft festgehalten. Bestehende Schnittstellenbezeichner bleiben kompatibel.
+
+### Nächste Schritte
+
+1. Das bestehende Administratorpasswort ändern; die Anmeldung mit dem bekannten
+   Standardpasswort wurde bestätigt. Eine Änderung allein der Railway-Startvariable
+   setzt das Passwort eines bestehenden Benutzers nicht zurück.
+2. Tatsächliche Unternehmensdaten und erforderliche Gewerbe-/Steuerfragen klären,
+   anschließend Meta-Unternehmensverifizierung und Tech-Provider-Freigaben bearbeiten.
+   Eine Gewerbeanmeldung allein schaltet die Meta-Freigaben nicht automatisch frei.
+3. Onboarding fremder Werkstätten und ihrer WhatsApp-Konten umsetzen und mit
+   autorisierten Konten sowie echten Testnachrichten prüfen.
+4. Bekannte Sicherheitsupdates der Pakete, Anbieterangaben, Backup-/Restore-
+   Nachweise und Betriebsüberwachung abschließen. Der folgende historische
+   Prüfumfang ist keine aktuelle Freigabe dieser offenen Punkte.
+
+Die ausführlichen lokalen Nachweise und Screenshots liegen unter
+`artifacts/readiness-2026-10-19/`, insbesondere `ABSCHLUSSBERICHT.txt`,
+`railway_aktuell.json` und `meta_konto_ui.json`. Diese lokalen Prüfartefakte,
+Datenbanken und Zugangsdaten werden weder in Git noch in Docker aufgenommen.
+
+## Historischer Prüfstand vom 26. September 2026
+
+Die folgenden Abschnitte dokumentieren den damaligen Ausgangsstand. Für bereits
+umgesetzte Arbeiten und heutige Testergebnisse gilt die Aktualisierung oben.
+
 Stand: 26. September 2026. Grundlage sind lokale Codeprüfungen, die anschließenden
 Sicherheitskorrekturen und Tests mit synthetischen Daten. Hosting-Konten,
 produktive Datenbanken und reale WhatsApp-Nachrichten wurden nicht geprüft.

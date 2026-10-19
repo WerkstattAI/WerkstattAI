@@ -27,5 +27,6 @@ node --test tests/test_privacy_worker.mjs
 ```
 
 Die aktuell gepinnten Abhängigkeiten benötigen ein Sicherheitsupdate.
-Die bekannten Grenzen der lokalen Tests und die noch ausstehende
-PostgreSQL-/Docker-Prüfung sind im Projektstand dokumentiert.
+Die PostgreSQL-/Docker-Prüfung vom 19. Oktober 2026, der veröffentlichte Stand
+und die verbleibenden Sicherheits- und Betriebsaufgaben sind im
+[Projektstand](docs/projektstand.md) dokumentiert.
