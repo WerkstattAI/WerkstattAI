@@ -1,6 +1,64 @@
 # WerkstattAI – Projektstand und nächste Schritte
 
-## Aktueller Stand vom 19. Oktober 2026
+## Aktueller Stand vom 21. Oktober 2026
+
+**M1 ist offen und wartet auf die Teilnahme mit einem bestätigten eigenen
+WhatsApp-Testempfänger.** Mikolaj hat am 21. Oktober gebeten, zunächst alle
+unabhängigen Prüfungen zu erledigen und den Telefontest später durchzuführen.
+Es wurde keine echte Testnachricht versendet. Der tatsächliche Empfang,
+Ticketanlage, Mitarbeiterübernahme und der echte Meta-Bildabruf sind noch
+nicht belegt. Bericht: [M1-WhatsApp-Prüfung](m1-whatsapp-pruefung-2026-10-21.md).
+
+Die Anwendung und die Dashboard-Anmeldung wurden erneut erfolgreich geprüft.
+Die `phone_number_id` der Standardwerkstatt stimmt mit der Konfiguration
+überein. Meta meldet `CONNECTED`, einen gültigen Zugang mit den benötigten
+Messaging-/Verwaltungsbereichen und ein aktives `messages`-App-Abonnement an
+der passenden öffentlichen Webhook-Adresse. Beide gültigen
+Webhook-Verifikationsabfragen waren erfolgreich. Diese Vorprüfungen belegen
+noch keinen echten Nachrichteneingang oder eine Zustellung.
+
+Railway meldet weiterhin Deployment
+`e81fee99-9838-4ee3-9639-ba2674b3537b`, Status `SUCCESS`, Instanz `RUNNING`,
+Anwendungscommit `aa965e481f62ad34ee752d5b3cd89f365c4d30fb`.
+Ein zusätzlicher Dateivergleich in der laufenden Instanz war wegen eines
+fehlenden lokalen SSH-Schlüssels nicht möglich. Der aktuelle Versionsnachweis
+stammt aus Railway, nicht aus einem Versionsendpunkt der Anwendung.
+
+Die Abweichung zwischen lokaler Dokumentation und GitHub ist geklärt:
+Der aktuell abgefragte Remote-Branch `codex/kundenkommunikation-2026-09-26`
+steht auf `aa965e4`; dessen Projektstand stammt vom 26. September. Lokal lagen
+die beiden Dokumentationscommits `bd0a218` und `4e8b979` vom 19. Oktober darüber.
+Die Anwendungsdateien unterscheiden sich zwischen diesen Ständen nicht.
+Beide lokalen Commits bleiben im separaten M1-Prüfbranch
+`codex/m1-whatsapp-pruefung-2026-10-21` erhalten.
+
+Zusätzlich sind 26 gezielte lokale WhatsApp-/Medientests unter Python 3.14.3
+bestanden. Sie verwenden temporäre SQLite-Daten und simulierten Transport.
+Es wurde kein Produktfehler nachgewiesen und kein Anwendungscode geändert.
+Lokale Prüfscripte, Protokolle und ein synthetisches PNG liegen ausschließlich
+unter dem von Git und Docker ausgeschlossenen `artifacts/m1-2026-10-21/`.
+
+### Nächste Schritte
+
+Die neueren Nutzerentscheidungen ersetzen die Reihenfolge vom 19. Oktober:
+
+1. **M1: vollständigen realen WhatsApp-Test durchführen.** Sobald Mikolaj am
+   eigenen Telefon teilnehmen kann, Eigentum und Endziffern des Testempfängers
+   bestätigen; anschließend Textannahme, genau ein Ticket, automatische und
+   manuelle Zustellung, Mitarbeiterübernahme und ein synthetisches JPEG/PNG
+   einschließlich geschütztem echtem Meta-Abruf prüfen. Bis zum Nachweis offen.
+2. **Anbindung von Werkstätten bearbeiten.** Die erforderlichen Meta-Freigaben
+   und den vollständigen Embedded-Signup mit Berechtigungs-/Tokenaustausch sowie
+   werkstattspezifischer Zuordnung bearbeiten und mit autorisierten Werkstätten
+   prüfen. M1 bestätigt weder Coexistence noch die Anbindung fremder Nummern.
+3. **Betreuten Pilotbetrieb vorbereiten.** Paketabsicherung, Datensicherung und
+   Wiederherstellung, Fehlerüberwachung sowie Anbieter-/Betriebsunterlagen bleiben
+   vor dem Pilotbetrieb zu erledigen. Das Administratorpasswort wird kurz vor
+   dem Pilotbetrieb geändert; Mikolaj speichert es selbst.
+4. **Spätere Aufgaben zurückstellen.** Sprachnachrichten, Namensänderung,
+   Figma-Design und weitere Funktionen folgen später.
+
+## Historischer Stand vom 19. Oktober 2026
 
 Die Dashboard-Überarbeitung und die geschützte WhatsApp-Bildvorschau sind im
 Projekt gespeichert und veröffentlicht. Anwendungsstand:
@@ -38,12 +96,11 @@ Anwendung: https://werkstattai-whatsapp.up.railway.app
   Fehlermeldungen und Dokumentation auf Deutsch; in [AGENTS.md](../AGENTS.md)
   dauerhaft festgehalten. Bestehende Schnittstellenbezeichner bleiben kompatibel.
 
-### Nächste Schritte
+### Historische Reihenfolge vom 19. Oktober 2026 – überholt
 
-Vereinbarte Reihenfolge vom 19. Oktober 2026. Alle fünf Arbeitspakete sind offen.
-Zuerst die Punkte 1 und 2 bearbeiten. Dashboard und Bildvorschau sind bereits
-veröffentlicht; der nächste Schwerpunkt liegt auf Sicherheit und dem echten
-Kommunikationsablauf.
+Die damalige Vereinbarung führte fünf offene Arbeitspakete und stellte die
+Punkte 1 und 2 voran. Sie wird als Historie bewahrt; für die weitere Arbeit
+gilt die neue Reihenfolge vom 21. Oktober oben.
 
 1. **Zugänge absichern und Abhängigkeiten aktualisieren.** Das Passwort des
    bestehenden Administratorkontos ändern und Pakete mit bekannten
@@ -72,8 +129,8 @@ Kommunikationsablauf.
    den erforderlichen Nachweisen echte Kundendaten aufnehmen.
 
 Der folgende historische Prüfumfang ist keine aktuelle Freigabe dieser offenen
-Punkte. Bei der nächsten Projektsitzung diese Reihenfolge als Ausgangspunkt
-verwenden und erledigte Aufgaben mit ihrem tatsächlichen Prüfnachweis aktualisieren.
+Punkte. Erledigte Aufgaben weiterhin nur mit ihrem tatsächlichen Prüfnachweis
+aktualisieren; die damalige Reihenfolge gilt nicht mehr als Arbeitsauftrag.
 
 Die ausführlichen lokalen Nachweise und Screenshots liegen unter
 `artifacts/readiness-2026-10-19/`, insbesondere `ABSCHLUSSBERICHT.txt`,
