@@ -15,10 +15,13 @@ Sie bestätigt das Ausbleiben der Automatik nach weiterem Eingang, aber keinen
 neuen Übernahme-Klick oder vollständig neuen Ablauf auf frischem Kontakt.
 Einzelheiten und Quellen: [M1-Ergebnis](m1-whatsapp-pruefung-2026-10-26.md).
 
-**Offen: GET-Verifikation am öffentlichen Cloudflare-Callback liefert 403,**
-während das Backend mit demselben Verify-Token 200 und die richtige Challenge
-liefert. Echte POST-Ereignisse kommen an. Vor erneuter Webhook-Einrichtung
-oder Werkstattanbindung diese Abweichung untersuchen.
+**GET-Nachprüfung am 26. Oktober geklärt:** Die zunächst beobachteten 403
+stammten von Cloudflare 1010 gegen den Standard-Client des Prüfskripts.
+Mit offen ausgewiesenem Prüfclient liefern öffentlicher Callback und Backend
+jeweils 200 und die identische Challenge; absichtlich falsche Tokens werden
+an beiden Endpunkten abgelehnt. Es wurde keine Konfiguration geändert.
+Der zuvor vermutete Konfigurationsfehler ist nicht nachgewiesen.
+Details stehen im aktualisierten [M1-Ergebnis](m1-whatsapp-pruefung-2026-10-26.md).
 
 Geprüfter Railway-Anwendungscommit:
 `aa965e481f62ad34ee752d5b3cd89f365c4d30fb`, Deployment
@@ -30,8 +33,8 @@ Anwendungsdeployment aus.
 
 1. **M2: Werkstattanbindung und Coexistence vorbereiten.** Den erforderlichen
    Autorisierungsprozess mit Code und aktuellem Meta-Zugang abgleichen;
-   GET-403 untersuchen und erforderliche Freigaben als eigene Voraussetzungen
-   führen. M1 bestätigt keine externen Nummern oder Coexistence.
+   erforderliche Freigaben als eigene Voraussetzungen führen. Die GET-Nachprüfung
+   ist geklärt. M1 bestätigt keine externen Nummern oder Coexistence.
 2. **Danach die vereinbarten Produktaufgaben neu bewerten:** W1 Bedienung der
    Vorgänge, N1 endgültiger Name, D1 Dashboard mit Figma, S1 Website und
    Gespräche, P1 betreuter Pilot. Den aktuellen Arbeitsplan führt das

@@ -3,8 +3,10 @@
 **Ergebnis: M1 abgeschlossen auf Grundlage der unten getrennt ausgewiesenen
 technischen Prüfungen und Nutzerbestätigungen.** Die Testnummer wurde wieder
 registriert; Versand, Eingang, manueller Betrieb und echter Bildabruf
-funktionieren im beobachteten Ablauf. Die öffentliche GET-Verifikation bleibt
-als eigener Fehler offen.
+funktionieren im beobachteten Ablauf. Die Nachprüfung der öffentlichen
+GET-Verifikation am 26. Oktober klärte den zuvor gemeldeten HTTP 403:
+Cloudflare blockierte den Standard-Client des Prüfskripts; die Verifikation
+mit ausgewiesenem Prüfclient funktioniert.
 
 ## Version und Umfang
 
@@ -61,16 +63,43 @@ SHA-256 der abgerufenen Datei:
 `030dc336b03e98ddb26b2fba9e10f9e8d6506e65376b34c769db7d1fce216c32`.
 Das Foto selbst sowie Empfänger-, Sitzungs- und Zugangsdaten werden nicht veröffentlicht.
 
-## Offener Fehler: öffentliche GET-Verifikation
+## Nachprüfung der öffentlichen GET-Verifikation: geklärt
 
-Mit dem vorhandenen Verify-Token lieferte das Backend `/meta/whatsapp`
-HTTP 200 und die unveränderte Challenge. Der konfigurierte öffentliche
-Cloudflare-Callback lieferte dagegen **HTTP 403**.
+Der zunächst gemeldete Unterschied (Railway 200, Cloudflare 403) wurde am
+26. Oktober um 00:18/00:19 MEZ gezielt nachgeprüft. Die ursprüngliche Prüfung
+verwendete den Standard-Client von Python-urllib. Die Antwort von Cloudflare
+enthielt **`error code: 1010`**, nicht den Ablehnungstext des Workers.
 
-Die derzeitige POST-Weiterleitung funktioniert: echte Zustellereignisse,
-Text und Bild kamen an. Daraus folgt keine korrekte erneute GET-Verifikation.
-An dieser Konfiguration wurde nichts geändert. Vor einer erneuten
-Webhook-Einrichtung oder Werkstattanbindung muss die Abweichung untersucht werden.
+[Cloudflare beschreibt 1010](https://developers.cloudflare.com/support/troubleshooting/http-status-codes/cloudflare-1xxx-errors/error-1010/)
+als Ablehnung anhand der Client-/Browser-Signatur. Der konkrete Name einer
+Sicherheitsregel im Cloudflare-Konto wurde nicht eingesehen.
+
+Mit demselben Verify-Token und ansonsten gleichem GET-Prüfverfahren wurde
+anschließend der eigene, offen ausgewiesene User-Agent
+`WerkstattAI-Webhook-Pruefung/1.0` verwendet:
+
+| Endpunkt und Client | Korrekter Token | Absichtlich falscher Token |
+| --- | --- | --- |
+| Cloudflare, Python-urllib-Standard | 403, Cloudflare 1010 | 403, Cloudflare 1010 |
+| Railway, Python-urllib-Standard | 200, Challenge identisch | 403, Anwendungsablehnung |
+| Cloudflare, ausgewiesener Prüfclient | 200, Challenge identisch | 403, Ablehnung des Workers |
+| Railway, ausgewiesener Prüfclient | 200, Challenge identisch | 403, Anwendungsablehnung |
+
+Der erfolgreiche öffentliche Test beweist, dass der Worker den in Railway
+vorhandenen Verify-Token akzeptiert. Ein fehlender oder abweichender Token
+im Worker ist damit für diesen Prüfzeitpunkt widerlegt. Die Ablehnung des
+falschen Tokens bleibt wirksam. Die frühere Einstufung als offener
+Webhook-Konfigurationsfehler wird korrigiert: **Nachgewiesen wurde eine
+Blockade des ursprünglichen Prüfclients, kein Fehler der GET-Verifikation
+mit dem ausgewiesenen Client.**
+
+Die lokale Prüfmethodik wurde um Antwortinhalt, Fehlerursprung und einen
+ausgewiesenen Client ergänzt. Die ursprünglichen Ergebnisse bleiben als
+Beleg erhalten. Keine Änderung an Cloudflare-Einstellungen, Geheimnissen,
+Railway-Konfiguration oder Produktcode; keine Abschaltung von Schutzregeln.
+Nur acht GET-Abfragen, keine POSTs oder weiteren WhatsApp-Nachrichten.
+Dies war kein neuer Verifikationsaufruf durch Meta selbst und kein allgemeiner
+Nachweis für jede mögliche Client-/Netzwerkkombination.
 
 ## Einordnung und Fortsetzung
 
@@ -86,8 +115,9 @@ simulierte Ergebnisse. Für diese Dokumentationsänderung werden Inhalt,
 Änderungsumfang und Ausschluss privater Daten geprüft.
 
 **Nächster Schritt: M2 vorbereiten.** Erforderlichen Autorisierungs- und
-Embedded-Signup-/Coexistence-Ablauf mit aktuellem Code und Meta-Zugang abgleichen;
-den GET-403-Befund dabei als offene technische Voraussetzung aufnehmen.
+Embedded-Signup-/Coexistence-Ablauf mit aktuellem Code und Meta-Zugang abgleichen.
+Die GET-Nachprüfung ist geklärt und stellt keine nachgewiesene
+Konfigurationsblockade für M2 mehr dar.
 Coexistence, externe Werkstattnummern und Pilotbereitschaft sind durch M1
 nicht bestätigt.
 
