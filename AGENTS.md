@@ -8,4 +8,4 @@
 # Projektfortsetzung
 
 - Der aktuelle Stand und die vereinbarte Reihenfolge der nächsten Aufgaben stehen in `docs/projektstand.md`, Abschnitt „Nächste Schritte“.
-- Bei der Fortsetzung diese Notizen berücksichtigen. Aktuell haben der vollständige reale WhatsApp-Test und anschließend die Anbindung von Werkstätten Vorrang. Das Administratorpasswort wird kurz vor dem Pilotbetrieb geändert; Mikolaj speichert es selbst.
+- Bei der Fortsetzung diese Notizen berücksichtigen. M1 ist mit den im Bericht vom 26. Oktober ausgewiesenen Nachweisen abgeschlossen. Als Nächstes haben die Anbindung von Werkstätten (M2) und die offene GET-Webhook-Verifikation Vorrang. Das Administratorpasswort wird kurz vor dem Pilotbetrieb geändert; Mikolaj speichert es selbst.

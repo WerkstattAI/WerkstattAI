@@ -1,6 +1,47 @@
 # WerkstattAI – Projektstand und nächste Schritte
 
-## Aktueller Stand vom 21. Oktober 2026
+## Aktueller Stand vom 26. Oktober 2026
+
+**M1 ist abgeschlossen; als Nächstes folgt M2, die Anbindung von Werkstätten.**
+Die Meta-Testnummer wurde nach dem nachgewiesenen Fehler 133010 erneut
+registriert. Vorlagenversand, neuer Texteingang, manueller Anwendungsversand
+mit bestätigtem Telefonempfang und echter geschützter JPEG-Abruf funktionieren
+im beobachteten Ablauf. Mikolaj bestätigte das Foto im Posteingang und Ticket.
+
+Der frühere Grundablauf mit Ticketanlage und automatischer Antwort beruht auf
+Mikolajs Bestätigung vom 23. Oktober; Datum und Version dieses früheren Tests
+sind unbekannt. Die neue Prüfung nutzte eine bereits manuelle Unterhaltung.
+Sie bestätigt das Ausbleiben der Automatik nach weiterem Eingang, aber keinen
+neuen Übernahme-Klick oder vollständig neuen Ablauf auf frischem Kontakt.
+Einzelheiten und Quellen: [M1-Ergebnis](m1-whatsapp-pruefung-2026-10-26.md).
+
+**Offen: GET-Verifikation am öffentlichen Cloudflare-Callback liefert 403,**
+während das Backend mit demselben Verify-Token 200 und die richtige Challenge
+liefert. Echte POST-Ereignisse kommen an. Vor erneuter Webhook-Einrichtung
+oder Werkstattanbindung diese Abweichung untersuchen.
+
+Geprüfter Railway-Anwendungscommit:
+`aa965e481f62ad34ee752d5b3cd89f365c4d30fb`, Deployment
+`e81fee99-9838-4ee3-9639-ba2674b3537b`, `SUCCESS`.
+Diese Aktualisierung ändert ausschließlich Dokumentation und löst kein neues
+Anwendungsdeployment aus.
+
+### Nächste Schritte
+
+1. **M2: Werkstattanbindung und Coexistence vorbereiten.** Den erforderlichen
+   Autorisierungsprozess mit Code und aktuellem Meta-Zugang abgleichen;
+   GET-403 untersuchen und erforderliche Freigaben als eigene Voraussetzungen
+   führen. M1 bestätigt keine externen Nummern oder Coexistence.
+2. **Danach die vereinbarten Produktaufgaben neu bewerten:** W1 Bedienung der
+   Vorgänge, N1 endgültiger Name, D1 Dashboard mit Figma, S1 Website und
+   Gespräche, P1 betreuter Pilot. Den aktuellen Arbeitsplan führt das
+   Notion-Projektzentrum.
+3. **Vor dem Pilotbetrieb:** Paketabsicherung, Backup und Wiederherstellung,
+   Fehlerüberwachung und Betriebsunterlagen erledigen. Administratorpasswort
+   kurz vor dem Pilotbetrieb ändern; Mikolaj speichert es selbst.
+   Unternehmensformalitäten und Meta-Freigaben laufen parallel.
+
+## Historischer Stand vom 21. Oktober 2026
 
 **M1 ist offen und wartet auf die Teilnahme mit einem bestätigten eigenen
 WhatsApp-Testempfänger.** Mikolaj hat am 21. Oktober gebeten, zunächst alle
@@ -38,7 +79,7 @@ Es wurde kein Produktfehler nachgewiesen und kein Anwendungscode geändert.
 Lokale Prüfscripte, Protokolle und ein synthetisches PNG liegen ausschließlich
 unter dem von Git und Docker ausgeschlossenen `artifacts/m1-2026-10-21/`.
 
-### Nächste Schritte
+### Historische nächste Schritte vom 21. Oktober 2026
 
 Die neueren Nutzerentscheidungen ersetzen die Reihenfolge vom 19. Oktober:
 
