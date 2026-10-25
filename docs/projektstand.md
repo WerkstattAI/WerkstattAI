@@ -29,12 +29,30 @@ Geprüfter Railway-Anwendungscommit:
 Diese Aktualisierung ändert ausschließlich Dokumentation und löst kein neues
 Anwendungsdeployment aus.
 
+### M2-Vorprüfung vom 26. Oktober 2026
+
+**Noch nicht anschlussbereit für die bestehende Business-App eines Kunden.**
+Aktuell fehlen der freigegebene Tech-Provider-/Advanced-Access-Prozess,
+eine Login-Konfiguration, der serverseitige Kunden-Onboarding-Ablauf und
+ein Verbindungsmodell mit sicherem kundenbezogenem Tokenbezug. Telefon-Echos,
+Kontolebenszyklus und Synchronisierung werden noch nicht verarbeitet.
+Die entsprechenden Coexistence-Felder sind im Meta-Panel deaktiviert.
+
+Ein isolierter Aufruf der Originalparser bestätigt: ein neues Textpaket wird
+erkannt, ein Business-App-Echo nicht; ein historisches Medienpaket wird noch
+nicht nach seinem Webhook-Feld getrennt. Die vorhandene Werkstatttrennung
+und Ablehnung mehrdeutiger Sender sind eine Basis; Schreibschutz/eindeutige
+Autorisierung der Nummernzuordnung fehlen. Für neue Implementierung v4 verwenden,
+da Meta v2/v3 seit 15. Oktober als eingestellt ausweist.
+Details und Abnahmekriterien: [M2-Vorprüfung](m2-coexistence-vorpruefung-2026-10-26.md).
+
 ### Nächste Schritte
 
-1. **M2: Werkstattanbindung und Coexistence vorbereiten.** Den erforderlichen
-   Autorisierungsprozess mit Code und aktuellem Meta-Zugang abgleichen;
-   erforderliche Freigaben als eigene Voraussetzungen führen. Die GET-Nachprüfung
-   ist geklärt. M1 bestätigt keine externen Nummern oder Coexistence.
+1. **M2 umsetzen; Meta-Freigaben parallel vorbereiten.** Zuerst Verbindungsmodell,
+   eindeutige autorisierte Nummernbindung, sicherer Tokenbezug und Embedded Signup;
+   danach Telefon-Echos, Lebenszyklus und Synchronisierung. Anschließend mit
+   ausdrücklich autorisierten Werkstätten real prüfen. Die GET-Nachprüfung
+   ist geklärt; M1 bestätigt keine externen Nummern oder Coexistence.
 2. **Danach die vereinbarten Produktaufgaben neu bewerten:** W1 Bedienung der
    Vorgänge, N1 endgültiger Name, D1 Dashboard mit Figma, S1 Website und
    Gespräche, P1 betreuter Pilot. Den aktuellen Arbeitsplan führt das
