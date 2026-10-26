@@ -336,19 +336,14 @@ def _save_or_send_whatsapp_reply(
     ticket_id: str | None,
     reply_to_wa_message_id: str,
 ) -> dict:
-    from app.whatsapp import WhatsAppSendResult, deliver_prepared_whatsapp_reply
+    from app.whatsapp import deliver_prepared_whatsapp_reply
 
     def send(prepared: dict):
-        access_token = str(settings.whatsapp_access_token or "").strip()
-        if not access_token:
-            if not is_production(settings):
-                return WhatsAppSendResult(True, 200, None, {"local_only": True})
-            return WhatsAppSendResult(False, 503, None, {}, "WhatsApp access token is missing")
         return send_whatsapp_text_message(
             phone_number_id=str(prepared["phone_number_id"] or ""),
             customer_phone=prepared["customer_phone"],
             text=prepared["text"],
-            access_token=access_token,
+            workshop_id=workshop_id,
             graph_api_version=settings.whatsapp_graph_api_version,
         )
 

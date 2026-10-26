@@ -17,6 +17,8 @@ from starlette.requests import Request
 
 import app.db as db
 import app.main as main
+import app.whatsapp_verbindungen as verbindungen
+from verbindungsdaten import TESTSCHLUESSEL, synthetische_verbindung
 from app.conversation_sessions import load_session_state, save_session_state
 from app.models import ChatResponse, IntakeState
 from app.tickets import add_ticket_note, find_ticket_by_id, save_ticket
@@ -30,6 +32,8 @@ class WhatsAppReliabilityTests(unittest.TestCase):
     def setUp(self):
         self.temp = tempfile.TemporaryDirectory(prefix="werkstattai-wa-reliability-", ignore_cleanup_errors=True)
         self.stack = ExitStack()
+        self.stack.enter_context(patch.object(verbindungen, "settings", replace(verbindungen.settings,
+            whatsapp_zugangsschluessel=TESTSCHLUESSEL)))
         self.stack.enter_context(patch.dict(os.environ, {"WERKSTATTAI_SQLITE_PATH": os.path.join(self.temp.name, "db.sqlite")}))
         self.stack.enter_context(patch.object(db, "settings", replace(db.settings, database_url=None, app_env="development")))
         self.stack.enter_context(patch.object(main, "settings", replace(main.settings, database_url=None, app_env="development",
@@ -41,6 +45,7 @@ class WhatsAppReliabilityTests(unittest.TestCase):
             conn.execute("UPDATE workshops SET whatsapp_phone_number_id = ?, subscription_status = 'active' WHERE id = ?",
                          ("reliability-sender", self.wid))
             conn.commit()
+        synthetische_verbindung(self.wid, "reliability-sender")
 
     def tearDown(self):
         self.stack.close()

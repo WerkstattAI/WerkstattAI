@@ -1,6 +1,52 @@
 # WerkstattAI – Projektstand und nächste Schritte
 
-## Aktueller Stand vom 26. Oktober 2026
+## Aktueller Stand vom 27. Oktober 2026
+
+**M2, Aufgabe 1 ist lokal umgesetzt: Verbindungsmodell und werkstattgebundener
+Zugang. Kein echter Kundenanschluss und keine Coexistence-Freigabe.**
+Die additive Migration sichert eindeutige Nummernreservierungen auch auf
+Datenbankebene, erhält Altzuordnungen und sperrt mehrdeutige Bestandsdaten.
+Kundenzugänge sind mit eigenem Umgebungsschlüssel authentifiziert
+verschlüsselt. Gespeicherter Zugang, bestätigte Autorisierung und
+Coexistence-Bereitschaft bleiben getrennt.
+
+Automatische und manuelle Antworten, Testversand, Vorlagen und geschützter
+Bildabruf verwenden den gemeinsamen werkstattgebundenen Zugriff. Neue,
+widerrufene oder widersprüchliche Verbindungen erben keinen globalen Token.
+Nur die einmalig festgehaltene, exakt zur Konfiguration passende eigene
+M1-Zuordnung besitzt einen begrenzten Legacy-Pfad; die öffentliche Demo ist
+über `is_demo` gesperrt. Profil- und Adminformulare dürfen keine Nummern
+zuweisen oder ändern. Ein interner Entwurf erteilt keine Autorisierung.
+
+544 Python-Tests unter Python 3.12.13 einschließlich zweier tatsächlich
+ausgeführter PostgreSQL-18-Integrationstests sowie 35 JavaScript-Tests bestanden.
+Gezielte SQLite-Tests liefen zusätzlich unter Windows/Python 3.14.3.
+Prüfnachweise und Grenzen stehen im
+[M2-Verbindungsmodell-Bericht](m2-verbindungsmodell-2026-10-27.md).
+Es wurden keine Produktionsdatenbank, Meta-Kontoeinstellungen oder realen
+Nachrichten verwendet und kein Deployment durchgeführt. Die Änderungen
+liegen auf der eigenen Branch `codex/m2-verbindungsmodell-2026-10-27`.
+Der zuvor dokumentierte M1-Abschluss bleibt bestehen.
+
+### Nächste Schritte
+
+1. **Den serverseitig verifizierten Meta-Onboarding-Ablauf implementieren.**
+   Den angemeldeten Werkstattinhaber und die von Meta bestätigten Assets
+   zuverlässig mit dem neuen Modell verbinden; zunächst weiter mit isolierten
+   Daten und simuliertem Transport prüfen. Diese Aufgabe wurde hier noch nicht
+   begonnen. Der vollständige Embedded Signup und echte Kundenanschluss bleiben
+   offen; fehlende Meta-Freigaben blockieren unabhängige lokale Arbeit nicht.
+2. **Anschließend die weiteren M2-Teile:** Kontolebenszyklus, Telefon-Echos,
+   Übernahme und Synchronisierung ergänzen; erst danach mit ausdrücklich
+   autorisierten Werkstätten real prüfen. Anbieter-/Unternehmensfreigaben
+   parallel vorbereiten. M1 bestätigt keine externen Nummern oder Coexistence.
+3. **Danach Produktaufgaben und Pilotvorbereitung:** W1, N1, D1, S1 und P1
+   anhand des Projektzentrums neu bewerten. Paketabsicherung, Backup und
+   Wiederherstellung, Fehlerüberwachung sowie Betriebsunterlagen bleiben vor
+   einem Pilot erforderlich. Das Administratorpasswort wird erst kurz vor dem
+   Pilotbetrieb geändert; Mikolaj speichert es selbst.
+
+## Historischer Stand vom 26. Oktober 2026
 
 **M1 ist abgeschlossen; als Nächstes folgt M2, die Anbindung von Werkstätten.**
 Die Meta-Testnummer wurde nach dem nachgewiesenen Fehler 133010 erneut
@@ -46,7 +92,7 @@ Autorisierung der Nummernzuordnung fehlen. Für neue Implementierung v4 verwende
 da Meta v2/v3 seit 15. Oktober als eingestellt ausweist.
 Details und Abnahmekriterien: [M2-Vorprüfung](m2-coexistence-vorpruefung-2026-10-26.md).
 
-### Nächste Schritte
+### Historische nächste Schritte vom 26. Oktober 2026
 
 1. **M2 umsetzen; Meta-Freigaben parallel vorbereiten.** Zuerst Verbindungsmodell,
    eindeutige autorisierte Nummernbindung, sicherer Tokenbezug und Embedded Signup;

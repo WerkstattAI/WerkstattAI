@@ -58,6 +58,7 @@ from app.whatsapp import (
 )
 from app.workshops import get_workshop, get_workshop_identity, update_workshop
 from app.whatsapp_medien import MedienFehler, BILD_TYPEN, lade_bild, medienangaben
+from app.whatsapp_verbindungen import VerbindungsFehler, verbindungsstatus, zugang_fuer_werkstatt
 
 router = APIRouter()
 templates = Jinja2Templates(directory="templates")
@@ -382,7 +383,8 @@ def _decorate_whatsapp_messages(messages: list[dict[str, Any]]) -> list[dict[str
 
 
 def _whatsapp_readiness(request: Request, workshop: dict[str, Any]) -> dict[str, Any]:
-    access_token_ready = bool(str(settings.whatsapp_access_token or "").strip())
+    status = verbindungsstatus(str(workshop.get("id") or ""))
+    access_token_ready = status["versand_bereit"]
     verify_token_ready = bool(str(settings.whatsapp_verify_token or "").strip())
     app_secret_ready = bool(str(settings.whatsapp_app_secret or "").strip())
     phone_number_id = str(workshop.get("whatsapp_phone_number_id") or "").strip()
@@ -394,9 +396,9 @@ def _whatsapp_readiness(request: Request, workshop: dict[str, Any]) -> dict[str,
 
     checks = [
         {
-            "label": "Access Token",
+            "label": "Werkstattzugang",
             "configured": access_token_ready,
-            "detail": "WHATSAPP_ACCESS_TOKEN",
+            "detail": status["meldung"],
         },
         {
             "label": "Verify Token",
@@ -411,7 +413,7 @@ def _whatsapp_readiness(request: Request, workshop: dict[str, Any]) -> dict[str,
         {
             "label": "Phone Number ID",
             "configured": bool(phone_number_id),
-            "detail": phone_number_id or "In Einstellungen eintragen",
+            "detail": phone_number_id or "Noch kein verifizierter Anschluss",
         },
         {
             "label": "Startvorlage",
@@ -614,13 +616,8 @@ def _send_ticket_customer_whatsapp(
 
     workshop = get_workshop(workshop_id)
     phone_number_id = str(workshop.get("whatsapp_phone_number_id") or "").strip()
-    access_token = str(settings.whatsapp_access_token or "").strip()
     def prepare_send() -> None:
-        # Replay is resolved by the dispatcher before fresh-send prerequisites.
-        if not phone_number_id:
-            raise ValueError("Die WhatsApp Phone Number ID fehlt in den Einstellungen.")
-        if not access_token:
-            raise ValueError("Der WhatsApp Access Token fehlt auf dem Server.")
+        zugang_fuer_werkstatt(workshop_id, phone_number_id=phone_number_id)
 
     try:
         result = send_workshop_message(workshop_id=workshop_id, customer_phone=recipient,
@@ -629,7 +626,7 @@ def _send_ticket_customer_whatsapp(
             require_explicit_target=True, prepare_send=prepare_send,
             user=(get_current_user(request) or {}).get("email"),
             send=lambda: send_whatsapp_text_message(phone_number_id=phone_number_id, customer_phone=recipient,
-                text=text, access_token=access_token, graph_api_version=settings.whatsapp_graph_api_version))
+                text=text, workshop_id=workshop_id, graph_api_version=settings.whatsapp_graph_api_version))
     except ValueError as exc:
         return False, str(exc), recipient
     except Exception:
@@ -1196,6 +1193,7 @@ def dashboard_settings(
             workshop=workshop,
             workshop_id=wid,
             saved=saved == "1",
+            verbindung=verbindungsstatus(wid),
         ),
     )
 
@@ -1262,8 +1260,8 @@ def dashboard_admin_workshops_create(
     towing_info: str = Form("", max_length=4096),
     subscription_plan: str = Form("starter", max_length=128),
     subscription_status: str = Form("trialing", max_length=128),
-    whatsapp_phone_number_id: str = Form("", max_length=128),
-    whatsapp_display_phone_number: str = Form("", max_length=32),
+    whatsapp_phone_number_id: str | None = Form(None, max_length=128),
+    whatsapp_display_phone_number: str | None = Form(None, max_length=32),
 ):
     if not _is_admin_user(request):
         return HTMLResponse("Nur Admins duerfen Werkstattkonten verwalten.", status_code=403)
@@ -1348,8 +1346,8 @@ def dashboard_admin_workshop_update(
     subscription_status: str = Form("trialing", max_length=128),
     trial_ends_at: str = Form("", max_length=128),
     subscription_ends_at: str = Form("", max_length=128),
-    whatsapp_phone_number_id: str = Form("", max_length=128),
-    whatsapp_display_phone_number: str = Form("", max_length=32),
+    whatsapp_phone_number_id: str | None = Form(None, max_length=128),
+    whatsapp_display_phone_number: str | None = Form(None, max_length=32),
 ):
     if not _is_admin_user(request):
         return HTMLResponse("Nur Admins duerfen Werkstattkonten verwalten.", status_code=403)
@@ -1434,12 +1432,13 @@ def whatsapp_bild(request: Request, nachrichten_id: int, workshop_id: str | None
     if not bild:
         raise HTTPException(404, "Bild nicht gefunden")
     try:
+        zugang = zugang_fuer_werkstatt(wid, phone_number_id=str(zeile["phone_number_id"] or ""))
         inhalt, typ = lade_bild(medien_id=bild["id"], nummer_id=str(zeile["phone_number_id"] or ""),
-                                zugang=str(settings.whatsapp_access_token or ""), version=settings.whatsapp_graph_api_version)
-    except MedienFehler as fehler:
+                                zugang=zugang.token, version=settings.whatsapp_graph_api_version)
+    except (MedienFehler, VerbindungsFehler) as fehler:
         return HTMLResponse("<html lang='de'><meta name='viewport' content='width=device-width'><title>Bild nicht verfügbar</title>"
                             "<body><h1>Bild nicht verfügbar</h1><p>" + str(fehler) + "</p></body></html>",
-                            status_code=fehler.status, headers={"Cache-Control": "private, no-store"})
+                            status_code=getattr(fehler, "status", 409), headers={"Cache-Control": "private, no-store"})
     return Response(inhalt, media_type=typ, headers={"Cache-Control": "private, no-store",
                     "X-Content-Type-Options": "nosniff", "Content-Disposition": f'inline; filename="whatsapp-bild.{BILD_TYPEN[typ]}"'})
 
@@ -1564,11 +1563,10 @@ def dashboard_whatsapp_test(
 
     workshop = get_workshop(wid)
     phone_number_id = str(workshop.get("whatsapp_phone_number_id") or "").strip()
-    access_token = str(settings.whatsapp_access_token or "").strip()
-    if not access_token:
-        return redirect("failed", "WHATSAPP_ACCESS_TOKEN fehlt.")
-    if not phone_number_id:
-        return redirect("failed", "Phone Number ID fehlt in den Werkstatt-Einstellungen.")
+    try:
+        zugang_fuer_werkstatt(wid, phone_number_id=phone_number_id)
+    except VerbindungsFehler as fehler:
+        return redirect("failed", str(fehler))
 
     window_error = _free_text_window_error(
         workshop_id=wid,
@@ -1586,7 +1584,7 @@ def dashboard_whatsapp_test(
             message_id=message_id if isinstance(message_id, str) else None,
             source="dashboard_test", user=(get_current_user(request) or {}).get("email"),
             send=lambda: send_whatsapp_text_message(phone_number_id=phone_number_id, customer_phone=phone,
-                text=text, access_token=access_token, graph_api_version=settings.whatsapp_graph_api_version))
+                text=text, workshop_id=wid, graph_api_version=settings.whatsapp_graph_api_version))
     except ValueError as exc:
         return redirect("failed", str(exc))
     except Exception:
@@ -1673,11 +1671,7 @@ def dashboard_whatsapp_reply(
 
         workshop = get_workshop(wid)
         phone_number_id = str(workshop.get("whatsapp_phone_number_id") or "").strip()
-        access_token = str(settings.whatsapp_access_token or "").strip()
-        if not phone_number_id:
-            return redirect("failed", "Die WhatsApp Phone Number ID fehlt in den Einstellungen.")
-        if not access_token:
-            return redirect("failed", "Der WhatsApp Access Token fehlt auf dem Server.")
+        zugang_fuer_werkstatt(wid, phone_number_id=phone_number_id)
 
         window_error = _free_text_window_error(
             workshop_id=wid,
@@ -1691,7 +1685,7 @@ def dashboard_whatsapp_reply(
             text=text, ticket_id=None, purpose=purpose, reply_to_message_id=reply_to_message_id,
             message_id=message_id, source="dashboard", user=(get_current_user(request) or {}).get("email"),
             send=lambda: send_whatsapp_text_message(phone_number_id=phone_number_id, customer_phone=phone,
-                text=text, access_token=access_token, graph_api_version=settings.whatsapp_graph_api_version))
+                text=text, workshop_id=wid, graph_api_version=settings.whatsapp_graph_api_version))
         if not send_result.ok:
             return redirect("unknown" if send_result.status_code is None else "failed", _meta_send_error(send_result))
     except ValueError as exc:
@@ -1844,12 +1838,13 @@ def dashboard_whatsapp_start_template(
 
     workshop = get_workshop(wid)
     phone_number_id = str(workshop.get("whatsapp_phone_number_id") or "").strip()
-    access_token = str(settings.whatsapp_access_token or "").strip()
+    try:
+        zugang_fuer_werkstatt(wid, phone_number_id=phone_number_id)
+    except VerbindungsFehler as fehler:
+        return redirect("failed", str(fehler))
     template_name = str(settings.whatsapp_start_template_name or "").strip()
     template_language = str(settings.whatsapp_start_template_language or "").strip()
     missing = []
-    if not access_token:
-        missing.append("WHATSAPP_ACCESS_TOKEN")
     if not phone_number_id:
         missing.append("Phone Number ID")
     if not template_name:
@@ -1872,7 +1867,7 @@ def dashboard_whatsapp_start_template(
             user=(get_current_user(request) or {}).get("email"),
             send=lambda: send_whatsapp_template_message(phone_number_id=phone_number_id, customer_phone=phone,
                 template_name=template_name, template_language=template_language,
-                access_token=access_token, graph_api_version=settings.whatsapp_graph_api_version))
+                workshop_id=wid, graph_api_version=settings.whatsapp_graph_api_version))
     except ValueError as exc:
         return redirect("failed", str(exc))
     except Exception:
@@ -2048,8 +2043,8 @@ def dashboard_settings_save(
     services: str = Form("", max_length=4096),
     pricing_info: str = Form("", max_length=4096),
     towing_info: str = Form("", max_length=4096),
-    whatsapp_phone_number_id: str = Form("", max_length=128),
-    whatsapp_display_phone_number: str = Form("", max_length=32),
+    whatsapp_phone_number_id: str | None = Form(None, max_length=128),
+    whatsapp_display_phone_number: str | None = Form(None, max_length=32),
 ):
     wid = _workshop_id_for_request(request, workshop_id)
     try:

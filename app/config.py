@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 import os
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 
 
 def _env(key: str, default: str | None = None) -> str | None:
@@ -35,7 +35,8 @@ class Settings:
     whatsapp_verify_token: str | None = _env("WHATSAPP_VERIFY_TOKEN", None)
     whatsapp_app_secret: str | None = _env("WHATSAPP_APP_SECRET", None)
     whatsapp_default_phone_number_id: str | None = _env("WHATSAPP_DEFAULT_PHONE_NUMBER_ID", None)
-    whatsapp_access_token: str | None = _env("WHATSAPP_ACCESS_TOKEN", None)
+    whatsapp_access_token: str | None = field(default=_env("WHATSAPP_ACCESS_TOKEN", None), repr=False)
+    whatsapp_zugangsschluessel: str | None = field(default=_env("WHATSAPP_ZUGANGSSCHLUESSEL", None), repr=False)
     whatsapp_graph_api_version: str = _env("WHATSAPP_GRAPH_API_VERSION", "v23.0") or "v23.0"
     whatsapp_webhook_public_url: str | None = _env("WHATSAPP_WEBHOOK_PUBLIC_URL", None)
     whatsapp_start_template_name: str | None = _env("WHATSAPP_START_TEMPLATE_NAME", None)

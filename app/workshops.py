@@ -3,6 +3,7 @@ from __future__ import annotations
 from typing import Any
 
 from app.db import default_workshop_id, get_conn
+from app.whatsapp_verbindungen import pruefe_unveraenderte_nummer
 
 
 DEFAULT_WORKSHOP = {
@@ -105,7 +106,7 @@ def find_workshop_id_by_whatsapp_phone_number_id(phone_number_id: str | None) ->
             """
             SELECT id
             FROM workshops
-            WHERE whatsapp_phone_number_id = ?
+            WHERE NULLIF(TRIM(whatsapp_phone_number_id), '') = ? AND is_demo = 0
             ORDER BY id ASC
             LIMIT 2
             """,
@@ -126,8 +127,8 @@ def update_workshop(
     services: str,
     pricing_info: str,
     towing_info: str,
-    whatsapp_phone_number_id: str = "",
-    whatsapp_display_phone_number: str = "",
+    whatsapp_phone_number_id: str | None = None,
+    whatsapp_display_phone_number: str | None = None,
 ) -> dict[str, Any]:
     wid = _normalize_workshop_id(workshop_id)
     identity = get_workshop_identity(wid)
@@ -142,14 +143,13 @@ def update_workshop(
         "services": services.strip(),
         "pricing_info": pricing_info.strip(),
         "towing_info": towing_info.strip(),
-        "whatsapp_phone_number_id": whatsapp_phone_number_id.strip(),
-        "whatsapp_display_phone_number": whatsapp_display_phone_number.strip(),
     }
 
     if not values["name"]:
         raise ValueError("Der Werkstattname darf nicht leer sein.")
 
     with get_conn() as conn:
+        pruefe_unveraenderte_nummer(conn, wid, whatsapp_phone_number_id, whatsapp_display_phone_number)
         conn.execute(
             """
             INSERT INTO workshops (
@@ -161,11 +161,9 @@ def update_workshop(
                 opening_hours,
                 services,
                 pricing_info,
-                towing_info,
-                whatsapp_phone_number_id,
-                whatsapp_display_phone_number
+                towing_info
             )
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
             ON CONFLICT(id) DO UPDATE SET
                 name = excluded.name,
                 address = excluded.address,
@@ -175,8 +173,6 @@ def update_workshop(
                 services = excluded.services,
                 pricing_info = excluded.pricing_info,
                 towing_info = excluded.towing_info,
-                whatsapp_phone_number_id = excluded.whatsapp_phone_number_id,
-                whatsapp_display_phone_number = excluded.whatsapp_display_phone_number,
                 updated_at = CURRENT_TIMESTAMP
             """,
             (
@@ -189,8 +185,6 @@ def update_workshop(
                 values["services"],
                 values["pricing_info"],
                 values["towing_info"],
-                values["whatsapp_phone_number_id"],
-                values["whatsapp_display_phone_number"],
             ),
         )
         conn.commit()

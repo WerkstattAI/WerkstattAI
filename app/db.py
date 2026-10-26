@@ -345,8 +345,11 @@ def init_db() -> None:
             "SELECT email FROM users WHERE workshop_id = ? LIMIT 1",
             (demo_workshop_id(),),
         ).fetchone()
-        if not demo["is_demo"] or demo["whatsapp_phone_number_id"] or demo_user:
+        if not demo["is_demo"] or str(demo["whatsapp_phone_number_id"] or "").strip() or demo_user:
             raise ValueError("DEMO_WORKSHOP_ID ist bereits mit einem Produktivkonto verknüpft.")
+
+        from app.whatsapp_verbindungen import migriere_verbindungen
+        migriere_verbindungen(conn, settings)
 
         conn.execute(
             """

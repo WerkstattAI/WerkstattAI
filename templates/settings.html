@@ -647,20 +647,21 @@
             <div class="form-section">
               <div class="section-heading">
                 <h3>WhatsApp-Verbindung</h3>
-                <p>Ordnen Sie die geschäftliche WhatsApp-Nummer diesem Werkstattkonto zu.</p>
+                <p>{{ verbindung.meldung }}</p>
+                <p>Zugang gespeichert: {{ 'Ja' if verbindung.zugang_gespeichert else 'Nein' }} · Autorisierung: {{ 'Bestätigt' if verbindung.autorisierung == 'bestaetigt' else ('Widerrufen' if verbindung.autorisierung == 'widerrufen' else 'Nicht bestätigt') }} · Coexistence: {{ 'Bereit' if verbindung.coexistence_bereit and verbindung.versand_bereit else 'Nicht freigegeben' }}</p>
               </div>
 
               <div class="field-row">
                 <label>
                   WhatsApp Phone Number ID
-                  <input name="whatsapp_phone_number_id" value="{{ workshop.whatsapp_phone_number_id or '' }}" autocomplete="off" />
-                  <span class="hint">Die Phone Number ID finden Sie in der Meta Cloud API.</span>
+                  <input value="{{ workshop.whatsapp_phone_number_id or '' }}" readonly />
+                  <span class="hint">Eine Änderung erfordert einen verifizierten Anschluss. Dieser ist noch nicht verfügbar.</span>
                 </label>
 
                 <label>
                   WhatsApp-Anzeigenummer
-                  <input name="whatsapp_display_phone_number" value="{{ workshop.whatsapp_display_phone_number or '' }}" autocomplete="off" />
-                  <span class="hint">Nummer zur Anzeige im Werkstattbereich, zum Beispiel +49 176 12345678.</span>
+                  <input value="{{ workshop.whatsapp_display_phone_number or '' }}" readonly />
+                  <span class="hint">Gespeicherte Anzeigenummer der Verbindung.</span>
                 </label>
               </div>
             </div>

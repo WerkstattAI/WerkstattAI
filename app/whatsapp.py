@@ -959,13 +959,13 @@ def send_whatsapp_text_message(
     phone_number_id: str,
     customer_phone: str,
     text: str,
-    access_token: str,
+    access_token: str | None = None,
+    workshop_id: str | None = None,
     graph_api_version: str = "v23.0",
 ) -> WhatsAppSendResult:
     normalized_phone_number_id = str(phone_number_id or "").strip()
     normalized_customer_phone = str(customer_phone or "").strip()
     normalized_text = str(text or "").strip()
-    normalized_token = str(access_token or "").strip()
     version = str(graph_api_version or "v23.0").strip().lstrip("/") or "v23.0"
 
     if not normalized_phone_number_id:
@@ -974,20 +974,16 @@ def send_whatsapp_text_message(
         return WhatsAppSendResult(False, None, None, {}, "customer_phone is missing")
     if not normalized_text:
         return WhatsAppSendResult(False, None, None, {}, "message text is missing")
-    if not normalized_token:
-        return WhatsAppSendResult(False, None, None, {}, "access token is missing")
-
-    # This is the shared boundary used by automatic, ticket, inbox and test sends.
-    # Resolve the sender to exactly one tenant, then check its inbound event time.
-    with get_conn() as conn:
-        workshops = conn.execute(
-            "SELECT id FROM workshops WHERE whatsapp_phone_number_id = ? LIMIT 2",
-            (normalized_phone_number_id,),
-        ).fetchall()
-    if len(workshops) != 1:
-        return WhatsAppSendResult(False, 409, None, {}, "WhatsApp sender is not assigned to exactly one workshop")
+    # Der alte Tokenparameter bleibt syntaktisch kompatibel, erteilt aber keinen Zugang.
+    from app.whatsapp_verbindungen import VerbindungsFehler, zugang_fuer_werkstatt
+    from app.workshops import find_workshop_id_by_whatsapp_phone_number_id
+    wid = workshop_id or find_workshop_id_by_whatsapp_phone_number_id(normalized_phone_number_id)
+    try:
+        zugang = zugang_fuer_werkstatt(wid or "", phone_number_id=normalized_phone_number_id)
+    except VerbindungsFehler as fehler:
+        return WhatsAppSendResult(False, 409, None, {}, str(fehler))
     window = whatsapp_customer_service_window_for_phone(
-        workshop_id=str(workshops[0]["id"]), customer_phone=normalized_customer_phone,
+        workshop_id=zugang.workshop_id, customer_phone=normalized_customer_phone,
     )
     if not window["service_window_open"]:
         return WhatsAppSendResult(False, 409, None, {}, "Das 24-Stunden-Kundenfenster ist geschlossen. Bitte eine freigegebene Vorlage verwenden.")
@@ -1007,24 +1003,19 @@ def send_whatsapp_text_message(
     try:
         status_code, response_payload = _post_graph_api_json(
             url=url,
-            access_token=normalized_token,
+            access_token=zugang.token,
             payload=payload,
         )
     except urllib.error.HTTPError as exc:
-        error_body = exc.read().decode("utf-8", errors="replace")
-        try:
-            error_payload = json.loads(error_body) if error_body else {}
-        except json.JSONDecodeError:
-            error_payload = {"raw": error_body}
         return WhatsAppSendResult(
             False,
             exc.code,
             None,
-            error_payload if isinstance(error_payload, dict) else {},
+            {},
             f"Meta API HTTP {exc.code}",
         )
-    except Exception as exc:
-        return WhatsAppSendResult(False, None, None, {}, str(exc))
+    except Exception:
+        return WhatsAppSendResult(False, None, None, {}, "Der Meta-Versand konnte nicht bestätigt werden.")
 
     message_id = None
     messages = response_payload.get("messages")
@@ -1033,11 +1024,14 @@ def send_whatsapp_text_message(
         if isinstance(first, dict):
             message_id = str(first.get("id") or "").strip() or None
 
+    if message_id and zugang.token in message_id:
+        message_id = None
+
     return WhatsAppSendResult(
         ok=200 <= int(status_code or 0) < 300,
         status_code=status_code,
         wa_message_id=message_id,
-        payload=response_payload,
+        payload={"messages": [{"id": message_id}]} if message_id else {},
         error=None,
     )
 
@@ -1048,7 +1042,8 @@ def send_whatsapp_template_message(
     customer_phone: str,
     template_name: str,
     template_language: str,
-    access_token: str,
+    access_token: str | None = None,
+    workshop_id: str | None = None,
     graph_api_version: str = "v23.0",
 ) -> WhatsAppSendResult:
     """Send a parameter-free, pre-approved WhatsApp template through Cloud API."""
@@ -1056,7 +1051,6 @@ def send_whatsapp_template_message(
     normalized_customer_phone = str(customer_phone or "").strip()
     normalized_template_name = str(template_name or "").strip()
     normalized_template_language = str(template_language or "").strip()
-    normalized_token = str(access_token or "").strip()
     version = str(graph_api_version or "v23.0").strip().lstrip("/") or "v23.0"
 
     if not normalized_phone_number_id:
@@ -1067,8 +1061,13 @@ def send_whatsapp_template_message(
         return WhatsAppSendResult(False, None, None, {}, "template name is missing")
     if not normalized_template_language:
         return WhatsAppSendResult(False, None, None, {}, "template language is missing")
-    if not normalized_token:
-        return WhatsAppSendResult(False, None, None, {}, "access token is missing")
+    from app.whatsapp_verbindungen import VerbindungsFehler, zugang_fuer_werkstatt
+    from app.workshops import find_workshop_id_by_whatsapp_phone_number_id
+    wid = workshop_id or find_workshop_id_by_whatsapp_phone_number_id(normalized_phone_number_id)
+    try:
+        zugang = zugang_fuer_werkstatt(wid or "", phone_number_id=normalized_phone_number_id)
+    except VerbindungsFehler as fehler:
+        return WhatsAppSendResult(False, 409, None, {}, str(fehler))
 
     payload = {
         "messaging_product": "whatsapp",
@@ -1085,24 +1084,19 @@ def send_whatsapp_template_message(
     try:
         status_code, response_payload = _post_graph_api_json(
             url=url,
-            access_token=normalized_token,
+            access_token=zugang.token,
             payload=payload,
         )
     except urllib.error.HTTPError as exc:
-        error_body = exc.read().decode("utf-8", errors="replace")
-        try:
-            error_payload = json.loads(error_body) if error_body else {}
-        except json.JSONDecodeError:
-            error_payload = {"raw": error_body}
         return WhatsAppSendResult(
             False,
             exc.code,
             None,
-            error_payload if isinstance(error_payload, dict) else {},
+            {},
             f"Meta API HTTP {exc.code}",
         )
-    except Exception as exc:
-        return WhatsAppSendResult(False, None, None, {}, str(exc))
+    except Exception:
+        return WhatsAppSendResult(False, None, None, {}, "Der Meta-Versand konnte nicht bestätigt werden.")
 
     message_id = None
     messages = response_payload.get("messages")
@@ -1111,11 +1105,14 @@ def send_whatsapp_template_message(
         if isinstance(first, dict):
             message_id = str(first.get("id") or "").strip() or None
 
+    if message_id and zugang.token in message_id:
+        message_id = None
+
     return WhatsAppSendResult(
         ok=200 <= int(status_code or 0) < 300,
         status_code=status_code,
         wa_message_id=message_id,
-        payload=response_payload,
+        payload={"messages": [{"id": message_id}]} if message_id else {},
         error=None,
     )
 

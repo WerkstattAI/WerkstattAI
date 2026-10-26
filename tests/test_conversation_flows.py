@@ -43,6 +43,9 @@ from app.db import (
     set_whatsapp_conversation_control,
 )
 from app.config import settings
+import app.whatsapp_verbindungen as verbindungen
+from verbindungsdaten import TESTSCHLUESSEL, synthetische_verbindung
+from dataclasses import replace
 from app.customer_access import CustomerAccess
 from app.conversation_sessions import _storage_session_id
 from app.conversation.analysis import analyze_problem
@@ -445,6 +448,11 @@ class MessyCustomerIntentTests(unittest.TestCase):
 
 
 class WhatsAppWebhookTests(unittest.TestCase):
+    def setUp(self):
+        schutz = patch.object(verbindungen, "settings", replace(verbindungen.settings, whatsapp_zugangsschluessel=TESTSCHLUESSEL))
+        schutz.start()
+        self.addCleanup(schutz.stop)
+
     def test_home_page_is_publicly_renderable(self) -> None:
         response = home_page(_get_request("/"))
 
@@ -805,7 +813,7 @@ class WhatsAppWebhookTests(unittest.TestCase):
             self.assertEqual(messages[0]["wa_message_id"], "wamid.test-message-1")
             self.assertEqual(messages[0]["text"], "Hallo")
             self.assertEqual(messages[1]["direction"], "outbound")
-            self.assertEqual(messages[1]["status"], "sent_local")
+            self.assertEqual(messages[1]["status"], "failed")
             self.assertIn("kein freier KI-Chat", messages[1]["text"])
         finally:
             object.__setattr__(settings, "whatsapp_app_secret", old_secret)
@@ -874,7 +882,7 @@ class WhatsAppWebhookTests(unittest.TestCase):
             self.assertEqual(payload["replies"][0]["outbound_wa_message_id"], "wamid.auto-reply-1")
             self.assertEqual(send_mock.call_args.kwargs["phone_number_id"], "wa-phone-123")
             self.assertEqual(send_mock.call_args.kwargs["customer_phone"], "4917612345678")
-            self.assertEqual(send_mock.call_args.kwargs["access_token"], "test-access-token")
+            self.assertEqual(send_mock.call_args.kwargs["workshop_id"], "demo-werkstatt")
 
             messages = list_whatsapp_messages(
                 workshop_id="demo-werkstatt",
@@ -1212,6 +1220,7 @@ class WhatsAppWebhookTests(unittest.TestCase):
             )
             conn.commit()
 
+        synthetische_verbindung("demo-werkstatt", get_workshop("demo-werkstatt")["whatsapp_phone_number_id"])
         old_token = settings.whatsapp_access_token
         object.__setattr__(settings, "whatsapp_access_token", "test-access-token")
         try:
@@ -1292,6 +1301,7 @@ class WhatsAppWebhookTests(unittest.TestCase):
             ticket_id=ticket_id,
         )
 
+        synthetische_verbindung("demo-werkstatt", get_workshop("demo-werkstatt")["whatsapp_phone_number_id"])
         old_token = settings.whatsapp_access_token
         object.__setattr__(settings, "whatsapp_access_token", "test-access-token")
         try:
@@ -1367,6 +1377,7 @@ class WhatsAppWebhookTests(unittest.TestCase):
             status="received",
         )
 
+        synthetische_verbindung("demo-werkstatt", get_workshop("demo-werkstatt")["whatsapp_phone_number_id"])
         old_token = settings.whatsapp_access_token
         object.__setattr__(settings, "whatsapp_access_token", "test-access-token")
         try:
@@ -1539,6 +1550,7 @@ class WhatsAppWebhookTests(unittest.TestCase):
             status="received",
         )
 
+        synthetische_verbindung("demo-werkstatt", get_workshop("demo-werkstatt")["whatsapp_phone_number_id"])
         old_token = settings.whatsapp_access_token
         object.__setattr__(settings, "whatsapp_access_token", "test-access-token")
         try:
@@ -1675,6 +1687,7 @@ class WhatsAppWebhookTests(unittest.TestCase):
             status="received",
         )
 
+        synthetische_verbindung("demo-werkstatt", get_workshop("demo-werkstatt")["whatsapp_phone_number_id"])
         old_token = settings.whatsapp_access_token
         object.__setattr__(settings, "whatsapp_access_token", "test-access-token")
         try:
@@ -1731,6 +1744,9 @@ class WhatsAppWebhookTests(unittest.TestCase):
     def test_dashboard_whatsapp_test_requires_access_token(self) -> None:
         init_db()
 
+        with get_conn() as conn:
+            conn.execute("DELETE FROM whatsapp_verbindungen WHERE workshop_id = ?", ("demo-werkstatt",))
+            conn.commit()
         old_token = settings.whatsapp_access_token
         object.__setattr__(settings, "whatsapp_access_token", "")
         try:
@@ -1744,7 +1760,7 @@ class WhatsAppWebhookTests(unittest.TestCase):
 
             self.assertEqual(response.status_code, 303)
             self.assertIn("test_status=failed", response.headers["location"])
-            self.assertIn("WHATSAPP_ACCESS_TOKEN", response.headers["location"])
+            self.assertIn("WhatsApp-Verbindung", response.headers["location"])
             send_mock.assert_not_called()
         finally:
             object.__setattr__(settings, "whatsapp_access_token", old_token)
@@ -1780,6 +1796,7 @@ class WhatsAppWebhookTests(unittest.TestCase):
             status="received",
         )
 
+        synthetische_verbindung("demo-werkstatt", get_workshop("demo-werkstatt")["whatsapp_phone_number_id"])
         old_token = settings.whatsapp_access_token
         object.__setattr__(settings, "whatsapp_access_token", "test-access-token")
         try:
@@ -1819,24 +1836,25 @@ class WhatsAppWebhookTests(unittest.TestCase):
     def test_workshop_settings_store_whatsapp_number_config(self) -> None:
         init_db()
 
-        update_workshop(
-            "settings-whatsapp-test",
-            name="WhatsApp Test Werkstatt",
-            address="Teststrasse 1",
-            phone="012345",
-            email="test@example.com",
-            opening_hours="Montag bis Freitag: 09:00-17:00",
-            services="Reifenwechsel",
-            pricing_info="Nach Absprache",
-            towing_info="Partnerdienst",
-            whatsapp_phone_number_id="wa-settings-123",
-            whatsapp_display_phone_number="+49 176 55555555",
-        )
+        with self.assertRaises(verbindungen.VerbindungsFehler):
+            update_workshop(
+                "settings-whatsapp-test",
+                name="WhatsApp Test Werkstatt",
+                address="Teststrasse 1",
+                phone="012345",
+                email="test@example.com",
+                opening_hours="Montag bis Freitag: 09:00-17:00",
+                services="Reifenwechsel",
+                pricing_info="Nach Absprache",
+                towing_info="Partnerdienst",
+                whatsapp_phone_number_id="wa-settings-123",
+                whatsapp_display_phone_number="+49 176 55555555",
+            )
 
         workshop = get_workshop("settings-whatsapp-test")
 
-        self.assertEqual(workshop["whatsapp_phone_number_id"], "wa-settings-123")
-        self.assertEqual(workshop["whatsapp_display_phone_number"], "+49 176 55555555")
+        self.assertIsNone(workshop["whatsapp_phone_number_id"])
+        self.assertIsNone(workshop["whatsapp_display_phone_number"])
 
     def test_dashboard_settings_save_uses_authenticated_workshop(self) -> None:
         init_db()
@@ -1852,8 +1870,8 @@ class WhatsAppWebhookTests(unittest.TestCase):
             services="Service, Reifen",
             pricing_info="Individuell",
             towing_info="Abschlepppartner",
-            whatsapp_phone_number_id="wa-demo-secure",
-            whatsapp_display_phone_number="+49 176 000000",
+            whatsapp_phone_number_id=None,
+            whatsapp_display_phone_number=None,
         )
 
         self.assertEqual(response.status_code, 303)
@@ -1861,9 +1879,9 @@ class WhatsAppWebhookTests(unittest.TestCase):
         demo = get_workshop("demo-werkstatt")
         other = get_workshop("other-workshop")
 
-        self.assertEqual(demo["whatsapp_phone_number_id"], "wa-demo-secure")
-        self.assertEqual(demo["whatsapp_display_phone_number"], "+49 176 000000")
-        self.assertNotEqual(other["whatsapp_phone_number_id"], "wa-demo-secure")
+        self.assertEqual(demo["name"], "Demo Settings Werkstatt")
+        self.assertEqual(demo["phone"], "0176000000")
+        self.assertNotEqual(other["name"], "Demo Settings Werkstatt")
 
 
 class AuthTests(unittest.TestCase):
@@ -1971,7 +1989,7 @@ class AdminWorkshopTests(unittest.TestCase):
             phone="0123",
             email="kontakt@example.com",
             services="Service",
-            whatsapp_phone_number_id="wa-admin-panel-test",
+            whatsapp_phone_number_id="",
         )
 
         self.assertEqual(account["id"], self.WORKSHOP_ID)
@@ -1983,7 +2001,7 @@ class AdminWorkshopTests(unittest.TestCase):
 
         workshop = get_workshop(self.WORKSHOP_ID)
         self.assertEqual(workshop["name"], "Admin Panel Test Werkstatt")
-        self.assertEqual(workshop["whatsapp_phone_number_id"], "wa-admin-panel-test")
+        self.assertIsNone(workshop["whatsapp_phone_number_id"])
 
         accounts = list_workshop_accounts()
         self.assertTrue(any(item["id"] == self.WORKSHOP_ID for item in accounts))
@@ -2009,8 +2027,8 @@ class AdminWorkshopTests(unittest.TestCase):
             towing_info="Partnerdienst",
             subscription_plan="pilot",
             subscription_status="trialing",
-            whatsapp_phone_number_id="wa-admin-panel-test",
-            whatsapp_display_phone_number="+49 176 999999",
+            whatsapp_phone_number_id="",
+            whatsapp_display_phone_number="",
         )
 
         self.assertEqual(response.status_code, 303)
@@ -2058,14 +2076,14 @@ class AdminWorkshopTests(unittest.TestCase):
             subscription_status="active",
             trial_ends_at="2026-07-01T00:00:00+00:00",
             subscription_ends_at="2027-07-01T00:00:00+00:00",
-            whatsapp_phone_number_id="wa-updated",
-            whatsapp_display_phone_number="+49 176 111111",
+            whatsapp_phone_number_id="",
+            whatsapp_display_phone_number="",
         )
 
         self.assertEqual(account["name"], "Admin Panel Updated Werkstatt")
         self.assertEqual(account["subscription_plan"], "pro")
         self.assertEqual(account["subscription_status"], "active")
-        self.assertEqual(account["whatsapp_phone_number_id"], "wa-updated")
+        self.assertIsNone(account["whatsapp_phone_number_id"])
 
     def test_admin_update_route_saves_workshop_account(self) -> None:
         create_workshop_account(
@@ -2090,8 +2108,8 @@ class AdminWorkshopTests(unittest.TestCase):
             subscription_status="past_due",
             trial_ends_at="2026-07-02T00:00:00+00:00",
             subscription_ends_at="",
-            whatsapp_phone_number_id="wa-route-updated",
-            whatsapp_display_phone_number="+49 176 222222",
+            whatsapp_phone_number_id="",
+            whatsapp_display_phone_number="",
         )
 
         self.assertEqual(response.status_code, 303)
@@ -2101,7 +2119,7 @@ class AdminWorkshopTests(unittest.TestCase):
         self.assertIsNotNone(account)
         self.assertEqual(account["name"], "Admin Route Updated Werkstatt")
         self.assertEqual(account["subscription_status"], "past_due")
-        self.assertEqual(account["whatsapp_phone_number_id"], "wa-route-updated")
+        self.assertIsNone(account["whatsapp_phone_number_id"])
 
     def test_reset_workshop_owner_password_replaces_login_password(self) -> None:
         create_workshop_account(
@@ -3181,6 +3199,9 @@ class WhatsAppConversationControlTests(unittest.TestCase):
     PHONE_PREFIX = "49157990"
 
     def setUp(self) -> None:
+        schutz = patch.object(verbindungen, "settings", replace(verbindungen.settings, whatsapp_zugangsschluessel=TESTSCHLUESSEL))
+        schutz.start()
+        self.addCleanup(schutz.stop)
         init_db()
         with get_conn() as conn:
             conn.execute(
@@ -3210,6 +3231,8 @@ class WhatsAppConversationControlTests(unittest.TestCase):
                 ),
             )
             conn.commit()
+
+        synthetische_verbindung("demo-werkstatt", "wa-flow-default")
 
     def tearDown(self) -> None:
         with get_conn() as conn:
@@ -3337,6 +3360,7 @@ class WhatsAppConversationControlTests(unittest.TestCase):
         workshop_ids = ("flow-duplicate-a", "flow-duplicate-b")
         try:
             with get_conn() as conn:
+                conn.execute("DROP INDEX idx_workshops_whatsapp_nummer_eindeutig")
                 for workshop_id in workshop_ids:
                     conn.execute(
                         """
@@ -3369,9 +3393,11 @@ class WhatsAppConversationControlTests(unittest.TestCase):
                     "DELETE FROM workshops WHERE id IN (?, ?)",
                     workshop_ids,
                 )
+                verbindungen.migriere_verbindungen(conn, settings)
                 conn.commit()
 
     def test_template_sender_builds_parameter_free_meta_payload(self) -> None:
+        synthetische_verbindung("demo-werkstatt", "phone-id-flow")
         with patch("app.whatsapp._post_graph_api_json") as post_mock:
             post_mock.return_value = (200, {"messages": [{"id": "wamid.flow-template"}]})
             result = send_whatsapp_template_message(
@@ -4070,7 +4096,7 @@ class StartupDataIsolationTests(unittest.TestCase):
         self.assertEqual(before, {table: self._rows(table) for table in before})
         self.assertIsNotNone(authenticate_user(settings.dashboard_admin_email, "ChangedLocally123!"))
         self.assertEqual(get_workshop(wid)["opening_hours"], "")
-        self.assertEqual(get_workshop(wid)["whatsapp_phone_number_id"], "")
+        self.assertIsNone(get_workshop(wid)["whatsapp_phone_number_id"])
         self.assertFalse(is_subscription_active(wid))
 
     def test_existing_user_workshop_assignment_survives_restart(self) -> None:

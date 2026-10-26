@@ -7,6 +7,7 @@ from typing import Any
 from app.config import settings
 from app.db import get_conn
 from app.security import hash_password
+from app.whatsapp_verbindungen import pruefe_unveraenderte_nummer
 
 
 _SLUG_PATTERN = re.compile(r"[^a-z0-9]+")
@@ -139,8 +140,8 @@ def update_workshop_account(
     subscription_status: str = "trialing",
     trial_ends_at: str = "",
     subscription_ends_at: str = "",
-    whatsapp_phone_number_id: str = "",
-    whatsapp_display_phone_number: str = "",
+    whatsapp_phone_number_id: str | None = None,
+    whatsapp_display_phone_number: str | None = None,
 ) -> dict[str, Any]:
     wid = normalize_workshop_slug(workshop_id)
     name = str(workshop_name or "").strip()
@@ -159,6 +160,8 @@ def update_workshop_account(
         if not existing:
             raise ValueError("Werkstattkonto wurde nicht gefunden.")
 
+        pruefe_unveraenderte_nummer(conn, wid, whatsapp_phone_number_id, whatsapp_display_phone_number)
+
         conn.execute(
             """
             UPDATE workshops
@@ -175,8 +178,6 @@ def update_workshop_account(
                 subscription_status = ?,
                 trial_ends_at = ?,
                 subscription_ends_at = ?,
-                whatsapp_phone_number_id = ?,
-                whatsapp_display_phone_number = ?,
                 updated_at = CURRENT_TIMESTAMP
             WHERE id = ?
             """,
@@ -193,8 +194,6 @@ def update_workshop_account(
                 status,
                 str(trial_ends_at or "").strip() or None,
                 str(subscription_ends_at or "").strip() or None,
-                str(whatsapp_phone_number_id or "").strip(),
-                str(whatsapp_display_phone_number or "").strip(),
                 wid,
             ),
         )
@@ -290,6 +289,8 @@ def create_workshop_account(
         if existing_workshop:
             raise ValueError("Diese Workshop-ID existiert bereits.")
 
+        pruefe_unveraenderte_nummer(conn, wid, whatsapp_phone_number_id, whatsapp_display_phone_number)
+
         existing_user = conn.execute(
             "SELECT email FROM users WHERE email = ? LIMIT 1",
             (user_email,),
@@ -330,8 +331,8 @@ def create_workshop_account(
                 plan,
                 status,
                 _trial_ends_at(),
-                str(whatsapp_phone_number_id or "").strip(),
-                str(whatsapp_display_phone_number or "").strip(),
+                None,
+                None,
             ),
         )
         conn.execute(
