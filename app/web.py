@@ -427,6 +427,10 @@ def _whatsapp_readiness(request: Request, workshop: dict[str, Any]) -> dict[str,
         },
     ]
 
+    if status["herkunft"] == "embedded_signup_coexistence":
+        checks.append({"label": "Coexistence-Automatik", "configured": bool(status["coexistence_bereit"]),
+                       "detail": "Echo- und Synchronisierungsschutz muss vor der Betriebsfreigabe nachgewiesen sein."})
+
     return {
         "is_ready": all(check["configured"] for check in checks),
         "can_send": access_token_ready and bool(phone_number_id),
@@ -1099,7 +1103,10 @@ def login_submit(
 
 
 @router.post("/logout")
-def logout_submit():
+def logout_submit(request: Request):
+    from app.auth import SESSION_COOKIE
+    from app.whatsapp_anschluss import sitzung_beenden
+    sitzung_beenden(request.cookies.get(SESSION_COOKIE))
     response = RedirectResponse(url="/login", status_code=303)
     clear_session_cookie(response)
     return response

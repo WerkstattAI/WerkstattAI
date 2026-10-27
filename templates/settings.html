@@ -647,6 +647,7 @@
             <div class="form-section">
               <div class="section-heading">
                 <h3>WhatsApp-Verbindung</h3>
+                <p><a href="/dashboard/whatsapp/verbinden?workshop_id={{ workshop_id | urlencode }}">WhatsApp verbinden</a></p>
                 <p>{{ verbindung.meldung }}</p>
                 <p>Zugang gespeichert: {{ 'Ja' if verbindung.zugang_gespeichert else 'Nein' }} · Autorisierung: {{ 'Bestätigt' if verbindung.autorisierung == 'bestaetigt' else ('Widerrufen' if verbindung.autorisierung == 'widerrufen' else 'Nicht bestätigt') }} · Coexistence: {{ 'Bereit' if verbindung.coexistence_bereit and verbindung.versand_bereit else 'Nicht freigegeben' }}</p>
               </div>
@@ -655,7 +656,7 @@
                 <label>
                   WhatsApp Phone Number ID
                   <input value="{{ workshop.whatsapp_phone_number_id or '' }}" readonly />
-                  <span class="hint">Eine Änderung erfordert einen verifizierten Anschluss. Dieser ist noch nicht verfügbar.</span>
+                  <span class="hint">Änderungen sind nur über „WhatsApp verbinden“ mit verifiziertem Kundenzugang möglich.</span>
                 </label>
 
                 <label>

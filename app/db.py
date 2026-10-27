@@ -350,6 +350,8 @@ def init_db() -> None:
 
         from app.whatsapp_verbindungen import migriere_verbindungen
         migriere_verbindungen(conn, settings)
+        from app.whatsapp_anschluss import migriere_anschluss
+        migriere_anschluss(conn)
 
         conn.execute(
             """

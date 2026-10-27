@@ -302,6 +302,9 @@ def whatsapp_customer_service_window_for_phone(
 ) -> dict[str, Any]:
     """Return the free-text window from the latest inbound message in this tenant."""
     wid = str(workshop_id or "").strip()
+    from app.whatsapp_anschluss import automatik_gesperrt
+    if wid and automatik_gesperrt(wid):
+        return {**whatsapp_customer_service_window(None, now=now), "last_customer_message_at": None}
     phone = str(customer_phone or "").strip()
     if not wid or not phone:
         return whatsapp_customer_service_window(None, now=now)
@@ -609,6 +612,11 @@ def prepare_whatsapp_inbound(*, workshop_id: str, message: WhatsAppInboundMessag
     session, ticket, notes and incoming-message marker as one unit.
     """
     with atomic_database() as conn:
+        from app.db import lock_communication_scope
+        from app.whatsapp_anschluss import eingang_zurueckhalten
+        lock_communication_scope(conn, workshop_id)
+        if eingang_zurueckhalten(conn, workshop_id, message):
+            return {"action": "manual", "reason": "coexistence_nicht_freigegeben"}
         _lock_conversation(conn, workshop_id, message.from_phone)
         control = get_whatsapp_conversation_control(workshop_id=workshop_id, customer_phone=message.from_phone)
         existing = conn.execute("""
@@ -754,13 +762,17 @@ def deliver_prepared_whatsapp_reply(*, workshop_id: str, customer_phone: str,
         if reply["dispatch_state"] != "pending":
             return {"status": reply["status"], "wa_message_id": reply["wa_message_id"], "retry": False,
                     "already_dispatched": True}
-        if conn.execute("SELECT 1 FROM whatsapp_messages WHERE workshop_id = ? AND customer_phone = ? "
+        from app.whatsapp_anschluss import automatik_gesperrt
+        gesperrt = automatik_gesperrt(workshop_id)
+        if not gesperrt and conn.execute("SELECT 1 FROM whatsapp_messages WHERE workshop_id = ? AND customer_phone = ? "
                         "AND direction = 'outbound' AND dispatch_state = 'sending' AND id <> ? LIMIT 1",
                         (workshop_id, customer_phone, reply["id"])).fetchone():
             return {"status": "pending", "wa_message_id": None, "retry": True}
         reason = None
         handoff_ack = json.loads(reply["payload_json"] or "{}").get("handoff_ack") and control["conversation_state"] == "waiting_for_workshop"
-        if (control["mode"] != "assistant" and not handoff_ack) or control["revision"] != reply["control_revision"]:
+        if gesperrt:
+            reason = "coexistence_nicht_freigegeben"
+        elif (control["mode"] != "assistant" and not handoff_ack) or control["revision"] != reply["control_revision"]:
             reason = "manual_takeover_before_assistant_reply"
         elif not whatsapp_customer_service_window_for_phone(
             workshop_id=workshop_id, customer_phone=customer_phone,
@@ -781,7 +793,11 @@ def deliver_prepared_whatsapp_reply(*, workshop_id: str, customer_phone: str,
                      (started_at, workshop_id, reply["id"]))
 
     try:
-        send_result = send_message(reply)
+        # Erneut unmittelbar vor HTTP prüfen; keine Datenbanksperre über den Transport.
+        if automatik_gesperrt(workshop_id):
+            send_result = WhatsAppSendResult(False, 409, None, {}, "Coexistence-Automatik ist nicht freigegeben.")
+        else:
+            send_result = send_message(reply)
     except Exception as exc:
         send_result = WhatsAppSendResult(False, None, None, {}, str(exc))
     retry = not send_result.ok and send_result.status_code is not None and (

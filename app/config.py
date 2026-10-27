@@ -37,6 +37,10 @@ class Settings:
     whatsapp_default_phone_number_id: str | None = _env("WHATSAPP_DEFAULT_PHONE_NUMBER_ID", None)
     whatsapp_access_token: str | None = field(default=_env("WHATSAPP_ACCESS_TOKEN", None), repr=False)
     whatsapp_zugangsschluessel: str | None = field(default=_env("WHATSAPP_ZUGANGSSCHLUESSEL", None), repr=False)
+    whatsapp_app_id: str | None = _env("WHATSAPP_APP_ID", None)
+    whatsapp_signup_config_id: str | None = _env("WHATSAPP_SIGNUP_CONFIG_ID", None)
+    whatsapp_signup_origin: str | None = _env("WHATSAPP_SIGNUP_ORIGIN", None)
+    whatsapp_signup_graph_version: str = _env("WHATSAPP_SIGNUP_GRAPH_VERSION", "v26.0") or "v26.0"
     whatsapp_graph_api_version: str = _env("WHATSAPP_GRAPH_API_VERSION", "v23.0") or "v23.0"
     whatsapp_webhook_public_url: str | None = _env("WHATSAPP_WEBHOOK_PUBLIC_URL", None)
     whatsapp_start_template_name: str | None = _env("WHATSAPP_START_TEMPLATE_NAME", None)

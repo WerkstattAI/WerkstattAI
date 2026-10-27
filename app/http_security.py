@@ -66,6 +66,12 @@ class SecurityHeadersMiddleware:
             # FastAPI's development-only API explorers use CDN scripts and inline setup.
             csp = "default-src 'self'; script-src 'self' https://cdn.jsdelivr.net 'unsafe-inline'; style-src 'self' https: 'unsafe-inline'; img-src 'self' data: https://fastapi.tiangolo.com; font-src https:; frame-ancestors 'none'; object-src 'none'; base-uri 'none'"
 
+        if scope["path"] == "/dashboard/whatsapp/verbinden":
+            # Nur die Anschlussseite lädt das offizielle SDK. Keine Wildcards.
+            csp = csp.replace(f"script-src 'nonce-{nonce}'", f"script-src 'nonce-{nonce}' https://connect.facebook.net")
+            csp = csp.replace("connect-src 'self'", "connect-src 'self' https://www.facebook.com https://web.facebook.com https://graph.facebook.com")
+            csp = csp.replace("frame-src 'none'", "frame-src https://www.facebook.com https://web.facebook.com")
+
         async def send_headers(message):
             if message["type"] == "http.response.start":
                 headers = MutableHeaders(scope=message)

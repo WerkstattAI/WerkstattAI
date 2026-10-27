@@ -1,0 +1,35 @@
+<!doctype html>
+<html lang="de">
+<head>
+  <meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>WhatsApp verbinden – WerkstattAI</title>
+  <style>
+    body{font:17px/1.6 "Segoe UI",sans-serif;background:#f3f6f5;color:#182522;margin:0}
+    main{max-width:760px;margin:50px auto;padding:28px;background:white;border:1px solid #dfe6e3;border-radius:16px}
+    a{color:#0f6f66} h1{line-height:1.2} button{font:inherit;padding:12px 18px;border:1px solid #0f6f66;border-radius:8px;background:#0f6f66;color:white;cursor:pointer;margin:5px}
+    button:disabled{opacity:.5;cursor:default}.hinweis{background:#fff6dc;border-left:4px solid #b77b16;padding:16px}
+    #fortschritt{padding:16px;background:#eef4f2;min-height:3em}ol{padding-left:25px}
+  </style>
+</head>
+<body><main>
+  <a href="/dashboard/settings?workshop_id={{ workshop_id | urlencode }}">← Einstellungen</a>
+  <h1>WhatsApp verbinden</h1><p>{{ workshop.name }}</p>
+  <p>Verbinden Sie Ihre bestehende WhatsApp Business-App. Ihre Nummer und die App bleiben erhalten. Löschen Sie Ihr WhatsApp-Konto nicht.</p>
+  <ol><li>Verbindung in Meta und Ihrer Business-App erlauben.</li><li>WerkstattAI prüft den Kundenzugang, die Nummer und das Kontoabonnement.</li><li>Autorisierung anzeigen; die Automatik bleibt vorerst gesperrt.</li></ol>
+  <p class="hinweis">Bis Echo- und Synchronisierungsschutz freigegeben sind, bearbeitet WerkstattAI keine neuen WhatsApp-Eingänge automatisch. Zurückgehaltene Eingänge werden nicht später automatisch nachverarbeitet. Verwenden Sie weiterhin Ihre Business-App.</p>
+  <p>Zurückgehaltene Eingänge: <strong>{{ zurueckgehalten.anzahl }}</strong>{% if zurueckgehalten.zuletzt %} · Zuletzt: {{ zurueckgehalten.zuletzt }}{% endif %}. Es werden nur Ereigniskennungen und Sperrgrund gespeichert, keine Nachrichtentexte oder Medien importiert.</p>
+  {% if eingerichtet %}
+  <p id="fortschritt" role="status" aria-live="polite">Meta-Anmeldung wird geladen …</p>
+  <button type="button" id="start" disabled>WhatsApp verbinden</button>
+  <button type="button" id="abbruch" hidden>Abbrechen</button>
+  <button type="button" id="fortsetzen" hidden>Abonnement erneut prüfen</button>
+  <button type="button" id="status">Status prüfen</button>
+  <noscript>Zum Verbinden ist JavaScript erforderlich.</noscript>
+  <script nonce="{{ request.state.csp_nonce }}">
+    {% include '_whatsapp_anschluss_script.html' %}
+    starteAnschlussSeite({{ konfiguration | tojson }});
+  </script>
+  {% else %}
+  <p class="hinweis">WhatsApp verbinden ist noch nicht eingerichtet. Die öffentliche App-/Login-Konfiguration oder der geschützte Serverzugang fehlt. Ihre bestehende Verbindung wird nicht verändert.</p>
+  {% endif %}
+</main></body></html>

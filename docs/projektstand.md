@@ -2,6 +2,51 @@
 
 ## Aktueller Stand vom 27. Oktober 2026
 
+**M2, Aufgabe 2: Die autorisierte Embedded-Signup-Anschlusskette ist lokal
+implementiert und mit simuliertem Meta-HTTP geprüft. Kein realer Kundenanschluss
+und keine Coexistence-Betriebsfreigabe.** Ausgangspunkt war der unabhängig
+nachgeprüfte Commit `2569f57`; Arbeitsbaum und Remote waren identisch und sauber.
+Die Änderungen liegen auf `codex/m2-embedded-signup-2026-10-27`.
+
+Der bestehende Verbindungs-/Fernet-/Versionskern bleibt die einzige
+Zugangsverwaltung. Ergänzt wurden der Dashboard-Einstieg, sitzungsgebundene
+kurzlebige Einmalversuche, serverseitiger Codeaustausch, Konto-/Nummern- und
+Tokenprüfung sowie bestätigtes Abonnement der App am Kundenkonto. Browser-Erfolg
+allein autorisiert nichts. Abbruch, Logout, Rollenverlust, abgelaufene oder
+wiederverwendete Kennungen/Codes, konkurrierende Abschlüsse und spätere Widerrufe
+werden kontrolliert behandelt. Teilfehler bleiben unbestätigt; Abonnementprüfung
+kann ohne erneuten Codeaustausch fortgesetzt werden.
+
+Neue Coexistence-Verbindungen bleiben serverseitig für Automatik gesperrt.
+Nicht freigegebene Eingänge werden einmalig mit Kennung und Sperrgrund erfasst
+und ohne Wiederholungsfehler quittiert; keine Ticket-/Intake-Änderung und kein
+neues 24-Stunden-Fenster. Vorbereitete automatische Antworten werden ebenfalls
+unterdrückt. Der begrenzte M1-Legacy-Pfad bleibt erhalten. Die Oberfläche trennt
+autorisierte Zugänge von der noch fehlenden Betriebsbereitschaft.
+
+Neu tatsächlich bestanden: **581 Python-Tests** unter Python 3.12.13, darin
+**zehn PostgreSQL-18-Tests**, ohne übersprungene Tests. Zuvor gezielte SQLite-
+und PostgreSQL-Läufe; nach letzten Ergänzungen 100 gezielte Kommunikations-/
+Anschlusstests und 42 Anschluss-/Verbindungstests unter Windows/Python 3.14.3.
+Abschließend zehn gezielte PostgreSQL-Tests einschließlich eines zusätzlichen
+Konkurrenztests für Logout und dauerhaften Abschluss; die Versuchzeile wird
+beim Abschluss bis zum Transaktionsende gesperrt.
+**42 JavaScript-Tests bestanden.** Die Gruppen überschneiden sich.
+Nachweise, geprüfte offizielle Quellen, Konfigurationsnamen, lokale Testanleitung
+und offene externe Voraussetzungen stehen im
+[Embedded-Signup-Bericht](m2-embedded-signup-2026-10-27.md).
+
+Die realen Meta-Freigaben, App-Konfiguration, SDK-/Popup-Durchlauf und
+Kundennummer wurden nicht geprüft oder verändert. Kein Merge oder Deployment.
+Keine echten Nachrichten, Registrierung oder Rechtevergabe. Aufgabe 3 wurde
+nicht begonnen; Echo-/Historien-/Synchronisierungsschutz bleibt offen.
+
+### Nächste Schritte
+
+1. **Unabhängige Nachprüfung des Anschlussprozesses vor Aufgabe 3.**
+
+## Historischer Stand nach den M2.1-Korrekturen vom 27. Oktober 2026
+
 **Zwei unabhängig gefundene Fehler in M2, Aufgabe 1 sind lokal korrigiert;
 die unabhängige Nachprüfung steht aus. Aufgabe 2 wurde nicht begonnen.**
 Ausgangsstand war der saubere Commit `59252bb` der bisherigen M2-Branch,
@@ -32,7 +77,7 @@ Datenbanken und Testnetze wurden entfernt. Diff- und Geheimnisprüfung ohne Befu
 Keine Produktion, Meta-Aufrufe, realen Nachrichten, Registrierung, Merge oder
 Deployment. Die bisherigen M1-Nachweise bleiben unverändert.
 
-### Nächste Schritte
+### Damals vorgesehener nächster Schritt (inzwischen unabhängig nachgeprüft)
 
 1. **Unabhängige Nachprüfung beider Korrekturen vor Aufgabe 2.** Embedded Signup
    und weitere M2-Arbeiten erst danach fortsetzen; hier nicht automatisch beginnen.

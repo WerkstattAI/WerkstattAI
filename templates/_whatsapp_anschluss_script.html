@@ -1,0 +1,109 @@
+function pruefeMetaEreignis(event) {
+  if (!['https://www.facebook.com', 'https://web.facebook.com'].includes(event.origin)) return null;
+  let inhalt;
+  try { inhalt = typeof event.data === 'string' ? JSON.parse(event.data) : event.data; } catch { return null; }
+  if (!inhalt || typeof inhalt !== 'object' || Array.isArray(inhalt) || inhalt.type !== 'WA_EMBEDDED_SIGNUP' || inhalt.version !== 3) return null;
+  const daten = inhalt.data;
+  if (!daten || typeof daten !== 'object' || Array.isArray(daten)) return null;
+  if (inhalt.event === 'CANCEL' || inhalt.event === 'ERROR') return {abbruch:true};
+  if (inhalt.event !== 'FINISH_WHATSAPP_BUSINESS_APP_ONBOARDING') return {abbruch:true};
+  const id = wert => typeof wert === 'string' && /^[0-9]{1,32}$/.test(wert);
+  if (!id(daten.waba_id) || (daten.phone_number_id !== undefined && !id(daten.phone_number_id))) return null;
+  return {meta_ursprung:event.origin, ereignis:inhalt.event, waba_id:daten.waba_id, phone_number_id:daten.phone_number_id ?? null};
+}
+
+function starteAnschlussSeite(konfiguration) {
+  const el = id => document.getElementById(id);
+  const anzeigen = text => { el('fortschritt').textContent = text; };
+  let kennung = null, aktiv = false, code = null, auswahl = null, timer = null, vorbereitet = false;
+  const speicher = 'werkstattai-anschluss-' + konfiguration.workshopId;
+  try { kennung = sessionStorage.getItem(speicher); } catch {}
+  const anfrage = async (aktion, daten={}) => {
+    const antwort = await fetch('/dashboard/whatsapp/verbinden/' + aktion, {
+      method:'POST', credentials:'same-origin', headers:{'Content-Type':'application/json'},
+      body:JSON.stringify({workshop_id:konfiguration.workshopId, kennung, ...daten})
+    });
+    if (antwort.redirected) throw new Error('Die Sitzung ist abgelaufen. Bitte erneut anmelden.');
+    let ergebnis;
+    try { ergebnis = await antwort.json(); } catch { throw new Error('Anschluss nicht bestätigt. Bitte Status prüfen.'); }
+    if (!antwort.ok) throw new Error(ergebnis.detail || 'Anschluss nicht bestätigt. Bitte Status prüfen.');
+    return ergebnis;
+  };
+  const ergebnisAnzeigen = ergebnis => {
+    anzeigen(ergebnis.meldung + (ergebnis.diagnose ? ' ' + ergebnis.diagnose : ''));
+    el('fortsetzen').hidden = !ergebnis.fortsetzbar;
+  };
+  const beenden = () => { aktiv=false; code=null; auswahl=null; clearTimeout(timer); el('abbruch').hidden=true; el('start').disabled=false; el('start').textContent='Neuen Anschluss vorbereiten'; };
+  const abbrechen = async () => {
+    beenden();
+    try { if (kennung) ergebnisAnzeigen(await anfrage('abbruch')); } catch { anzeigen('Abbruch nicht bestätigt. Bitte Status prüfen; der Versuch läuft nach zehn Minuten ab.'); }
+  };
+  const abschliessen = async () => {
+    if (!aktiv || !code || !auswahl) return;
+    const daten = {code, ...auswahl};
+    aktiv=false; code=null; auswahl=null; clearTimeout(timer);
+    anzeigen('Kundenzugang und Kontoabonnement werden serverseitig geprüft …');
+    try { ergebnisAnzeigen(await anfrage('abschluss', daten)); }
+    catch (fehler) { anzeigen(fehler.message); }
+    finally { beenden(); }
+  };
+  window.addEventListener('message', event => {
+    if (!aktiv) return;
+    const daten = pruefeMetaEreignis(event);
+    if (!daten) return;
+    if (daten.abbruch) { abbrechen(); return; }
+    auswahl=daten; abschliessen();
+  });
+  // Der Versuch wird vorab erstellt; FB.login bleibt unmittelbar im Nutzerklick.
+  const vorbereiten = async () => {
+    if (window.location.origin !== konfiguration.origin) { anzeigen('Diese Adresse ist nicht für den Anschluss freigegeben.'); return; }
+    try {
+      const ergebnis = await anfrage('start'); kennung=ergebnis.kennung;
+      try { sessionStorage.setItem(speicher, kennung); } catch {}
+      vorbereitet=true; el('start').disabled=false; el('start').textContent='WhatsApp verbinden'; anzeigen('Bereit. Mit „WhatsApp verbinden“ öffnen Sie die Meta-Anmeldung.');
+    } catch (fehler) { anzeigen(fehler.message); }
+  };
+  el('start').addEventListener('click', () => {
+    if (aktiv || !window.FB) return;
+    if (!vorbereitet) { vorbereiten(); return; }
+    aktiv=true; vorbereitet=false; el('start').disabled=true; el('abbruch').hidden=false; el('fortsetzen').hidden=true;
+    anzeigen('Schließen Sie die Anmeldung im Meta-Fenster ab. Bei blockiertem Popup erlauben Sie Popups für diese Seite und starten erneut.');
+    timer=setTimeout(() => { abbrechen(); }, 9 * 60 * 1000);
+    const lauf=kennung;
+    try {
+      FB.login(antwort => {
+        if (!aktiv || kennung !== lauf) return;
+        const wert=antwort && antwort.authResponse && antwort.authResponse.code;
+        if (typeof wert !== 'string' || !wert || wert.length > 4096) { abbrechen(); return; }
+        code=wert;
+        clearTimeout(timer); timer=setTimeout(() => { abbrechen(); }, 20000);
+        abschliessen();
+      }, {config_id:konfiguration.configId, response_type:'code', override_default_response_type:true,
+          extras:{setup:{}, featureType:'whatsapp_business_app_onboarding'}});
+    } catch { abbrechen().then(() => anzeigen('Meta-Anmeldung konnte nicht geöffnet werden. Bitte die Seite neu laden und Popups erlauben.')); }
+  });
+  el('abbruch').addEventListener('click', abbrechen);
+  el('status').addEventListener('click', async () => {
+    try { if (kennung) ergebnisAnzeigen(await anfrage('status')); } catch (fehler) { anzeigen(fehler.message); }
+  });
+  el('fortsetzen').addEventListener('click', async () => {
+    el('fortsetzen').hidden=true; anzeigen('Kontoabonnement wird erneut geprüft …');
+    try { ergebnisAnzeigen(await anfrage('fortsetzen')); } catch (fehler) { anzeigen(fehler.message); }
+  });
+  const ladeTimer=setTimeout(() => anzeigen('Meta-Anmeldung lädt nicht. Bitte Verbindung und Browser-Schutz prüfen.'), 15000);
+  window.fbAsyncInit = () => {
+    clearTimeout(ladeTimer);
+    try {
+      FB.init({appId:konfiguration.appId, autoLogAppEvents:false, xfbml:false, version:konfiguration.version});
+      if (kennung) {
+        anfrage('status').then(ergebnis => {
+          ergebnisAnzeigen(ergebnis);
+          el('start').textContent='Neuen Anschluss vorbereiten'; el('start').disabled=false;
+        }).catch(() => vorbereiten());
+      } else vorbereiten();
+    } catch { anzeigen('Meta-SDK konnte nicht initialisiert werden. Bitte später erneut versuchen.'); }
+  };
+  const sdk=document.createElement('script'); sdk.src='https://connect.facebook.net/de_DE/sdk.js'; sdk.async=true;
+  sdk.onerror=() => { clearTimeout(ladeTimer); anzeigen('Meta-Anmeldung konnte nicht geladen werden. Bitte Verbindung und Browser-Schutz prüfen.'); };
+  document.head.appendChild(sdk);
+}

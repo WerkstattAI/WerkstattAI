@@ -99,6 +99,8 @@ async def dashboard_auth_middleware(request, call_next):
 
 
 app.include_router(web_router)
+from app.whatsapp_anschluss_web import router as anschluss_router
+app.include_router(anschluss_router)
 app.include_router(privacy_router)
 
 
@@ -176,6 +178,9 @@ def process_chat_message(
     message_id: str | None = None,
 ) -> ChatResponse:
     lock_communication_scope(get_conn(), workshop_id)
+    from app.whatsapp_anschluss import automatik_gesperrt
+    if channel == "whatsapp" and automatik_gesperrt(workshop_id):
+        return ChatResponse(reply="", done=False, data={"gesperrt": "coexistence_nicht_freigegeben"})
     if not is_subscription_active(workshop_id):
         raise HTTPException(
             status_code=402,

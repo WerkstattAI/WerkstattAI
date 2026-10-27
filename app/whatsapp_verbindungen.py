@@ -136,7 +136,9 @@ def speichere_verbindungsentwurf(*, workshop_id: str, waba_id: str, phone_number
                 VALUES (?, ?, ?, ?, 'interner_entwurf', 'unbestaetigt', 'vorbereitet', 0, ?, ?)
                 ON CONFLICT(workshop_id) DO UPDATE SET waba_id = excluded.waba_id,
                 phone_number_id = excluded.phone_number_id, anzeigenummer = excluded.anzeigenummer,
-                herkunft = excluded.herkunft, autorisierung = excluded.autorisierung, zustand = excluded.zustand,
+                herkunft = CASE WHEN whatsapp_verbindungen.herkunft = 'embedded_signup_coexistence'
+                    THEN whatsapp_verbindungen.herkunft ELSE excluded.herkunft END,
+                autorisierung = excluded.autorisierung, zustand = excluded.zustand,
                 coexistence_bereit = 0, version = excluded.version,
                 zugang_verschluesselt = excluded.zugang_verschluesselt, updated_at = CURRENT_TIMESTAMP
                 WHERE whatsapp_verbindungen.version = ?""",
@@ -209,6 +211,8 @@ def verbindungsstatus(workshop_id: str) -> dict:
         zugang_fuer_werkstatt(workshop_id)
         status.update(versand_bereit=True, meldung=("Eigene M1-Altverbindung; keine Coexistence-Freigabe."
                       if status["herkunft"] == "m1_legacy" else "Autorisierte WhatsApp-Verbindung."))
+        if status["herkunft"] == "embedded_signup_coexistence" and not status["coexistence_bereit"]:
+            status["meldung"] = "Zugang autorisiert; Coexistence-Automatik bis zum Echo- und Synchronisierungsschutz gesperrt."
     except VerbindungsFehler as fehler:
         status.update(versand_bereit=False, meldung=str(fehler))
     return status
