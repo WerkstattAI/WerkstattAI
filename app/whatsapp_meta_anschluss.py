@@ -120,10 +120,22 @@ class MetaAnschluss:
             if type(wert) is not int or (wert != 0 and wert <= int(time.time())):
                 raise MetaAnschlussFehler("Der Kundenzugang ist abgelaufen oder nicht prüfbar.")
         granular = daten.get("granular_scopes")
-        if not isinstance(granular, list) or not any(isinstance(r, dict)
-                and r.get("scope") == "whatsapp_business_management"
-                and ("target_ids" not in r or (isinstance(r["target_ids"], list) and waba_id in r["target_ids"])) for r in granular):
+        if not isinstance(granular, list):
             raise MetaAnschlussFehler("Das ausgewählte Messaging-Konto wurde nicht autorisiert.")
+        for recht in rechte:
+            eintraege = [r for r in granular if isinstance(r, dict) and r.get("scope") == recht]
+            if not eintraege:
+                raise MetaAnschlussFehler("Eine erforderliche Kontoberechtigung wurde nicht nachgewiesen.")
+            for eintrag in eintraege:
+                # Nur ein vorhandener Scope ohne Ziele gilt laut Meta für alle Assets.
+                if "target_ids" not in eintrag:
+                    continue
+                ziele = eintrag["target_ids"]
+                # Meta dokumentiert auch ganzzahlige IDs; Bool und andere Typen gelten nicht als IDs.
+                if (not isinstance(ziele, list) or not ziele
+                        or any(not (meta_id(z) or (type(z) is int and z > 0 and len(str(z)) <= 32)) for z in ziele)
+                        or waba_id not in [str(z) for z in ziele]):
+                    raise MetaAnschlussFehler("Das ausgewählte Messaging-Konto wurde nicht autorisiert.")
         nummern = self._liste(f"{waba_id}/phone_numbers", token, "id")
         ids = {n.get("id") for n in nummern if meta_id(n.get("id"))}
         if phone_number_id is None:

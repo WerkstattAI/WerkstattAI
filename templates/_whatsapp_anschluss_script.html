@@ -14,14 +14,27 @@ function pruefeMetaEreignis(event) {
 
 function starteAnschlussSeite(konfiguration) {
   const el = id => document.getElementById(id);
-  const anzeigen = text => { el('fortschritt').textContent = text; };
-  let kennung = null, aktiv = false, code = null, auswahl = null, timer = null, vorbereitet = false;
   const speicher = 'werkstattai-anschluss-' + konfiguration.workshopId;
-  try { kennung = sessionStorage.getItem(speicher); } catch {}
-  const anfrage = async (aktion, daten={}) => {
+  const neuerLauf = kennung => ({kennung, aktiv:false, code:null, auswahl:null, timer:null, vorbereitet:false, anzeige:0});
+  let gespeicherteKennung = null;
+  try { gespeicherteKennung = sessionStorage.getItem(speicher); } catch {}
+  let aktuell = neuerLauf(gespeicherteKennung), sdkBereit = false;
+  const gilt = lauf => aktuell === lauf;
+  const wechseln = kennung => {
+    clearTimeout(aktuell.timer);
+    aktuell = neuerLauf(kennung);
+    return aktuell;
+  };
+  const anzeigen = (lauf, text) => {
+    if (!gilt(lauf)) return;
+    lauf.anzeige++;
+    el('fortschritt').textContent = text;
+  };
+  // Jede Anfrage verwendet ausschließlich die Kennung ihres unveränderlichen Laufbezugs.
+  const anfrage = async (lauf, aktion, daten={}) => {
     const antwort = await fetch('/dashboard/whatsapp/verbinden/' + aktion, {
       method:'POST', credentials:'same-origin', headers:{'Content-Type':'application/json'},
-      body:JSON.stringify({workshop_id:konfiguration.workshopId, kennung, ...daten})
+      body:JSON.stringify({workshop_id:konfiguration.workshopId, kennung:lauf.kennung, ...daten})
     });
     if (antwort.redirected) throw new Error('Die Sitzung ist abgelaufen. Bitte erneut anmelden.');
     let ergebnis;
@@ -29,81 +42,120 @@ function starteAnschlussSeite(konfiguration) {
     if (!antwort.ok) throw new Error(ergebnis.detail || 'Anschluss nicht bestätigt. Bitte Status prüfen.');
     return ergebnis;
   };
-  const ergebnisAnzeigen = ergebnis => {
-    anzeigen(ergebnis.meldung + (ergebnis.diagnose ? ' ' + ergebnis.diagnose : ''));
+  const ergebnisAnzeigen = (lauf, ergebnis) => {
+    if (!gilt(lauf)) return;
+    anzeigen(lauf, ergebnis.meldung + (ergebnis.diagnose ? ' ' + ergebnis.diagnose : ''));
     el('fortsetzen').hidden = !ergebnis.fortsetzbar;
   };
-  const beenden = () => { aktiv=false; code=null; auswahl=null; clearTimeout(timer); el('abbruch').hidden=true; el('start').disabled=false; el('start').textContent='Neuen Anschluss vorbereiten'; };
-  const abbrechen = async () => {
-    beenden();
-    try { if (kennung) ergebnisAnzeigen(await anfrage('abbruch')); } catch { anzeigen('Abbruch nicht bestätigt. Bitte Status prüfen; der Versuch läuft nach zehn Minuten ab.'); }
+  const beenden = lauf => {
+    if (!gilt(lauf)) return;
+    lauf.aktiv=false; lauf.code=null; lauf.auswahl=null; clearTimeout(lauf.timer);
+    el('abbruch').hidden=true; el('start').disabled=false; el('start').textContent='Neuen Anschluss vorbereiten';
   };
-  const abschliessen = async () => {
-    if (!aktiv || !code || !auswahl) return;
-    const daten = {code, ...auswahl};
-    aktiv=false; code=null; auswahl=null; clearTimeout(timer);
-    anzeigen('Kundenzugang und Kontoabonnement werden serverseitig geprüft …');
-    try { ergebnisAnzeigen(await anfrage('abschluss', daten)); }
-    catch (fehler) { anzeigen(fehler.message); }
-    finally { beenden(); }
+  const abbrechen = async (lauf, hinweis=null) => {
+    if (!gilt(lauf)) return;
+    // Auch Antworten desselben, gerade abgebrochenen Laufs dürfen nichts mehr ändern.
+    const abbruch = wechseln(lauf.kennung);
+    beenden(abbruch); el('fortsetzen').hidden=true;
+    anzeigen(abbruch, 'Anschluss wird abgebrochen …');
+    try { if (abbruch.kennung) ergebnisAnzeigen(abbruch, await anfrage(abbruch, 'abbruch')); }
+    catch { anzeigen(abbruch, 'Abbruch nicht bestätigt. Bitte Status prüfen; der Versuch läuft nach zehn Minuten ab.'); }
+    if (hinweis) anzeigen(abbruch, hinweis);
+  };
+  const abschliessen = async lauf => {
+    if (!gilt(lauf) || !lauf.aktiv || !lauf.code || !lauf.auswahl) return;
+    const daten = {code:lauf.code, ...lauf.auswahl};
+    lauf.aktiv=false; lauf.code=null; lauf.auswahl=null; clearTimeout(lauf.timer);
+    anzeigen(lauf, 'Kundenzugang und Kontoabonnement werden serverseitig geprüft …');
+    try { ergebnisAnzeigen(lauf, await anfrage(lauf, 'abschluss', daten)); }
+    catch (fehler) { anzeigen(lauf, fehler.message); }
+    finally { beenden(lauf); }
   };
   window.addEventListener('message', event => {
-    if (!aktiv) return;
+    const lauf = aktuell;
+    if (!lauf.aktiv) return;
     const daten = pruefeMetaEreignis(event);
     if (!daten) return;
-    if (daten.abbruch) { abbrechen(); return; }
-    auswahl=daten; abschliessen();
+    if (daten.abbruch) { abbrechen(lauf); return; }
+    lauf.auswahl=daten; abschliessen(lauf);
   });
   // Der Versuch wird vorab erstellt; FB.login bleibt unmittelbar im Nutzerklick.
   const vorbereiten = async () => {
-    if (window.location.origin !== konfiguration.origin) { anzeigen('Diese Adresse ist nicht für den Anschluss freigegeben.'); return; }
+    const lauf = wechseln(null);
+    el('start').disabled=true; el('fortsetzen').hidden=true; el('abbruch').hidden=true;
+    if (window.location.origin !== konfiguration.origin) { anzeigen(lauf, 'Diese Adresse ist nicht für den Anschluss freigegeben.'); return; }
+    anzeigen(lauf, 'Anschlussversuch wird vorbereitet …');
     try {
-      const ergebnis = await anfrage('start'); kennung=ergebnis.kennung;
-      try { sessionStorage.setItem(speicher, kennung); } catch {}
-      vorbereitet=true; el('start').disabled=false; el('start').textContent='WhatsApp verbinden'; anzeigen('Bereit. Mit „WhatsApp verbinden“ öffnen Sie die Meta-Anmeldung.');
-    } catch (fehler) { anzeigen(fehler.message); }
+      const ergebnis = await anfrage(lauf, 'start');
+      if (!gilt(lauf)) return;
+      // Mit der Serverkennung beginnt ein neuer, fest gebundener Lauf.
+      const bereit = wechseln(ergebnis.kennung);
+      try { sessionStorage.setItem(speicher, bereit.kennung); } catch {}
+      bereit.vorbereitet=true; el('start').disabled=false; el('start').textContent='WhatsApp verbinden';
+      anzeigen(bereit, 'Bereit. Mit „WhatsApp verbinden“ öffnen Sie die Meta-Anmeldung.');
+    } catch (fehler) { beenden(lauf); anzeigen(lauf, fehler.message); }
   };
   el('start').addEventListener('click', () => {
-    if (aktiv || !window.FB) return;
-    if (!vorbereitet) { vorbereiten(); return; }
-    aktiv=true; vorbereitet=false; el('start').disabled=true; el('abbruch').hidden=false; el('fortsetzen').hidden=true;
-    anzeigen('Schließen Sie die Anmeldung im Meta-Fenster ab. Bei blockiertem Popup erlauben Sie Popups für diese Seite und starten erneut.');
-    timer=setTimeout(() => { abbrechen(); }, 9 * 60 * 1000);
-    const lauf=kennung;
+    if (el('start').disabled || !sdkBereit || !window.FB) return;
+    if (!aktuell.vorbereitet) { vorbereiten(); return; }
+    const lauf = wechseln(aktuell.kennung);
+    lauf.aktiv=true; el('start').disabled=true; el('abbruch').hidden=false; el('fortsetzen').hidden=true;
+    anzeigen(lauf, 'Schließen Sie die Anmeldung im Meta-Fenster ab. Bei blockiertem Popup erlauben Sie Popups für diese Seite und starten erneut.');
+    lauf.timer=setTimeout(() => abbrechen(lauf), 9 * 60 * 1000);
     try {
       FB.login(antwort => {
-        if (!aktiv || kennung !== lauf) return;
+        if (!gilt(lauf) || !lauf.aktiv) return;
         const wert=antwort && antwort.authResponse && antwort.authResponse.code;
-        if (typeof wert !== 'string' || !wert || wert.length > 4096) { abbrechen(); return; }
-        code=wert;
-        clearTimeout(timer); timer=setTimeout(() => { abbrechen(); }, 20000);
-        abschliessen();
+        if (typeof wert !== 'string' || !wert || wert.length > 4096) { abbrechen(lauf); return; }
+        lauf.code=wert;
+        clearTimeout(lauf.timer); lauf.timer=setTimeout(() => abbrechen(lauf), 20000);
+        abschliessen(lauf);
       }, {config_id:konfiguration.configId, response_type:'code', override_default_response_type:true,
-          extras:{setup:{}, featureType:'whatsapp_business_app_onboarding'}});
-    } catch { abbrechen().then(() => anzeigen('Meta-Anmeldung konnte nicht geöffnet werden. Bitte die Seite neu laden und Popups erlauben.')); }
+          extras:{setup:{}, featureType:'whatsapp_business_app_onboarding', sessionInfoVersion:'3'}});
+    } catch { abbrechen(lauf, 'Meta-Anmeldung konnte nicht geöffnet werden. Bitte die Seite neu laden und Popups erlauben.'); }
   });
-  el('abbruch').addEventListener('click', abbrechen);
-  el('status').addEventListener('click', async () => {
-    try { if (kennung) ergebnisAnzeigen(await anfrage('status')); } catch (fehler) { anzeigen(fehler.message); }
-  });
+  el('abbruch').addEventListener('click', () => abbrechen(aktuell));
+  const statusPruefen = async (lauf, initial=false) => {
+    const anzeige = ++lauf.anzeige;
+    try {
+      if (!lauf.kennung) return;
+      const ergebnis = await anfrage(lauf, 'status');
+      if (!gilt(lauf) || lauf.anzeige !== anzeige) return;
+      ergebnisAnzeigen(lauf, ergebnis);
+      if (initial) beenden(lauf);
+    } catch (fehler) {
+      if (!gilt(lauf) || lauf.anzeige !== anzeige) return;
+      if (initial) vorbereiten(); else anzeigen(lauf, fehler.message);
+    }
+  };
+  el('status').addEventListener('click', () => statusPruefen(aktuell));
   el('fortsetzen').addEventListener('click', async () => {
-    el('fortsetzen').hidden=true; anzeigen('Kontoabonnement wird erneut geprüft …');
-    try { ergebnisAnzeigen(await anfrage('fortsetzen')); } catch (fehler) { anzeigen(fehler.message); }
+    if (el('fortsetzen').hidden) return;
+    const lauf = wechseln(aktuell.kennung);
+    el('fortsetzen').hidden=true; el('start').disabled=true; el('abbruch').hidden=false;
+    anzeigen(lauf, 'Kontoabonnement wird erneut geprüft …');
+    try { ergebnisAnzeigen(lauf, await anfrage(lauf, 'fortsetzen')); }
+    catch (fehler) { anzeigen(lauf, fehler.message); }
+    finally { beenden(lauf); }
   });
-  const ladeTimer=setTimeout(() => anzeigen('Meta-Anmeldung lädt nicht. Bitte Verbindung und Browser-Schutz prüfen.'), 15000);
+  const laden = aktuell;
+  const ladeTimer=setTimeout(() => {
+    if (!sdkBereit) anzeigen(laden, 'Meta-Anmeldung lädt nicht. Bitte Verbindung und Browser-Schutz prüfen.');
+  }, 15000);
   window.fbAsyncInit = () => {
+    if (sdkBereit) return;
     clearTimeout(ladeTimer);
     try {
       FB.init({appId:konfiguration.appId, autoLogAppEvents:false, xfbml:false, version:konfiguration.version});
-      if (kennung) {
-        anfrage('status').then(ergebnis => {
-          ergebnisAnzeigen(ergebnis);
-          el('start').textContent='Neuen Anschluss vorbereiten'; el('start').disabled=false;
-        }).catch(() => vorbereiten());
-      } else vorbereiten();
-    } catch { anzeigen('Meta-SDK konnte nicht initialisiert werden. Bitte später erneut versuchen.'); }
+      sdkBereit=true;
+      if (!gilt(laden)) return;
+      if (aktuell.kennung) { beenden(aktuell); statusPruefen(aktuell, true); } else vorbereiten();
+    } catch { anzeigen(laden, 'Meta-SDK konnte nicht initialisiert werden. Bitte später erneut versuchen.'); }
   };
   const sdk=document.createElement('script'); sdk.src='https://connect.facebook.net/de_DE/sdk.js'; sdk.async=true;
-  sdk.onerror=() => { clearTimeout(ladeTimer); anzeigen('Meta-Anmeldung konnte nicht geladen werden. Bitte Verbindung und Browser-Schutz prüfen.'); };
+  sdk.onerror=() => {
+    clearTimeout(ladeTimer);
+    if (!sdkBereit) anzeigen(laden, 'Meta-Anmeldung konnte nicht geladen werden. Bitte Verbindung und Browser-Schutz prüfen.');
+  };
   document.head.appendChild(sdk);
 }

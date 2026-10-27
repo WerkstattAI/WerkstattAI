@@ -2,6 +2,47 @@
 
 ## Aktueller Stand vom 27. Oktober 2026
 
+**M2, Aufgabe 2: Korrekturen nach der unabhängigen Nachprüfung lokal umgesetzt
+und geprüft. Keine reale Meta-Zulassung oder Coexistence-Betriebsfreigabe.**
+Ausgangspunkt: sauberer Arbeitsbaum und identischer Remote-Commit `841db3f`.
+Eigene Korrekturbranch: `codex/m2-signup-korrekturen-2026-10-27`.
+
+Beide granularen WhatsApp-Berechtigungen müssen nun das ausgewählte Konto
+abdecken. Ein vorhandener uneingeschränkter Scope wird von einem fehlenden
+Eintrag unterschieden. Fremde, leere und fehlerhafte Ziele werden vor dem
+Abonnement zurückgewiesen. Browser-Operationen sind an ihren eigenen Lauf
+gebunden; alte Antworten, Fehler, Timer und Abschlussblöcke überschreiben
+keinen neuen Versuch. Die Anschluss-CSP erlaubt gezielt den tatsächlich
+benötigten SDK-Konfigurationsabruf. Das dokumentierte Session-Schema `"3"`
+wird ausdrücklich angefordert; Signup v4 und strikte Ereignisprüfung bleiben.
+Verbindungsmodell, Verschlüsselung, Versionsschutz und Automatik-Sperren bleiben
+erhalten, insbesondere `coexistence_bereit=0` und der begrenzte M1-Legacy-Pfad.
+
+Neu bestanden: **585/585 Python-Tests**, darunter **elf PostgreSQL-18-Tests**
+auf eigener Wegwerf-Datenbank, ohne übersprungene Tests. Zusätzlich **151/151
+gezielte Python-Tests**, **56/56 JavaScript-Tests**, die drei ursprünglichen
+Zusatzgegenproben und ein Chrome-Test mit echtem lokal ausgeliefertem SDK,
+aktiver CSP und vollständig abgefangenen Browser-Anfragen. Gruppen überlappen.
+Ein anfänglicher falscher Testmodulname verursachte einen dokumentierten
+Importfehler; korrigierter Starter und vollständige Regression bestanden.
+
+Der einmalige `KeyError` im unabhängigen Gesamtprüflauf wurde nicht erneut
+beobachtet. Seine Ursache bleibt mangels damaligem Status/Antwortinhalt offen.
+Verbesserte Assertions liefern jetzt eine sichere Diagnose; eine kontrollierte
+Ablaufgegenprobe belegt nur einen möglichen Antworttyp, keine rückwirkende Ursache.
+Details, Quellen und lokale Testanleitung im
+[Embedded-Signup-Bericht](m2-embedded-signup-2026-10-27.md).
+
+Keine Produktion, echten Nachrichten, Meta-Kontoeinstellungen, Registrierung,
+Rechtevergabe, Merge oder Deployment. Reale Meta-Anmeldung, erfolgreicher Callback
+und Kundennummer bleiben ungeprüft. Aufgabe 3 wurde nicht begonnen.
+
+### Nächste Schritte
+
+1. **Unabhängige Nachprüfung der Korrekturen von Aufgabe 2.**
+
+## Historischer Stand der M2.2-Erstimplementierung vom 27. Oktober 2026
+
 **M2, Aufgabe 2: Die autorisierte Embedded-Signup-Anschlusskette ist lokal
 implementiert und mit simuliertem Meta-HTTP geprüft. Kein realer Kundenanschluss
 und keine Coexistence-Betriebsfreigabe.** Ausgangspunkt war der unabhängig
@@ -41,7 +82,7 @@ Kundennummer wurden nicht geprüft oder verändert. Kein Merge oder Deployment.
 Keine echten Nachrichten, Registrierung oder Rechtevergabe. Aufgabe 3 wurde
 nicht begonnen; Echo-/Historien-/Synchronisierungsschutz bleibt offen.
 
-### Nächste Schritte
+### Damals vorgesehener nächster Schritt (inzwischen unabhängig nachgeprüft)
 
 1. **Unabhängige Nachprüfung des Anschlussprozesses vor Aufgabe 3.**
 

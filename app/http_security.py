@@ -69,7 +69,7 @@ class SecurityHeadersMiddleware:
         if scope["path"] == "/dashboard/whatsapp/verbinden":
             # Nur die Anschlussseite lädt das offizielle SDK. Keine Wildcards.
             csp = csp.replace(f"script-src 'nonce-{nonce}'", f"script-src 'nonce-{nonce}' https://connect.facebook.net")
-            csp = csp.replace("connect-src 'self'", "connect-src 'self' https://www.facebook.com https://web.facebook.com https://graph.facebook.com")
+            csp = csp.replace("connect-src 'self'", "connect-src 'self' https://www.facebook.com https://web.facebook.com https://graph.facebook.com https://connect.facebook.net")
             csp = csp.replace("frame-src 'none'", "frame-src https://www.facebook.com https://web.facebook.com")
 
         async def send_headers(message):

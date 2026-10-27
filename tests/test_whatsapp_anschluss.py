@@ -50,6 +50,23 @@ class AnschlussTests(unittest.TestCase):
         self.assertEqual(antwort.status_code, 200, antwort.text)
         return antwort.json()["kennung"]
 
+    def pruefe_zustand(self, antwort, erwartet):
+        # Nur synthetische Testantworten; auch bei Regressionen Zugangswerte entfernen.
+        inhalt = antwort.text
+        anfrage = json.loads(antwort.request.content or "{}")
+        for geheimnis in (self.cookie, self.meta.token, self.config.whatsapp_app_secret,
+                          anfrage.get("code"), anfrage.get("kennung")):
+            if geheimnis:
+                inhalt = inhalt.replace(geheimnis, "[ENTFERNT]")
+        diagnose = f"HTTP {antwort.status_code}; Antwort: {inhalt[:1500]}"
+        self.assertEqual(antwort.status_code, 200, diagnose)
+        try:
+            daten = antwort.json()
+        except ValueError:
+            self.fail(diagnose)
+        self.assertIsInstance(daten, dict, diagnose)
+        self.assertEqual(daten.get("zustand"), erwartet, diagnose)
+
     def abschluss(self, kennung, **aenderungen):
         daten = dict(kennung=kennung, code="synthetischer-einmalcode-" + kennung, waba_id="333", phone_number_id="444",
             meta_ursprung="https://www.facebook.com", ereignis="FINISH_WHATSAPP_BUSINESS_APP_ONBOARDING")
@@ -87,20 +104,53 @@ class AnschlussTests(unittest.TestCase):
 
     def test_abbruch_ablauf_gefaelschte_und_wiederverwendete_kennung(self):
         kennung = self.start()
-        self.assertEqual(self.post("abbruch", kennung=kennung).json()["zustand"], "abgebrochen")
+        self.pruefe_zustand(self.post("abbruch", kennung=kennung), "abgebrochen")
         self.assertEqual(self.abschluss(kennung).status_code, 409)
         self.assertEqual(self.abschluss("x" * 43).status_code, 409)
         kennung = self.start()
         with db.get_conn() as conn:
             conn.execute("UPDATE whatsapp_anschlussversuche SET ablauf = 0")
             conn.commit()
-        self.assertEqual(self.post("status", kennung=kennung).json()["zustand"], "abgelaufen")
+        self.pruefe_zustand(self.post("status", kennung=kennung), "abgelaufen")
         self.assertEqual(self.abschluss(kennung).status_code, 409)
         self.assertEqual(self.meta.aufrufe, [])
         kennung = self.start()
-        self.assertEqual(self.abschluss(kennung).json()["zustand"], "abgeschlossen")
+        self.pruefe_zustand(self.abschluss(kennung), "abgeschlossen")
         self.assertEqual(self.abschluss(kennung).status_code, 409)
         self.assertEqual(self.meta.aufrufe.count(("GET", "oauth/access_token")), 1)
+
+    def test_beide_granularen_rechte_verlangen_passende_oder_ausdruecklich_alle_ziele(self):
+        for recht in self.meta.debug["scopes"]:
+            for ziele in (["333"], [333], ["999", "333"], "uneingeschraenkt"):
+                with self.subTest(recht=recht, ziele=ziele):
+                    self.meta.debug["granular_scopes"] = [
+                        {"scope": r, "target_ids": ["333"]} for r in self.meta.debug["scopes"]]
+                    eintrag = next(r for r in self.meta.debug["granular_scopes"] if r["scope"] == recht)
+                    if ziele == "uneingeschraenkt":
+                        del eintrag["target_ids"]
+                    else:
+                        eintrag["target_ids"] = ziele
+                    self.pruefe_zustand(self.abschluss(self.start()), "abgeschlossen")
+                    self.assertEqual(verbindungsstatus(self.wid)["coexistence_bereit"], 0)
+
+    def test_fremde_leere_fehlende_und_fehlerhafte_granulare_rechte_stoppen_vor_abonnement(self):
+        for recht in self.meta.debug["scopes"]:
+            for ziele in (["999"], [], None, "333", {"333": True}, [True], [False], [0], [-333],
+                          [333.0], ["333", None], ["333", {}], "fehlend", "widerspruechlich"):
+                with self.subTest(recht=recht, ziele=ziele):
+                    self.meta.aufrufe.clear()
+                    self.meta.debug["granular_scopes"] = [
+                        {"scope": r, "target_ids": ["333"]} for r in self.meta.debug["scopes"]]
+                    eintrag = next(r for r in self.meta.debug["granular_scopes"] if r["scope"] == recht)
+                    if ziele == "fehlend":
+                        self.meta.debug["granular_scopes"].remove(eintrag)
+                    elif ziele == "widerspruechlich":
+                        self.meta.debug["granular_scopes"].append({"scope": recht, "target_ids": []})
+                    else:
+                        eintrag["target_ids"] = ziele
+                    self.pruefe_zustand(self.abschluss(self.start()), "fehlgeschlagen")
+                    self.assertEqual(self.meta.aufrufe, [("GET", "oauth/access_token"), ("GET", "debug_token")])
+                    self.assertFalse(verbindungsstatus(self.wid)["zugang_gespeichert"])
 
     def test_falsche_urspruenge_und_nicht_coexistence_ereignis(self):
         kennung = self.start()
@@ -269,7 +319,12 @@ class AnschlussTests(unittest.TestCase):
         antwort = self.client.get("/dashboard/whatsapp/verbinden")
         self.assertEqual(antwort.status_code, 200)
         csp = antwort.headers["content-security-policy"]
-        self.assertIn("https://connect.facebook.net", csp)
+        regeln = {teile[0]: teile[1:] for regel in csp.split(";") if (teile := regel.strip().split())}
+        self.assertIn("https://connect.facebook.net", regeln["connect-src"])
+        self.assertIn("https://connect.facebook.net", regeln["script-src"])
+        self.assertTrue(any(wert.startswith("'nonce-") for wert in regeln["script-src"]))
+        self.assertEqual(regeln["object-src"], ["'none'"])
+        self.assertEqual(regeln["frame-ancestors"], ["'none'"])
         self.assertNotIn("*", csp)
         self.assertNotIn(self.config.whatsapp_app_secret, antwort.text)
         self.assertNotIn("https://connect.facebook.net", self.client.get("/dashboard/settings").headers["content-security-policy"])

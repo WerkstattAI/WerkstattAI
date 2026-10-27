@@ -15,7 +15,8 @@ class MetaSimulation:
         self.vor_aufruf = None
         self.debug = {"is_valid": True, "app_id": "111", "expires_at": 0, "data_access_expires_at": 0,
             "scopes": ["whatsapp_business_management", "whatsapp_business_messaging"],
-            "granular_scopes": [{"scope": "whatsapp_business_management", "target_ids": ["333"]}]}
+            "granular_scopes": [{"scope": recht, "target_ids": ["333"]}
+                                for recht in ("whatsapp_business_management", "whatsapp_business_messaging")]}
         self.nummern = [{"id": "444"}]
         self.nummer = {"id": "444", "display_phone_number": "+49 000 123", "is_on_biz_app": True, "platform_type": "CLOUD_API"}
 

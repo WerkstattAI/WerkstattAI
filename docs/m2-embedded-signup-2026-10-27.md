@@ -4,6 +4,129 @@ Stand: 27. Oktober 2026. **Die Anschlusskette ist lokal implementiert und mit
 simuliertem Meta-HTTP geprüft. Keine reale Kundennummer, Meta-Zulassung oder
 Coexistence-Betriebsfreigabe. Aufgabe 3 wurde nicht begonnen.**
 
+## Korrekturen nach der unabhängigen Nachprüfung
+
+Ausgangspunkt dieses Korrekturpakets ist `841db3f5e5ef02c9080a74a1b23b790a7d254629`.
+Arbeitsbaum war sauber; `git ls-remote` bestätigte denselben Stand der bisherigen
+Aufgabenbranch. Eigene Korrekturbranch: `codex/m2-signup-korrekturen-2026-10-27`.
+Der unabhängige Prüfbericht und seine Python-/Browser-Reproduktionen wurden gelesen.
+
+1. **Beide kontogebundenen Berechtigungen:** Neben der globalen Scope-Liste müssen
+   `whatsapp_business_management` und `whatsapp_business_messaging` jeweils einen
+   passenden Eintrag in `granular_scopes` haben. Ein vorhandener Eintrag ohne
+   `target_ids` bedeutet gemäß der erneut gelesenen
+   [Token-Dokumentation](https://developers.facebook.com/docs/graph-api/reference/debug_token/)
+   uneingeschränkte Ziele; ein fehlender Eintrag bedeutet keinen Nachweis.
+   Fremde, leere, nullwertige oder fehlerhaft typisierte Ziele und widersprüchliche
+   doppelte Einträge werden vor Nummernabruf und Abonnement abgelehnt. Numerische
+   ID-Strings und dokumentierte positive ganzzahlige IDs sind zulässig, Bool-Werte
+   nicht. Regressionen prüfen beide Berechtigungen getrennt, einschließlich
+   gemischter fehlerhafter Ziellisten. Die Erfolgsfixture weist jetzt beide nach.
+2. **Versuchsgebundene Browser-Antworten:** Jede asynchrone Operation verwendet
+   einen festen Laufbezug mit eigener Kennung. Vorbereitung, Popup-Start, Abbruch
+   und Fortsetzung erzeugen jeweils einen neuen Bezug. Veraltete Antworten,
+   Fehler, `finally`-Blöcke, SDK-Callbacks und Timer können den aktuellen Lauf
+   nicht verändern. Statusantworten dürfen zusätzlich keine neuere Anzeige
+   desselben Laufs überschreiben. Tests halten Antworten kontrolliert zurück,
+   starten einen neuen Versuch und geben alte Erfolge bzw. Fehler erst danach
+   frei. Der neue Versuch bleibt aktiv und wird genau einmal abgeschlossen.
+3. **Gezielte CSP-Ergänzung:** Ausschließlich die Anschlussseite erlaubt jetzt
+   `https://connect.facebook.net` auch in `connect-src`. Nonce, übrige Direktiven
+   und andere Dashboard-Seiten bleiben geschützt. Ein Chrome-Test verwendet die
+   tatsächlich gerenderte Seite samt tatsächlichem CSP-Header und die öffentlichen
+   SDK-Dateien aus der unabhängigen Prüfung vom selben Tag. Alle Browser-Anfragen
+   werden abgefangen: SDK-Dateien lokal ausgeliefert, App-Konfiguration und
+   Startantwort synthetisch beantwortet, übrige Anfragen abgebrochen. Der echte
+   `FB.init`-Abruf passiert die CSP. Gegenproben bestätigen die Sperre für Skripte
+   ohne Nonce, fremde Verbindungsursprünge und SDK-Verbindungen anderer Seiten.
+4. **Session-Schema ausdrücklich angefordert:** `extras.sessionInfoVersion` ist
+   jetzt der String `"3"`, entsprechend der erneut gelesenen
+   [Business-App-Anleitung](https://developers.facebook.com/documentation/business-messaging/whatsapp/embedded-signup/onboarding-business-app-users).
+   Der Empfänger verlangt unverändert die numerische Payload-Version `3` und die
+   exakten erlaubten Ursprünge. Signup v4 wird weiterhin durch die Login-Konfiguration
+   gewählt. Die frühere Behauptung, der Parameter müsse fehlen, wurde korrigiert.
+   Der Browser-Test weist auch nach, dass das echte SDK diesen Wert in den
+   Parametern seiner abgefangenen OAuth-Popup-Anfrage weitergibt. Er belegt keinen
+   erfolgreichen Meta-Login oder tatsächlichen Session-Callback.
+
+Beide Primärquellen wurden vor der Korrektur erneut öffentlich gelesen: Web-Abruf
+HTTP 429, anschließend direkter Dokumentationsabruf mit ausgewiesenem Client
+jeweils HTTP 200. Keine Meta-Anmeldung und keine Graph-API-Nutzung mit Kundenzugang.
+
+### Untersuchung des einmaligen Fehlers im vollständigen Prüflauf
+
+Der unabhängige Lauf auf `841db3f` erfasste 583 Tests: 571 bestanden, elf wegen
+fehlender PostgreSQL-Test-URL übersprungen, ein `KeyError: zustand`. Status und
+Antwortinhalt der betroffenen Abschlussantwort fehlen im damaligen Protokoll.
+Die Ursache kann deshalb nicht rückwirkend sicher bestimmt werden. Dessen
+Gesamtdauer beträgt 33.221,594 Sekunden, also über neun Stunden; daraus folgt
+allein weder ein Sitzungsablauf noch ein Ablauf des konkreten Anschlussversuchs.
+
+Die Assertions des betroffenen Abbruch-/Ablauf-/Wiederverwendungstests prüfen nun
+zuerst HTTP-Status und Antwortstruktur. Bei Abweichungen zeigen sie den begrenzten,
+um synthetische Codes, Kennungen und Zugangswerte bereinigten Antwortinhalt.
+Kein Retry und keine Unterdrückung. Eine zusätzliche kontrollierte Zeitgegenprobe
+lässt erst während der simulierten Tokenprüfung 601 Sekunden verstreichen:
+HTTP 409 mit lokalem Ablaufhinweis, kein Abonnement. Dies erklärt einen möglichen
+Antworttyp ohne `zustand`, beweist aber nicht die Ursache des historischen Fehlers.
+
+### Neue Prüfergebnisse des Korrekturpakets
+
+- **585/585 Python-Tests im vollständigen Lauf bestanden**, keine übersprungenen
+  Tests, Laufzeit 198,358 Sekunden. Darin **elf tatsächlich ausgeführte
+  PostgreSQL-18-Tests**: sechs Anschluss-, vier Verbindungs- und ein allgemeiner
+  Kommunikationstest. Eigene neu angelegte Wegwerf-Datenbank mit temporärem
+  Dateisystem und synthetischen Zugangsdaten; Entfernen von Datenbankcontainer
+  und Testnetz bestätigt. Die übrigen Tests verwenden überwiegend SQLite.
+- **151/151 gezielte Python-Tests unter Windows/Python 3.14.3 bestanden**:
+  Anschluss, Verbindungen, Fehlerdiagnose, Auth-Widerruf, HTTP-Sicherheit,
+  WhatsApp-Zuverlässigkeit, Versand, Recovery und Abschlusszustände. Der frühere
+  Abbruch-/Ablauftest bestand hier und im vollständigen Lauf ohne Wiederholung.
+- **56/56 JavaScript-Tests bestanden**, davon 21 Anschlusstests. Vierzehn neue Fälle
+  prüfen verspätete Erfolge/Fehler aller fünf Operationen, alte Timer/Callbacks,
+  Status-Reihenfolgen und den fortgesetzt genau einmal abschließbaren neuen Versuch.
+  Die abschließenden zwei Fälle sichern außerdem wiederholte Statusprüfungen beim
+  Wiederherstellen und eine verspätete SDK-Initialisierung während der Fortsetzung.
+- **Originale Zusatzreproduktionen bestanden:** ein Python-Gegentest zur fremden
+  Messaging-Zuordnung sowie beide JavaScript-Gegenproben aus der Nachprüfung.
+  Für die JS-Datei wurde lediglich der Quellpfad auf den aktuellen Arbeitsbaum
+  angepasst; ihre Assertions blieben erhalten.
+- **Browser-Prüfung mit echtem SDK und aktiver CSP bestanden**, einschließlich
+  SDK-Konfigurationsabruf, Schemaweitergabe im abgefangenen OAuth-Popup und drei
+  Sicherheitsgegenproben. Keine echte Anmeldung, kein erfolgreicher Meta-Callback.
+- Kontrollierte Ablaufgegenprobe während HTTP: erwartete 409-Antwort und kein
+  Kontoabonnement. Keine behauptete Aufklärung des historischen Einzelfehlers.
+
+Ein erster gezielter Start enthielt versehentlich den nicht vorhandenen Modulnamen
+`test_meta_fehlerdiagnose`: 44 Tests bestanden, ein Importfehler beim zusätzlichen
+Modul. Korrigiert auf `test_whatsapp_fehlerdiagnose`; der anschließende 151er-Lauf
+und der vollständige Lauf bestanden. Dieser Starterfehler wird nicht als grüner
+Testlauf ausgegeben. Keine automatischen Wiederholungen fehlgeschlagener Tests.
+Die Gruppen überschneiden sich und sind nicht zu einer Gesamtsumme zu addieren.
+Echter Meta-HTTP-Transport war in Python gesperrt; die Prüfung nutzt den bestehenden
+simulierten Transport. Diff- und Geheimnisprüfung ohne Befund.
+
+### Lokaler Browser-Vertragsnachweis
+
+`tests/whatsapp_sdk_csp_pruefen.cjs` benötigt die gepinnten Python-Testpakete,
+Playwright, Chrome und zwei separat öffentlich geladene SDK-Dateien im ignorierten
+Prüfordner: `meta-sdk-aktuell.js` von
+`https://connect.facebook.net/de_DE/sdk.js` und `meta-sdk-bundle.js` von
+`https://connect.facebook.net/de_DE/bundle/sdk.js/`. Die verwendeten öffentlichen
+Kopien aus der unabhängigen Prüfung haben folgende SHA-256-Werte:
+
+- SDK: `5f72c146ed1e98c3f73bf2e0e3bac1e303e602d8e7dd6a6741db2b582759b2ca`
+- Bundle: `f0d80dff314a7f423177339063b44e7b549ffa4ef77878a8d6172cb38bce92ba`
+
+Die lokalen Testpfade werden ausschließlich über `WERKSTATTAI_PRUEFSDK_ORDNER`,
+`WERKSTATTAI_PRUEFPLAYWRIGHT`, `WERKSTATTAI_PRUEFCHROME` und optional
+`WERKSTATTAI_PRUEFPYTHON` gesetzt. Keine neuen Anwendungsparameter oder Kundendaten.
+Aufruf vom Projektverzeichnis: `node tests/whatsapp_sdk_csp_pruefen.cjs`.
+Der Test startet selbst eine isolierte SQLite-Fixture, rendert die echten
+Dashboard-Seiten und schließt Browser sowie Fixture anschließend wieder.
+SDK-Kopien, Dokumentationsabrufe, Hilfsstarter und Protokolle verbleiben in
+`artifacts/m2-signup-korrekturen/`, außerhalb von Git und Docker-Images.
+
 ## Ausgangspunkt und Wiederverwendung
 
 Vor Beginn: sauberer Arbeitsbaum auf `codex/m2-korrekturen-2026-10-27`, Commit
@@ -35,7 +158,8 @@ keine App-Konfiguration und kein Graph-API-Aufruf mit echten Zugangsdaten.
 
 - [Embedded Signup v4](https://developers.facebook.com/documentation/business-messaging/whatsapp/embedded-signup/version-4):
   Die produktauswählende Login-for-Business-Konfiguration legt v4 fest. Kein
-  ungeprüft übernommenes `extras.version = v3` oder `sessionInfoVersion = 3`.
+  ungeprüft übernommenes `extras.version = v3`. Die davon unabhängige
+  Session-Schemaversion wird ausdrücklich mit `sessionInfoVersion: "3"` angefordert.
 - [Business-App-Onboarding](https://developers.facebook.com/documentation/business-messaging/whatsapp/embedded-signup/onboarding-business-app-users):
   Für diesen Flow wird `featureType: whatsapp_business_app_onboarding` gesetzt.
   Nur `FINISH_WHATSAPP_BUSINESS_APP_ONBOARDING` kommt als Abschluss infrage;
@@ -183,7 +307,7 @@ und ihre von Meta geforderten Fristen müssen vor einem realen Anschluss gelöst
 Keine Bedingungen angenommen, Rechte vergeben, Nummer registriert, Nachricht
 versendet, Produktion verändert oder Deployment ausgelöst.
 
-## Tatsächlich ausgeführte Prüfungen
+## Historische Prüfungen der Erstimplementierung
 
 - Zuerst gezielte SQLite-Läufe unter Windows/Python 3.14.3: zunächst 22 bestehende
   Verbindungs-/Fehlerdiagnosetests und 20 neue Anschlusstests; nach Ergänzungen
@@ -259,4 +383,4 @@ Fertig ist die lokal implementierte, simuliert geprüfte Anschlusskette. Reale
 Meta-Zulassung, tatsächlicher Browser-/SDK-Durchlauf und Kundenanschluss sind
 **nicht geprüft**. Die vollständige Coexistence-Freigabe bleibt ausgeschlossen.
 
-**Nächster Schritt:** Unabhängige Nachprüfung dieses Anschlussprozesses vor Aufgabe 3.
+**Nächster Schritt:** Unabhängige Nachprüfung der Korrekturen von Aufgabe 2.
