@@ -77,8 +77,7 @@ async def schritt(request: Request, aktion: str):
             elif aktion == "fortsetzen":
                 ergebnis = await run_in_threadpool(anschluss.fortsetzen, *args)
             elif aktion == "abbruch":
-                await run_in_threadpool(anschluss.abbrechen, *args)
-                ergebnis = {"zustand": "abgebrochen", "meldung": anschluss.MELDUNGEN["abgebrochen"]}
+                ergebnis = await run_in_threadpool(anschluss.abbrechen, *args)
             elif aktion == "status":
                 ergebnis = await run_in_threadpool(anschluss.status, *args)
             else:

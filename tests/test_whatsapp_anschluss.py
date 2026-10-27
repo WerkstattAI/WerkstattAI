@@ -433,3 +433,87 @@ class AnschlussTests(unittest.TestCase):
         self.assertEqual(antwort.json()["zustand"], "fehlgeschlagen")
         self.assertNotIn(self.meta.token, antwort.text)
         self.assertFalse(verbindungsstatus(self.wid)["zugang_gespeichert"])
+
+    def test_abbruch_muss_bereits_bestaetigten_abschluss_wahrheitsgemaess_melden(self):
+        kennung = self.start()
+        abgeschlossen, freigeben = threading.Event(), threading.Event()
+        original = anschluss.status
+
+        def antwort_anhalten(*args):
+            ergebnis = original(*args)
+            if ergebnis["zustand"] == "abgeschlossen":
+                abgeschlossen.set()
+                if not freigeben.wait(15):
+                    raise AssertionError("Abschlussantwort nicht freigegeben")
+            return ergebnis
+
+        with patch.object(anschluss, "status", side_effect=antwort_anhalten), ThreadPoolExecutor(max_workers=1) as pool:
+            abschluss = pool.submit(self.abschluss, kennung)
+            try:
+                self.assertTrue(abgeschlossen.wait(10), "Dauerhafter Abschluss nicht erreicht")
+                antwort = self.post("abbruch", kennung=kennung)
+                self.assertEqual(antwort.status_code, 200, antwort.text)
+            finally:
+                freigeben.set()
+            self.assertEqual(abschluss.result(timeout=15).json()["zustand"], "abgeschlossen")
+        wahrer_status = original(self.cookie, self.wid, self.config.whatsapp_signup_origin, kennung)
+        self.assertEqual(wahrer_status["zustand"], "abgeschlossen")
+        self.assertEqual(antwort.json()["zustand"], wahrer_status["zustand"],
+                         "Abbruchantwort widerspricht dem dauerhaft gespeicherten Zustand: " + antwort.text)
+
+    def test_abbruch_vor_dauerhafter_bestaetigung_verhindert_spaeteren_abschluss(self):
+        kennung = self.start()
+        vor_abschluss, freigeben = threading.Event(), threading.Event()
+
+        def abonnement_anhalten(methode, pfad):
+            if methode == "GET" and pfad.endswith("subscribed_apps") and self.meta.abonniert:
+                vor_abschluss.set()
+                if not freigeben.wait(15):
+                    raise AssertionError("Abonnementantwort nicht freigegeben")
+
+        self.meta.vor_aufruf = abonnement_anhalten
+        with ThreadPoolExecutor(max_workers=1) as pool:
+            abschluss = pool.submit(self.abschluss, kennung)
+            try:
+                self.assertTrue(vor_abschluss.wait(10), "Haltepunkt vor dauerhafter Bestätigung nicht erreicht")
+                antwort = self.post("abbruch", kennung=kennung)
+                self.pruefe_zustand(antwort, "abgebrochen")
+            finally:
+                freigeben.set()
+            spaete_antwort = abschluss.result(timeout=15)
+            self.assertEqual(spaete_antwort.status_code, 409, spaete_antwort.text)
+        self.pruefe_zustand(self.post("status", kennung=kennung), "abgebrochen")
+        verbindung = verbindungsstatus(self.wid)
+        self.assertEqual((verbindung["version"], verbindung["autorisierung"], verbindung["coexistence_bereit"]),
+                         (1, "unbestaetigt", 0))
+        self.assertTrue(anschluss.automatik_gesperrt(self.wid))
+        with self.assertRaises(VerbindungsFehler):
+            zugang_fuer_werkstatt(self.wid)
+
+    def test_spaeter_abbruch_achtet_widerruf_und_neuanschluss_ohne_zugangsaenderung(self):
+        kennung = self.start()
+        self.pruefe_zustand(self.abschluss(kennung), "abgeschlossen")
+
+        def verbindung_lesen():
+            with db.get_conn() as conn:
+                return dict(conn.execute("SELECT * FROM whatsapp_verbindungen WHERE workshop_id = ?", (self.wid,)).fetchone())
+
+        for schritt in ("bestaetigt", "widerrufen", "neu_angeschlossen"):
+            with self.subTest(schritt=schritt):
+                if schritt == "widerrufen":
+                    widerrufe_verbindung(self.wid, erwartete_version=2)
+                elif schritt == "neu_angeschlossen":
+                    self.pruefe_zustand(self.abschluss(self.start()), "abgeschlossen")
+                vorher = verbindung_lesen()
+                erwartet = "abgeschlossen" if schritt == "bestaetigt" else "ueberholt"
+                antwort = self.post("abbruch", kennung=kennung)
+                self.pruefe_zustand(antwort, erwartet)
+                self.assertEqual(antwort.json(), self.post("status", kennung=kennung).json())
+                self.assertEqual(verbindung_lesen(), vorher)
+                self.assertFalse(antwort.json()["coexistence_bereit"])
+                self.assertTrue(anschluss.automatik_gesperrt(self.wid))
+                if schritt == "widerrufen":
+                    with self.assertRaises(VerbindungsFehler):
+                        zugang_fuer_werkstatt(self.wid)
+                else:
+                    self.assertEqual(zugang_fuer_werkstatt(self.wid).token, self.meta.token)

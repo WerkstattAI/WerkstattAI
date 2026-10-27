@@ -1,6 +1,50 @@
 # WerkstattAI – Projektstand und nächste Schritte
 
-## Aktueller Stand vom 27. Oktober 2026
+## Aktueller Stand vom 28. Oktober 2026
+
+**M2, Aufgabe 2: Der nachgewiesene Fehler beim späten Abbruch ist korrigiert.**
+Ausgangspunkt war `e67ea2ea70ebf8926add448900880bd1521f39b4`, lokal und remote
+identisch bei sauberem Arbeitsbaum. Die vorherigen Korrekturen wurden unabhängig
+bestätigt. Eigene Branch: `codex/m2-signup-abbruch-2026-10-28`.
+
+Abbruchdienst und Route liefern jetzt den tatsächlich in der gemeinsamen
+Transaktion ermittelten Status. Gewinnt der Abbruch vor der dauerhaften
+Bestätigung, bleibt der Versuch abgebrochen und ein späterer Abschluss gesperrt.
+Ist der Anschluss bereits committed, meldet auch die Abbruchantwort den
+abgeschlossenen Anschluss. Bereits bestätigte Zugänge werden nicht verändert
+oder stillschweigend widerrufen. Nach Widerruf oder Neuanschluss liefert die
+vorhandene Versionsprüfung für einen alten Abschluss weiterhin `ueberholt`.
+
+Die Oberfläche übernimmt den maßgeblichen Ausgang der Abbruchanfrage; ihre
+vorhandene Laufbindung schützt weiterhin vor alten Antworten. Zwei neue
+Frontend-Regressionen prüfen den sichtbaren Abschluss sowie eine verspätete
+Abbruchantwort nach Start eines neuen Versuchs. Die unabhängige Gegenprobe
+wurde mit unverändertem Methodenrumpf und unveränderten Assertions übernommen.
+Beide Abbruch-/Abschlussreihenfolgen werden mit Events kontrolliert, zusätzlich
+auch unter PostgreSQL. Ein weiterer Test prüft Widerruf und Neuanschluss ohne
+unbeabsichtigte Änderung von Verbindung oder Zugang.
+
+Neu bestanden: **591/591 Python-Tests**, darin **14 PostgreSQL-18-Tests** auf
+eigener leerer Wegwerf-Datenbank, ohne übersprungene Tests. Zusätzlich **56/56
+gezielte Anschluss-/Auth-/Versionsregressionen** und **58/58 JavaScript-Tests**.
+Beide Abbruch-/Abschlussreihenfolgen sowie Widerruf/Neuanschluss wurden auf SQLite
+und PostgreSQL geprüft. Gruppen überlappen; keine automatischen Wiederholungen.
+Testdatenbank und Testnetz wurden entfernt, Diff- und Geheimnisprüfung ohne Befund.
+Der unveränderte Chrome-/SDK-Vertragsnachweis wurde hier nicht erneut ausgeführt.
+Details stehen im [Embedded-Signup-Bericht](m2-embedded-signup-2026-10-27.md).
+Lokale Prüfartefakte bleiben außerhalb von Git und Docker-Images.
+
+`coexistence_bereit=0`, Automatik-Sperren, verschlüsselte Zugangsspeicherung,
+Einmalcodes und HTTP außerhalb von Datenbanksperren bleiben erhalten. Reales
+Meta-Onboarding und produktive Coexistence bleiben ungeprüft. Keine Produktion,
+echten Nachrichten, Kontoeinstellungen, Registrierung, Merge oder Deployment.
+Aufgabe 3 wurde nicht begonnen.
+
+### Nächste Schritte
+
+1. **Unabhängige Nachprüfung dieser letzten Korrektur vor Abschluss von Aufgabe 2.**
+
+## Historischer Stand nach den M2.2-Korrekturen vom 27. Oktober 2026
 
 **M2, Aufgabe 2: Korrekturen nach der unabhängigen Nachprüfung lokal umgesetzt
 und geprüft. Keine reale Meta-Zulassung oder Coexistence-Betriebsfreigabe.**
@@ -37,7 +81,7 @@ Keine Produktion, echten Nachrichten, Meta-Kontoeinstellungen, Registrierung,
 Rechtevergabe, Merge oder Deployment. Reale Meta-Anmeldung, erfolgreicher Callback
 und Kundennummer bleiben ungeprüft. Aufgabe 3 wurde nicht begonnen.
 
-### Nächste Schritte
+### Damals vorgesehener nächster Schritt (inzwischen unabhängig nachgeprüft)
 
 1. **Unabhängige Nachprüfung der Korrekturen von Aufgabe 2.**
 

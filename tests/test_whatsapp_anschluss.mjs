@@ -96,6 +96,47 @@ test('Code vor Session-Ereignis und Popup-Zeitlimit bleiben kontrolliert', async
 });
 
 const antwort = (daten, ok=true) => ({ok, json:async()=>daten});
+for (const neustart of [false,true]) {
+  test(`Abbruch nach Commit zeigt den tatsächlichen Abschluss; neuer Versuch: ${neustart}`, async()=>{
+    let alterAbschluss, alterAbbruch, nummer=0, abschluesse=0;
+    const meldung='Zugang autorisiert. Automatik bleibt bis zum Echo- und Synchronisierungsschutz gesperrt.';
+    const s=seite({transport:async url=>{
+      if (url.endsWith('/start')) return antwort({kennung:String(++nummer).repeat(43),meldung:'Bereit'});
+      if (url.endsWith('/abschluss') && ++abschluesse === 1)
+        return new Promise(resolve=>{alterAbschluss=()=>resolve(antwort({zustand:'abgeschlossen',meldung:'Verspätete Abschlussantwort'}));});
+      if (url.endsWith('/abbruch')) {
+        const ergebnis={zustand:'abgeschlossen',meldung,fortsetzbar:false,coexistence_bereit:false};
+        if (neustart) return new Promise(resolve=>{alterAbbruch=()=>resolve(antwort(ergebnis));});
+        return antwort(ergebnis);
+      }
+      return antwort({zustand:'abgeschlossen',meldung});
+    }});
+    s.kontext.window.fbAsyncInit();await abwarten();s.ereignisse.get('start:click')();
+    s.callback({authResponse:{code:'synthetisch-alt'}});
+    s.ereignisse.get('message')({origin:'https://www.facebook.com',data:daten});await abwarten();
+    assert.equal(s.element('abbruch').hidden,false);
+    const abbruch=s.ereignisse.get('abbruch:click')();
+    if (neustart) {
+      s.ereignisse.get('start:click')();await abwarten();s.ereignisse.get('start:click')();
+      const aktuellerText=s.element('fortschritt').textContent;
+      alterAbbruch();await abbruch;alterAbschluss();await abwarten();
+      assert.equal(s.element('fortschritt').textContent,aktuellerText);
+      assert.equal(s.element('start').disabled,true);
+      s.ereignisse.get('message')({origin:'https://www.facebook.com',data:daten});
+      s.callback({authResponse:{code:'synthetisch-neu'}});await abwarten();
+      s.callback({authResponse:{code:'synthetisch-neu'}});await abwarten();
+      assert.equal(s.aufrufe.filter(a=>a[0].endsWith('/abschluss') && a[1].kennung==='2'.repeat(43)).length,1);
+    } else {
+      await abbruch;
+      assert.equal(s.element('fortschritt').textContent,meldung);
+      alterAbschluss();await abwarten();
+    }
+    assert.equal(s.element('fortschritt').textContent,meldung);
+    assert.equal(s.element('fortsetzen').hidden,true);
+    assert.equal(s.element('abbruch').hidden,true);
+  });
+}
+
 for (const aktion of ['abschluss','abbruch','status','fortsetzen','start']) {
   for (const erfolg of [true,false]) {
     test(`Verspätete ${aktion}-Antwort (${erfolg ? 'Erfolg' : 'Fehler'}) verändert keinen neuen Popup-Versuch`, async()=>{

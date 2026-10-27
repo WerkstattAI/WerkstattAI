@@ -125,18 +125,22 @@ def starte(cookie, wid, ursprung):
     return {"kennung": kennung, "zustand": "offen", "meldung": MELDUNGEN["offen"]}
 
 
-def status(cookie, wid, ursprung, kennung):
-    with atomic_database() as conn:
-        versuch = _versuch(conn, cookie, wid, ursprung, kennung)
-        zustand = versuch["zustand"]
-        if versuch["ablauf"] <= int(time.time()) and zustand not in {"abgeschlossen", "abgebrochen", "fehlgeschlagen"}:
-            zustand = "abgelaufen"
-            _zustand(conn, versuch, zustand)
-        aktuell = _version(conn, wid) == versuch["version"]
-        if zustand == "abgeschlossen" and not aktuell:
-            zustand = "ueberholt"
+def _status_ergebnis(conn, wid, versuch):
+    """Status innerhalb der bereits berechtigten und gesperrten Transaktion ermitteln."""
+    zustand = versuch["zustand"]
+    if versuch["ablauf"] <= int(time.time()) and zustand not in {"abgeschlossen", "abgebrochen", "fehlgeschlagen"}:
+        zustand = "abgelaufen"
+        _zustand(conn, versuch, zustand)
+    aktuell = _version(conn, wid) == versuch["version"]
+    if zustand == "abgeschlossen" and not aktuell:
+        zustand = "ueberholt"
     return {"zustand": zustand, "meldung": MELDUNGEN[zustand], "diagnose": versuch["diagnose"],
             "fortsetzbar": zustand == "teilfehler" and aktuell, "coexistence_bereit": False}
+
+
+def status(cookie, wid, ursprung, kennung):
+    with atomic_database() as conn:
+        return _status_ergebnis(conn, wid, _versuch(conn, cookie, wid, ursprung, kennung))
 
 
 def abbrechen(cookie, wid, ursprung, kennung):
@@ -144,6 +148,9 @@ def abbrechen(cookie, wid, ursprung, kennung):
         versuch = _versuch(conn, cookie, wid, ursprung, kennung)
         if versuch["zustand"] != "abgeschlossen":
             _zustand(conn, versuch, "abgebrochen")
+            versuch.update(zustand="abgebrochen", diagnose=None)
+        # Ein bereits bestätigter Zugang bleibt erhalten; auch dessen Version beachten.
+        return _status_ergebnis(conn, wid, versuch)
 
 
 def sitzung_beenden(cookie):

@@ -44,6 +44,10 @@ class PostgreSQLAnschlussTests(unittest.TestCase):
     start = pruefung.AnschlussTests.start
     abschluss = pruefung.AnschlussTests.abschluss
     dienst = pruefung.AnschlussTests.dienst
+    pruefe_zustand = pruefung.AnschlussTests.pruefe_zustand
+    test_abbruch_muss_bereits_bestaetigten_abschluss_wahrheitsgemaess_melden = pruefung.AnschlussTests.test_abbruch_muss_bereits_bestaetigten_abschluss_wahrheitsgemaess_melden
+    test_abbruch_vor_dauerhafter_bestaetigung_verhindert_spaeteren_abschluss = pruefung.AnschlussTests.test_abbruch_vor_dauerhafter_bestaetigung_verhindert_spaeteren_abschluss
+    test_spaeter_abbruch_achtet_widerruf_und_neuanschluss_ohne_zugangsaenderung = pruefung.AnschlussTests.test_spaeter_abbruch_achtet_widerruf_und_neuanschluss_ohne_zugangsaenderung
     test_erfolg_kette_chiffrat_version_und_gesperrte_betriebsbereitschaft = pruefung.AnschlussTests.test_erfolg_kette_chiffrat_version_und_gesperrte_betriebsbereitschaft
     test_zwei_abschluesse_verbrauchen_code_nur_einmal = pruefung.AnschlussTests.test_zwei_abschluesse_verbrauchen_code_nur_einmal
     test_widerruf_waehrend_abonnement_verhindert_verspaeteten_abschluss = pruefung.AnschlussTests.test_widerruf_waehrend_abonnement_verhindert_verspaeteten_abschluss

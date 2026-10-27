@@ -1,8 +1,91 @@
 # M2, Aufgabe 2: Autorisiertes Embedded Signup
 
-Stand: 27. Oktober 2026. **Die Anschlusskette ist lokal implementiert und mit
+Stand: 28. Oktober 2026. **Die Anschlusskette ist lokal implementiert und mit
 simuliertem Meta-HTTP geprüft. Keine reale Kundennummer, Meta-Zulassung oder
 Coexistence-Betriebsfreigabe. Aufgabe 3 wurde nicht begonnen.**
+
+## Letzte Korrektur: Wahrheitsgemäßer später Abbruch am 28. Oktober
+
+Ausgangspunkt: `e67ea2ea70ebf8926add448900880bd1521f39b4`, sauberer Arbeitsbaum
+und identischer Remote-SHA der bisherigen Korrekturbranch. Die unabhängige
+Nachprüfung bestätigte die früheren Korrekturen, 585 Python-Tests einschließlich
+elf PostgreSQL-Tests, 56 JavaScript-Tests und den Browser-Vertragsnachweis.
+Sie wies zusätzlich eine falsche Abbruchantwort nach. Eigene Aufgabenbranch:
+`codex/m2-signup-abbruch-2026-10-28`. Prüfbericht, Gegenprobe und Fehlernachweis
+wurden berücksichtigt; bestehende Arbeit wurde erhalten.
+
+Die Route hatte stets `abgebrochen` zurückgegeben, obwohl der Dienst einen
+bereits bestätigten Anschluss korrekt unverändert ließ. Jetzt gibt der Dienst
+den tatsächlichen Ausgang zurück und die Route reicht genau dieses Ergebnis
+weiter. Die gemeinsame interne Statusauswertung läuft innerhalb derselben
+Transaktion wie Berechtigungsprüfung, Sperren und gegebenenfalls Abbruchschreiben.
+Sie berücksichtigt auch die aktuelle Verbindungsversion.
+
+- **Abbruch vor dauerhaftem Abschluss:** Der Versuch wird `abgebrochen` und die
+  Antwort meldet dies. Eine danach zurückkehrende Meta-Antwort kann den lokalen
+  Anschluss nicht bestätigen. Ein bereits erfolgter externer Schritt wird dadurch
+  nicht rückgängig gemacht; der lokale Entwurf bleibt unautorisiert.
+- **Abbruch nach Commit, vor Auslieferung der Abschlussantwort:** Der Versuch
+  bleibt `abgeschlossen`; die Abbruchantwort meldet den autorisierten Zugang mit
+  weiterhin gesperrter Automatik. Kein stillschweigender Widerruf, kein zusätzlicher
+  Versionswechsel und keine Änderung des gespeicherten Chiffrats.
+- **Zwischenzeitlicher Widerruf oder Neuanschluss:** Ein alter Abschluss wird
+  entsprechend der vorhandenen Statuslogik als `ueberholt` ausgegeben und nicht
+  erneut als aktuell verbunden dargestellt. Das Ergebnis beschreibt den unter
+  den bestehenden Sperren gelesenen Zustand; spätere Änderungen bleiben möglich.
+
+Die Oberfläche zeigt bereits die Antwort des aktuellen Abbruchlaufs an und
+verwirft Antworten älterer Läufe. Daher war keine Änderung am Produkt-JavaScript
+nötig. Neue Frontend-Regressionen sichern den sichtbaren Ausgang: Eine verspätete
+alte Abschlussantwort überschreibt die zutreffende Abbruchantwort nicht; eine
+verspätete Abbruchantwort mit `abgeschlossen` überschreibt ebenso wenig einen
+inzwischen gestarteten neuen Popup-Versuch. Dieser kann genau einmal abschließen.
+
+Die unabhängige Methode
+`test_abbruch_muss_bereits_bestaetigten_abschluss_wahrheitsgemaess_melden`
+wurde unverändert in die bestehende SQLite-Testklasse übernommen; Quellvergleich
+bestätigte identischen Methodenrumpf und identische Assertions. Die PostgreSQL-
+Klasse verwendet dieselbe Methode mit ihrer vorhandenen isolierten Fixture.
+Ein zweiter Test hält die simulierte Abonnementantwort vor dem dauerhaften
+Abschluss an und lässt zuerst den Abbruch gewinnen. Ein weiterer Test prüft
+späten Abbruch vor/nach Widerruf und Neuanschluss einschließlich unveränderter
+Verbindung, Zugangsspeicherung und Automatik-Sperre. Alle drei laufen zusätzlich
+unter PostgreSQL. Events und kontrollierte Haltepunkte ersetzen zufällige Sleeps.
+
+### Prüfergebnisse dieses letzten Korrekturpakets
+
+- **591/591 Python-Tests bestanden**, vollständige Regression ohne übersprungene
+  Tests, Laufzeit 202,869 Sekunden. Darin **14 tatsächlich ausgeführte
+  PostgreSQL-18-Tests**: neun Anschluss-, vier Verbindungs- und ein allgemeiner
+  Kommunikationstest. Beide deterministischen Abbruch-/Abschlussreihenfolgen
+  und der Widerruf-/Neuanschlussfall bestanden auf SQLite und PostgreSQL.
+- **56/56 gezielte Anschluss-/Auth-/Versionsregressionen** unter Windows/Python
+  3.14.3 bestanden. Darin die unverändert übernommene unabhängige Gegenprobe.
+- **58/58 JavaScript-Tests bestanden**, einschließlich der zwei neuen Fälle
+  für späten Abbruch und Schutz des inzwischen gestarteten neuen Versuchs.
+  SDK und `fetch` sind in diesen Frontend-Tests vollständig simuliert.
+- Diff- und Geheimnisprüfung ohne Befund. Alle Läufe bestanden ohne automatische
+  Wiederholung. Die Gruppen überschneiden sich und bilden keine additive Summe.
+
+PostgreSQL lief ausschließlich in einer eigens neu angelegten leeren
+Wegwerf-Datenbank mit temporärem Dateisystem, zufälligem Testpasswort und eigenem
+Testnetz. Nur ausgewählte Quell-/Testdateien wurden eingebunden, keine `.env`
+oder lokalen Daten. Echter HTTP-Transport war im Python-Starter gesperrt.
+Entfernen von Datenbankcontainer und Testnetz wurde bestätigt. Der vollständige
+Lauf ist kein vollständiger Anwendungstest ausschließlich auf PostgreSQL.
+
+Keine beauftragte Python-/JavaScript-Prüfung wurde ausgelassen. Der vorhandene
+Chrome-/SDK-Vertragsnachweis wurde in diesem Backend-Korrekturpaket nicht erneut
+ausgeführt; SDK-, CSP- und Produkt-JavaScript sind unverändert. Sein im unabhängigen
+Prüfbericht bestätigter Nachweis bleibt historisch. Reales Meta-Onboarding,
+Kundenanschluss und produktive Coexistence bleiben ungeprüft.
+
+Lokale Starter und Protokolle liegen ausschließlich im ignorierten und vom
+Docker-Image ausgeschlossenen `artifacts/m2-signup-abbruch/`. Reales Meta-HTTP,
+Kundennummern, Nachrichten, Produktion und Meta-Kontoeinstellungen wurden nicht
+verwendet oder verändert. `coexistence_bereit=0`, alle Automatik-Sperren,
+Einmalcodes, Verschlüsselung und HTTP außerhalb von Datenbanksperren bleiben
+erhalten. Keine neuen Meta-API-Annahmen oder Konfigurationsparameter.
 
 ## Korrekturen nach der unabhängigen Nachprüfung
 
@@ -383,4 +466,4 @@ Fertig ist die lokal implementierte, simuliert geprüfte Anschlusskette. Reale
 Meta-Zulassung, tatsächlicher Browser-/SDK-Durchlauf und Kundenanschluss sind
 **nicht geprüft**. Die vollständige Coexistence-Freigabe bleibt ausgeschlossen.
 
-**Nächster Schritt:** Unabhängige Nachprüfung der Korrekturen von Aufgabe 2.
+**Nächster Schritt:** Unabhängige Nachprüfung dieser letzten Korrektur vor Abschluss von Aufgabe 2.
