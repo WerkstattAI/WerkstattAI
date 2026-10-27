@@ -128,7 +128,9 @@ def speichere_verbindungsentwurf(*, workshop_id: str, waba_id: str, phone_number
                 raise VerbindungsFehler("Die WhatsApp-Verbindung wurde zwischenzeitlich geändert.")
             conn.execute("UPDATE workshops SET whatsapp_phone_number_id = ?, whatsapp_display_phone_number = ? WHERE id = ?",
                          (nummer, normalisiere_nummernwert(anzeigenummer), workshop_id))
-            conn.execute("""INSERT INTO whatsapp_verbindungen
+            # Der Widerruf kann nach dem Lesen der Version bereits bestätigt sein.
+            # Deshalb entscheidet erst der bedingte Schreibvorgang über den Erfolg.
+            ergebnis = conn.execute("""INSERT INTO whatsapp_verbindungen
                 (workshop_id, waba_id, phone_number_id, anzeigenummer, herkunft, autorisierung, zustand,
                  coexistence_bereit, version, zugang_verschluesselt)
                 VALUES (?, ?, ?, ?, 'interner_entwurf', 'unbestaetigt', 'vorbereitet', 0, ?, ?)
@@ -136,8 +138,13 @@ def speichere_verbindungsentwurf(*, workshop_id: str, waba_id: str, phone_number
                 phone_number_id = excluded.phone_number_id, anzeigenummer = excluded.anzeigenummer,
                 herkunft = excluded.herkunft, autorisierung = excluded.autorisierung, zustand = excluded.zustand,
                 coexistence_bereit = 0, version = excluded.version,
-                zugang_verschluesselt = excluded.zugang_verschluesselt, updated_at = CURRENT_TIMESTAMP""",
-                (workshop_id, konto, nummer, normalisiere_nummernwert(anzeigenummer), version, geheimnis))
+                zugang_verschluesselt = excluded.zugang_verschluesselt, updated_at = CURRENT_TIMESTAMP
+                WHERE whatsapp_verbindungen.version = ?""",
+                (workshop_id, konto, nummer, normalisiere_nummernwert(anzeigenummer), version, geheimnis,
+                 erwartete_version))
+            if ergebnis.rowcount != 1:
+                # Die gesamte Transaktion einschließlich Nummernreservierung rollt zurück.
+                raise VerbindungsFehler("Die WhatsApp-Verbindung wurde zwischenzeitlich geändert.")
     except VerbindungsFehler:
         raise
     except Exception:

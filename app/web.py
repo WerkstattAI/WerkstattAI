@@ -49,6 +49,7 @@ from app.tickets import (
     validate_workshop_message,
 )
 from app.whatsapp import (
+    bereinigte_meta_fehlercodes,
     list_whatsapp_conversations,
     list_whatsapp_messages,
     save_whatsapp_message,
@@ -471,15 +472,11 @@ def _meta_send_error(send_result: Any) -> str:
             f"Meta-Status geprüft wurde. Technischer Hinweis: {technical_detail}"
         )
 
-    payload = send_result.payload if isinstance(getattr(send_result, "payload", None), dict) else {}
-    meta_error = payload.get("error") if isinstance(payload, dict) else None
-    if isinstance(meta_error, dict):
-        message = str(meta_error.get("message") or "").strip()
-        code = str(meta_error.get("code") or "").strip()
-        if message and code:
-            return f"{message} (Meta-Code {code})"
-        if message:
-            return message
+    codes = bereinigte_meta_fehlercodes(getattr(send_result, "payload", None))
+    if codes:
+        diagnose = ", ".join(f"{bezeichnung} {codes[feld]}" for feld, bezeichnung in
+                             (("code", "Meta-Code"), ("error_subcode", "Meta-Subcode")) if feld in codes)
+        return f"Meta hat die WhatsApp-Nachricht abgelehnt. ({diagnose})"
 
     return str(getattr(send_result, "error", "") or "Meta hat die WhatsApp-Nachricht abgelehnt.").strip()
 

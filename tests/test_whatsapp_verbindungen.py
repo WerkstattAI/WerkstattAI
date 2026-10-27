@@ -147,10 +147,18 @@ class VerbindungsTests(unittest.TestCase):
         with self.assertRaisesRegex(verbindungen.VerbindungsFehler, "widerrufen"):
             verbindungen.zugang_fuer_werkstatt(self.wid)
         with self.assertRaises(verbindungen.VerbindungsFehler):
-            self.entwurf(version=version)
+            self.entwurf(nummer="veraltete-nummer", version=version)
         with self.assertRaises(verbindungen.VerbindungsFehler):
             verbindungen.widerrufe_verbindung(self.wid, erwartete_version=version)
         self.assertFalse(verbindungen.verbindungsstatus(self.wid)["zugang_gespeichert"])
+        self.assertEqual(get_workshop(self.wid)["whatsapp_phone_number_id"], "nummer-a")
+        self.assertEqual(verbindungen.verbindungsstatus(self.wid)["version"], version + 1)
+        self.assertEqual(self.entwurf(nummer="neue-nummer", version=version + 1), version + 2)
+        with self.assertRaises(verbindungen.VerbindungsFehler):
+            verbindungen.widerrufe_verbindung(self.wid, erwartete_version=version + 1)
+        self.assertEqual(get_workshop(self.wid)["whatsapp_phone_number_id"], "neue-nummer")
+        self.assertTrue(verbindungen.verbindungsstatus(self.wid)["zugang_gespeichert"])
+        self.assertFalse(verbindungen.verbindungsstatus(self.wid)["versand_bereit"])
 
     def test_bestaetigung_ohne_zugang_und_geaenderte_version_sperren_versand(self):
         synthetische_verbindung(self.wid, "nummer-a")

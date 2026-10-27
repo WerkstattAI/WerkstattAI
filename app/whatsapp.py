@@ -954,6 +954,30 @@ def _post_graph_api_json(
         return response.status, parsed if isinstance(parsed, dict) else {}
 
 
+def bereinigte_meta_fehlercodes(payload: Any) -> dict[str, int]:
+    """Nur numerische Diagnosefelder übernehmen; auch bool ist kein Fehlercode."""
+    fehler = payload.get("error") if isinstance(payload, dict) else None
+    if not isinstance(fehler, dict):
+        return {}
+    return {feld: fehler[feld] for feld in ("code", "error_subcode")
+            if type(fehler.get(feld)) is int and fehler[feld] >= 0}
+
+
+def _meta_http_fehler(fehler: urllib.error.HTTPError) -> WhatsAppSendResult:
+    """Fremde Texte, Header und URLs weder weitergeben noch protokollieren."""
+    codes = {}
+    try:
+        with fehler:
+            inhalt = fehler.read(65537)
+        if len(inhalt) <= 65536:
+            codes = bereinigte_meta_fehlercodes(json.loads(inhalt))
+    except Exception:
+        # Auch bei unlesbarer Antwort bleibt der bestätigte HTTP-Status erhalten.
+        pass
+    return WhatsAppSendResult(False, fehler.code, None, {"error": codes} if codes else {},
+                              f"Meta API HTTP {fehler.code}")
+
+
 def send_whatsapp_text_message(
     *,
     phone_number_id: str,
@@ -1007,13 +1031,7 @@ def send_whatsapp_text_message(
             payload=payload,
         )
     except urllib.error.HTTPError as exc:
-        return WhatsAppSendResult(
-            False,
-            exc.code,
-            None,
-            {},
-            f"Meta API HTTP {exc.code}",
-        )
+        return _meta_http_fehler(exc)
     except Exception:
         return WhatsAppSendResult(False, None, None, {}, "Der Meta-Versand konnte nicht bestätigt werden.")
 
@@ -1088,13 +1106,7 @@ def send_whatsapp_template_message(
             payload=payload,
         )
     except urllib.error.HTTPError as exc:
-        return WhatsAppSendResult(
-            False,
-            exc.code,
-            None,
-            {},
-            f"Meta API HTTP {exc.code}",
-        )
+        return _meta_http_fehler(exc)
     except Exception:
         return WhatsAppSendResult(False, None, None, {}, "Der Meta-Versand konnte nicht bestätigt werden.")
 

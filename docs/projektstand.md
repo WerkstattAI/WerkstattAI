@@ -2,6 +2,43 @@
 
 ## Aktueller Stand vom 27. Oktober 2026
 
+**Zwei unabhängig gefundene Fehler in M2, Aufgabe 1 sind lokal korrigiert;
+die unabhängige Nachprüfung steht aus. Aufgabe 2 wurde nicht begonnen.**
+Ausgangsstand war der saubere Commit `59252bb` der bisherigen M2-Branch,
+nach Abruf der Remote-Referenzen unverändert. Die Korrekturen liegen auf
+`codex/m2-korrekturen-2026-10-27`.
+
+Ein bereits gelesener Verbindungsentwurf konnte durch bedingungsloses Schreiben
+einen inzwischen bestätigten Widerruf überschreiben. Der Entwurf prüft jetzt
+die Version atomar beim Schreiben und die betroffene Zeilenzahl, wie bereits
+der Widerruf. Ein Konflikt rollt auch die Nummern-/Anzeigenummernänderung zurück.
+Ein späterer bewusster Neuanschluss mit aktueller Version bleibt möglich.
+
+Die HTTP-Fehlerbereinigung hatte auch sichere Meta-Codes entfernt. Text und
+Vorlagen übernehmen jetzt gemeinsam nur streng ganzzahlige Codes und Subcodes;
+Providertexte, Rohantworten, Header und URLs werden verworfen. Die Oberfläche
+zeigt die Codes mit lokalem Text. HTTP-Status und Unknown-Semantik bleiben erhalten.
+
+Neu bestanden: zuerst **22 SQLite-Tests** unter Windows/Python 3.14.3, danach
+**4 PostgreSQL-18-Verbindungstests** unter Python 3.12.13, darunter drei
+deterministisch koordinierte Konkurrenztests. Anschließend bestanden
+**396 Kommunikations-/Sicherheitsprüfungen** unter Python 3.12.13 einschließlich
+des bestehenden PostgreSQL-Kommunikationstests; keine übersprungenen Tests.
+Die Gruppen überschneiden sich bei fünf Fehlerdiagnosetests. Der
+[M2.1-Bericht](m2-verbindungsmodell-2026-10-27.md) trennt diese Nachweise von den
+historischen Zahlen der Erstimplementierung. Ausschließlich synthetische Daten
+und isolierte Wegwerf-Datenbanken; echter HTTP-Transport in Tests gesperrt.
+Datenbanken und Testnetze wurden entfernt. Diff- und Geheimnisprüfung ohne Befund.
+Keine Produktion, Meta-Aufrufe, realen Nachrichten, Registrierung, Merge oder
+Deployment. Die bisherigen M1-Nachweise bleiben unverändert.
+
+### Nächste Schritte
+
+1. **Unabhängige Nachprüfung beider Korrekturen vor Aufgabe 2.** Embedded Signup
+   und weitere M2-Arbeiten erst danach fortsetzen; hier nicht automatisch beginnen.
+
+## Historischer Stand der M2.1-Erstimplementierung vom 27. Oktober 2026
+
 **M2, Aufgabe 1 ist lokal umgesetzt: Verbindungsmodell und werkstattgebundener
 Zugang. Kein echter Kundenanschluss und keine Coexistence-Freigabe.**
 Die additive Migration sichert eindeutige Nummernreservierungen auch auf
@@ -28,7 +65,7 @@ Nachrichten verwendet und kein Deployment durchgeführt. Die Änderungen
 liegen auf der eigenen Branch `codex/m2-verbindungsmodell-2026-10-27`.
 Der zuvor dokumentierte M1-Abschluss bleibt bestehen.
 
-### Nächste Schritte
+### Damals vorgesehene Folgeschritte (vor der unabhängigen Prüfung)
 
 1. **Den serverseitig verifizierten Meta-Onboarding-Ablauf implementieren.**
    Den angemeldeten Werkstattinhaber und die von Meta bestätigten Assets

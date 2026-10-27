@@ -1,8 +1,9 @@
 # M2.1: Verbindungsmodell und werkstattgebundener Zugang
 
-Stand: 27. Oktober 2026. **Aufgabe 1 lokal implementiert; kein Kundenanschluss
-und keine Coexistence-Freigabe.** Embedded Signup und verifizierte Übernahme von
-Meta-Ergebnissen gehören ausdrücklich zum nächsten Arbeitsschritt.
+Stand: 27. Oktober 2026, nach Korrektur zweier unabhängiger Prüfbefunde.
+**Aufgabe 1 lokal implementiert; unabhängige Nachprüfung steht aus. Kein
+Kundenanschluss und keine Coexistence-Freigabe.** Aufgabe 2 und Embedded Signup
+werden erst nach dieser Nachprüfung weiterverfolgt.
 
 ## Ausgangspunkt und wiederverwendete Funktionen
 
@@ -50,8 +51,9 @@ Werkstattverbindungen besitzen.
 - Interne Entwürfe speichern Zugang und Reservierung atomar, bleiben aber
   `unbestaetigt`/`vorbereitet`, Coexistence bleibt gesperrt. Es existiert kein
   HTTP-Endpunkt und keine Produktfunktion zur synthetischen Bestätigung.
-- Änderungen vergleichen die erwartete Version unter Werkstattsperre;
-  Widerruf erhöht die Version und entfernt den verschlüsselten Zugang.
+- Änderungen vergleichen die erwartete Version unter Werkstattsperre und
+  nochmals atomar beim Schreiben der Verbindung. Beide Schreibwege prüfen die
+  betroffene Zeilenzahl; Widerruf erhöht die Version und entfernt den verschlüsselten Zugang.
   Die Nummernreservierung bleibt erhalten. Ein künftiger Wechsel des
   Eigentümers braucht einen eigenen verifizierten Ablauf.
 
@@ -136,7 +138,10 @@ Die produktive Zuordnung wurde in dieser Aufgabe nicht erneut abgefragt;
 deren vorheriger Nachweis bleibt im M1-Bericht. Legacy ist hier synthetisch,
 nicht nochmals gegen Meta oder die Produktionsdatenbank geprüft.
 
-## Tatsächlich ausgeführte Prüfungen
+## Historische Prüfungen der Erstimplementierung (Commit `59252bb`)
+
+Die folgenden Zahlen gehören zur Erstimplementierung und wurden nicht als
+neuer Gesamtlauf der Korrekturen wiederholt. Deren neue Nachweise stehen unten.
 
 **544 von 544 Python-Tests bestanden**, Python 3.12.13 mit den gepinnten
 Anwendungs-/Testabhängigkeiten; keine übersprungenen Tests. Darin tatsächlich
@@ -184,6 +189,104 @@ Diff und neue Dateien wurden auf Secret-Muster und gegen vorhandene lokale
 Secretwerte geprüft. Keine Schlüssel, Kundendaten oder Prüfartefakte werden
 versioniert. Die übrigen Branches blieben unverändert.
 
+## Korrekturen nach unabhängiger Prüfung am 27. Oktober 2026
+
+Ausgangsbranch und Arbeitsbaum wurden erneut geprüft: sauberer Stand
+`59252bb465d1826d61334ceedec813a5b7e02479`, nach `git fetch origin` identisch
+mit `origin/codex/m2-verbindungsmodell-2026-10-27`. Die Korrekturen liegen
+auf `codex/m2-korrekturen-2026-10-27`; kein Rücksetzen auf `master`.
+Der externe Reproduktionscode wurde gelesen, aber weder übernommen noch
+gegen eine bestehende Datenbank ausgeführt.
+
+### Versionskonflikt zwischen Entwurf und Widerruf
+
+Ursache: Die Werkstattsperre des Entwurfs schützt nicht gegen den Widerruf,
+der nur die Verbindung aktualisiert. Das anschließende bedingungslose
+`ON CONFLICT DO UPDATE` konnte einen inzwischen bestätigten Widerruf mit
+derselben Versionsnummer überschreiben und den verschlüsselten Token
+wiederherstellen. Die frühere Parallelprüfung zweier Entwürfe erfasste
+diese Kombination nicht.
+
+Der Entwurf aktualisiert den Konfliktdatensatz jetzt nur bei weiterhin
+passender erwarteter Version. Bei einer Zeilenzahl ungleich eins wird die
+gesamte Transaktion einschließlich der bereits geschriebenen Nummer und
+Anzeigenummer zurückgerollt. Der Widerruf besitzt bereits denselben bedingten
+Versionswechsel mit Zeilenzahlprüfung und bleibt unverändert. Die Version
+steigt nur für einen erfolgreichen Schreibvorgang. Ein bewusster Neuanschluss
+mit der aktuellen Version nach Widerruf bleibt zulässig und unautorisiert.
+Es wurden keine Sperren über HTTP und keine neue dauerhafte Widerrufsperre eingeführt.
+
+Drei zusätzliche PostgreSQL-Tests steuern echte Produktfunktionen und
+Transaktionen mit Thread-Ereignissen: Entwurf nach Versionslesen anhalten,
+Widerruf vollständig bestätigen, alten Entwurf fortsetzen; gestarteten Widerruf
+vor seinem Schreiben anhalten und zuerst den Entwurf bestätigen; zwei Entwürfe
+an der Werkstattsperre geordnet konkurrieren lassen. Es gibt keine zufälligen
+Schlafpausen. Geprüft werden Erfolg/Ablehnung, monotone Versionen, Token und
+Zustand sowie Nummern-/Anzeigenummernbindung. Im ersten Fall wird ausdrücklich
+nachgewiesen, dass die Nummer bereits geschrieben wurde und der Rollback den
+gesamten bestätigten Bestand erhält. SQLite prüft zusätzlich den abgelehnten
+alten Entwurf und den zulässigen späteren Neuanschluss.
+
+### Sichere Meta-Fehlerdiagnose
+
+Ursache: Die bisherige Bereinigung entfernte mit den fremden Antworttexten
+auch den diagnostisch wichtigen Code, etwa `133010`. Text- und Vorlagenversand
+verwenden jetzt dieselbe HTTP-Fehlerbehandlung. Deren explizite Positivliste
+übernimmt ausschließlich `error.code` und `error.error_subcode` als nichtnegative
+Ganzzahlen; boolesche Werte, Strings und Gleitkommazahlen werden abgelehnt.
+Unbekannte Felder, Providertexte, `error_data`, Header und URLs werden verworfen.
+Ungültiges JSON, unlesbare oder über 64 KiB große Antworten führen zur sicheren
+HTTP-Statusmeldung. Der Status bleibt auch bei fehlgeschlagenem Lesen erhalten.
+
+Der Oberflächenformatierer verwendet dieselbe Typprüfung und lokal formulierten
+Text, sodass Code und Subcode auch ohne fremde Meldung sichtbar sind.
+Die Tests prüfen beide Versandarten mit synthetischem HTTP 400, Code `133010`,
+Subcode und Token im Fremdtext bis zum dauerhaften Versandergebnis und
+Oberflächenformatierer. Ergebnis, gespeicherte Nachricht, Ausgabe und
+Anwendungslogs enthalten keinen fremden Text oder Token. Falsche Typen,
+ungültiges JSON, Antwortgrößenlimit und Lesefehler werden zusätzlich geprüft.
+HTTP 400/429/503 und unbekannter Netzwerkstatus behalten ihre Bedeutung;
+die bestehenden Wiederholungs- und Unknown-Tests bleiben maßgeblich.
+
+### Neu ausgeführte Prüfungen der Korrekturen
+
+1. Zuerst **22/22 gezielte SQLite-Tests** unter Windows/Python 3.14.3:
+   `test_whatsapp_verbindungen` (17) und `test_whatsapp_fehlerdiagnose` (5).
+   Die bestehenden Tests gegen Token-Lecks wurden erhalten und mit ausgeführt.
+2. Danach **4/4 PostgreSQL-Verbindungstests** unter Python 3.12.13/PostgreSQL 18:
+   `test_whatsapp_verbindungen_postgres`, einschließlich der drei neuen
+   deterministischen Konkurrenztests. Keine übersprungenen Tests.
+3. Anschließend **396/396 Kommunikations-/Sicherheitsprüfungen** unter Python
+   3.12.13, ohne übersprungene Tests. Darin der bestehende
+   `test_communication_postgres` tatsächlich auf PostgreSQL 18; die übrigen
+   Prüfungen verwenden SQLite oder benötigen keine Datenbank. Ausgeführte Module:
+
+   ```text
+   test_communication_dispatch test_communication_model test_communication_postgres
+   test_communication_routing test_communication_transport test_communication_ui
+   test_conversation_flows test_whatsapp_reliability test_dispatch_recovery
+   test_dispatch_finalization test_manual_communication_forms test_whatsapp_medien
+   test_customer_authorization test_customer_handoff test_auth_revocation
+   test_http_security test_web_session_security test_privacy test_database_lifecycle
+   test_workshop_communication_fixes test_whatsapp_fehlerdiagnose
+   ```
+
+Die fünf Fehlerdiagnosetests liefen damit auf beiden Python-Versionen; die
+Gruppen dürfen nicht zu einer Anzahl unterschiedlicher Tests addiert werden.
+Die alten 544 Python- und 35 JavaScript-Tests wurden nicht als vollständige
+Gesamtsuiten erneut ausgeführt. Unveränderte JavaScript-, Intake- und
+Dashboard-Workflow-Suiten gehören nicht zum neuen Prüfnachweis.
+
+Alle Daten sind synthetisch. PostgreSQL läuft ausschließlich in einem neu
+angelegten Wegwerfcontainer mit temporärem Dateisystem und zufälligem Testpasswort.
+Der Python-Container bindet ausgewählte Quellen nur lesbar ein, keine `.env`
+oder lokalen Daten. Echter HTTP-Transport ist während der Tests gesperrt.
+Die Entfernung beider nacheinander angelegten Datenbanken und Testnetze wurde
+bestätigt. `git diff --check`, Diffprüfung und Scan aller acht geänderten/neuen
+Dateien auf Secret-Muster und vorhandene lokale Secretwerte waren ohne Befund.
+Lokale Skripte und Protokolle unter `artifacts/m2-korrekturen/` und
+`artifacts/m2-korrekturen-sqlite.log` bleiben durch Git und Docker ausgeschlossen.
+
 ## Offene Grenze und genau ein nächster Schritt
 
 Kein echter Meta-Test, Kundenanschluss, App-Review, Berechtigungswechsel,
@@ -193,6 +296,4 @@ Meta-Ergebnisse, Kontolebenszyklus, Telefon-Echos und Synchronisierung bleiben
 offen; sie wurden nicht automatisch begonnen. Die übrigen Paket-/Betriebsfragen
 aus dem Projektstand bleiben bestehen.
 
-**Nächster Schritt:** Den serverseitig verifizierten Meta-Onboarding-Ablauf
-für den angemeldeten Werkstattinhaber auf dieses Modell aufbauen, weiterhin
-zunächst mit isolierten Daten und simuliertem Transport.
+**Nächster Schritt:** Unabhängige Nachprüfung beider Korrekturen vor Aufgabe 2.
