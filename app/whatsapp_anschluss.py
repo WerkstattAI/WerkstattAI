@@ -264,8 +264,11 @@ def fortsetzen(cookie, wid, ursprung, kennung):
 
 def automatik_gesperrt(workshop_id):
     with get_conn() as conn:
-        zeile = conn.execute("SELECT herkunft, coexistence_bereit, autorisierung FROM whatsapp_verbindungen WHERE workshop_id = ?",
+        zeile = conn.execute("SELECT herkunft, coexistence_bereit, autorisierung, version FROM whatsapp_verbindungen WHERE workshop_id = ?",
                              (workshop_id,)).fetchone()
+        from app.whatsapp_ereignisse import kontopruefung_offen
+        if zeile and kontopruefung_offen(conn, workshop_id, zeile["version"]):
+            return True
     return bool(zeile and zeile["herkunft"] == HERKUNFT
                 and (not zeile["coexistence_bereit"] or zeile["autorisierung"] != "bestaetigt"))
 

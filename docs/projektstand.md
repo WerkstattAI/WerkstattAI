@@ -2,6 +2,48 @@
 
 ## Aktueller Stand vom 28. Oktober 2026
 
+**M2, Aufgabe 3: Business-App-Echos und Kontolebenszyklus lokal implementiert und
+mit simuliertem Meta-Transport geprüft. Aufgabe 2 ist unabhängig lokal abgenommen.**
+Ausgangspunkt war `533c7aeb41db9e7acf07a3bc50615d4fc8c77305`, lokal und remote
+identisch bei sauberem Arbeitsbaum. Eigene Branch:
+`codex/m2-business-app-ereignisse-2026-10-28`.
+
+Der Dispatcher trennt normale Nachrichten/Status, `smb_message_echoes`,
+`account_update` und die reservierten Importfelder. Telefonantworten erscheinen
+einmalig als ausgehende Werkstattnachrichten, übernehmen die Unterhaltung und
+verändern weder offene Fragen noch Reparaturstatus. Frühe Echos und Status
+werden mit der vorhandenen Versandfinalisierung abgeglichen; ungeklärter Versand
+bleibt reserviert. Duplikate übernehmen nach bewusstem Fortsetzen nicht erneut.
+
+Dokumentierte Kontoereignisse sperren ausschließlich die betroffene Nummer oder
+die Verbindungen der betroffenen WABA über die bestehende Widerrufslogik. Neue
+Verbindungsversionen und verspätete Ereignisse werden abgeglichen. Zeitlich
+uneindeutige Kontoereignisse sperren Zugang und Automatik versionsgebunden bis
+zum erneut verifizierten Anschluss. Versand und Medien verwenden denselben
+geschützten Resolver. Neue Coexistence-Verbindungen bleiben `coexistence_bereit=0`;
+normale zurückgehaltene Eingänge bleiben dauerhaft von Nachverarbeitung ausgeschlossen.
+
+Neu tatsächlich bestanden: **618/618 Python-Tests**, darin **19 PostgreSQL-18-Tests**
+auf eigens angelegter leerer Wegwerfdatenbank, keine Auslassungen, Python 3.12.13.
+Zusätzlich **58/58 JavaScript-Tests** mit Node.js 24.16.0 sowie zuvor **66/66
+gezielte Python-Regressionen** mit Python 3.14.3. Gruppen überlappen. Die neuen
+Konkurrenzfälle verwenden Events/Barrieren, einschließlich Reservierung und
+Neuanschluss; ein separater Python-Prozess prüft die dauerhafte Echo-Entscheidung.
+Prüfdatenbank und Netz wurden entfernt. Diff und Geheimnisse ohne Befund.
+
+Details, Primärquellen, korrigierte Testfiktionen und Grenzen stehen im
+[Bericht zu Aufgabe 3](m2-business-app-ereignisse-2026-10-28.md). Reale Meta-Ereignisse,
+Kundennummern und produktive Coexistence bleiben ungeprüft. Keine echten Nachrichten,
+Kontoeinstellungen, Produktion, Registrierung, Merge oder Deployment. Bereits
+gestartete externe HTTP-Aufrufe sind nicht rückholbar; keine globale
+Exactly-once-Garantie. Aufgabe 4 wurde nicht begonnen.
+
+### Nächste Schritte
+
+1. **Unabhängige Nachprüfung von Aufgabe 3.**
+
+## Historischer Stand der letzten M2.2-Korrektur vom 28. Oktober 2026
+
 **M2, Aufgabe 2: Der nachgewiesene Fehler beim späten Abbruch ist korrigiert.**
 Ausgangspunkt war `e67ea2ea70ebf8926add448900880bd1521f39b4`, lokal und remote
 identisch bei sauberem Arbeitsbaum. Die vorherigen Korrekturen wurden unabhängig
@@ -40,7 +82,7 @@ Meta-Onboarding und produktive Coexistence bleiben ungeprüft. Keine Produktion,
 echten Nachrichten, Kontoeinstellungen, Registrierung, Merge oder Deployment.
 Aufgabe 3 wurde nicht begonnen.
 
-### Nächste Schritte
+### Damals vorgesehener nächster Schritt (inzwischen unabhängig abgenommen)
 
 1. **Unabhängige Nachprüfung dieser letzten Korrektur vor Abschluss von Aufgabe 2.**
 

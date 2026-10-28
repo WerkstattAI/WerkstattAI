@@ -555,6 +555,9 @@ def init_db() -> None:
             """.format(ticket_pk=ticket_pk)
         )
 
+        _add_column_if_missing(conn, "whatsapp_events", "ereignis_schluessel", "TEXT")
+        conn.execute("""CREATE UNIQUE INDEX IF NOT EXISTS idx_whatsapp_ereignis_einmalig
+                        ON whatsapp_events(workshop_id, ereignis_schluessel)""")
         conn.execute(
             """
             CREATE INDEX IF NOT EXISTS idx_whatsapp_events_workshop_id
@@ -822,6 +825,10 @@ def set_whatsapp_conversation_control(
                                         AND dispatch_state = 'sending' LIMIT 1""", (wid, phone)).fetchone()
             if sending:
                 raise ValueError("Eine Nachricht wird gerade versendet. Bitte danach den Assistenten aktivieren.")
+            # Bewusstes Fortsetzen entscheidet auch über zeitlich unzuordenbare Echos.
+            # Laufende/unklare Sendungen bleiben durch die Prüfung oben geschützt.
+            conn.execute("""UPDATE whatsapp_messages SET processing_state = 'echo_veraltet'
+                WHERE workshop_id = ? AND customer_phone = ? AND processing_state = 'echo_pruefung'""", (wid, phone))
         previous = conn.execute("SELECT * FROM whatsapp_conversation_controls WHERE workshop_id = ? AND customer_phone = ?" +
                                 (" FOR UPDATE" if is_postgres() else ""), (wid, phone)).fetchone()
         previous = dict(previous) if previous else {}

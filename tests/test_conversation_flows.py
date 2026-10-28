@@ -470,7 +470,7 @@ class WhatsAppWebhookTests(unittest.TestCase):
         "object": "whatsapp_business_account",
         "entry": [
             {
-                "id": "waba-1",
+                "id": "synthetische-waba",
                 "changes": [
                     {
                         "field": "messages",
@@ -506,7 +506,7 @@ class WhatsAppWebhookTests(unittest.TestCase):
         "object": "whatsapp_business_account",
         "entry": [
             {
-                "id": "waba-1",
+                "id": "synthetische-waba",
                 "changes": [
                     {
                         "field": "messages",
@@ -3273,7 +3273,7 @@ class WhatsAppConversationControlTests(unittest.TestCase):
             "object": "whatsapp_business_account",
             "entry": [
                 {
-                    "id": "waba-flow",
+                    "id": "synthetische-waba",
                     "changes": [
                         {
                             "field": "messages",

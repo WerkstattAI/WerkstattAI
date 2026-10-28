@@ -38,6 +38,7 @@ class WhatsAppInboundMessage:
     message_type: str
     text: str | None
     raw: dict[str, Any]
+    waba_id: str | None = None
 
 
 @dataclass(frozen=True)
@@ -49,6 +50,7 @@ class WhatsAppStatusEvent:
     status: str
     timestamp: str | None
     raw: dict[str, Any]
+    waba_id: str | None = None
 
 
 @dataclass(frozen=True)
@@ -89,7 +91,7 @@ def parse_meta_messages(payload: dict[str, Any]) -> list[WhatsAppInboundMessage]
             continue
 
         for change in entry.get("changes") or []:
-            if not isinstance(change, dict):
+            if not isinstance(change, dict) or change.get("field") != "messages":
                 continue
 
             value = change.get("value") if isinstance(change.get("value"), dict) else {}
@@ -128,6 +130,7 @@ def parse_meta_messages(payload: dict[str, Any]) -> list[WhatsAppInboundMessage]
                         message_type=message_type or "unknown",
                         text=text,
                         raw=message,
+                        waba_id=entry.get("id") if isinstance(entry.get("id"), str) else None,
                     )
                 )
 
@@ -144,7 +147,7 @@ def parse_meta_statuses(payload: dict[str, Any]) -> list[WhatsAppStatusEvent]:
             continue
 
         for change in entry.get("changes") or []:
-            if not isinstance(change, dict):
+            if not isinstance(change, dict) or change.get("field") != "messages":
                 continue
 
             value = change.get("value") if isinstance(change.get("value"), dict) else {}
@@ -172,6 +175,7 @@ def parse_meta_statuses(payload: dict[str, Any]) -> list[WhatsAppStatusEvent]:
                         status=status,
                         timestamp=str(status_payload.get("timestamp") or "").strip() or None,
                         raw=status_payload,
+                        waba_id=entry.get("id") if isinstance(entry.get("id"), str) else None,
                     )
                 )
 
@@ -582,6 +586,8 @@ def finalize_whatsapp_dispatch(
         payload.update(metadata_updates or {})
         dispatch_state = "pending" if retry else "sending" if status == "unknown" else "complete"
         provider_id = str(wa_message_id or row["wa_message_id"] or "").strip() or None
+        from app.whatsapp_ereignisse import ordne_fruehe_rueckmeldung, schliesse_rueckmeldungen
+        ordne_fruehe_rueckmeldung(conn, row, provider_id, payload)
         timestamp_clause = "dispatch_started_at IS NULL" if row["dispatch_started_at"] is None else "dispatch_started_at = ?"
         params = [status, dispatch_state, provider_id, json.dumps(payload, ensure_ascii=False), workshop_id, message_id]
         if row["dispatch_started_at"] is not None:
@@ -600,6 +606,7 @@ def finalize_whatsapp_dispatch(
                                               preserve_conversation_state=not _dispatch_claim_is_current(conn, row, payload))
         if status == "failed" and not retry and payload.get("sender_role") == "workshop":
             _restore_failed_dispatch(conn, row, payload)
+        schliesse_rueckmeldungen(conn, workshop_id, row["customer_phone"], provider_id)
         current = conn.execute("SELECT * FROM whatsapp_messages WHERE workshop_id = ? AND message_id = ?",
                                (workshop_id, message_id)).fetchone()
         return _dispatch_result(current, finalized=status != "unknown")
@@ -619,6 +626,7 @@ def prepare_whatsapp_inbound(*, workshop_id: str, message: WhatsAppInboundMessag
             return {"action": "manual", "reason": "coexistence_nicht_freigegeben"}
         _lock_conversation(conn, workshop_id, message.from_phone)
         control = get_whatsapp_conversation_control(workshop_id=workshop_id, customer_phone=message.from_phone)
+        from app.whatsapp_ereignisse import echo_offen
         existing = conn.execute("""
             SELECT processing_state FROM whatsapp_messages
             WHERE workshop_id = ? AND direction = 'inbound' AND wa_message_id = ?
@@ -654,6 +662,9 @@ def prepare_whatsapp_inbound(*, workshop_id: str, message: WhatsAppInboundMessag
                 WHERE workshop_id = ? AND direction = 'inbound' AND wa_message_id = ?
             """, (workshop_id, message.message_id))
 
+        if echo_offen(conn, workshop_id, message.from_phone):
+            complete()
+            return {"action": "manual", "active_ticket_id": active_ticket_id, "reason": "echo_zuordnung_offen"}
         if message.message_type == "image":
             from app.tickets import add_ticket_note, find_ticket_by_id
             from app.db import set_whatsapp_conversation_control
@@ -778,6 +789,9 @@ def deliver_prepared_whatsapp_reply(*, workshop_id: str, customer_phone: str,
             workshop_id=workshop_id, customer_phone=customer_phone,
         )["service_window_open"]:
             reason = "customer_service_window_closed"
+        from app.whatsapp_ereignisse import echo_offen
+        if echo_offen(conn, workshop_id, customer_phone):
+            reason = "echo_zuordnung_offen"
         if reason:
             payload = json.loads(reply["payload_json"] or "{}")
             payload["suppressed_reason"] = reason
@@ -794,8 +808,8 @@ def deliver_prepared_whatsapp_reply(*, workshop_id: str, customer_phone: str,
 
     try:
         # Erneut unmittelbar vor HTTP prüfen; keine Datenbanksperre über den Transport.
-        if automatik_gesperrt(workshop_id):
-            send_result = WhatsAppSendResult(False, 409, None, {}, "Coexistence-Automatik ist nicht freigegeben.")
+        if not beginne_automatischen_transport(workshop_id, reply, started_at):
+            send_result = WhatsAppSendResult(False, 409, None, {}, "Automatischer Versand wurde vor Transportbeginn gesperrt.")
         else:
             send_result = send_message(reply)
     except Exception as exc:
@@ -818,12 +832,27 @@ def deliver_prepared_whatsapp_reply(*, workshop_id: str, customer_phone: str,
             "meta_error": completed["payload"].get("meta_error"), "retry": completed["dispatch_state"] == "pending"}
 
 
+def beginne_automatischen_transport(workshop_id, reply, started_at):
+    """Revision und ungeklärte Echos am letzten lokalen Übergabepunkt prüfen."""
+    from app.whatsapp_anschluss import automatik_gesperrt
+    from app.whatsapp_ereignisse import echo_offen
+    with atomic_database() as conn:
+        _lock_conversation(conn, workshop_id, reply["customer_phone"])
+        kontrolle = get_whatsapp_conversation_control(workshop_id=workshop_id, customer_phone=reply["customer_phone"])
+        aktuell = conn.execute("SELECT * FROM whatsapp_messages WHERE id = ?", (reply["id"],)).fetchone()
+        return bool(aktuell and aktuell["dispatch_state"] == "sending" and aktuell["dispatch_started_at"] == started_at
+                    and kontrolle["revision"] == reply["control_revision"] and not automatik_gesperrt(workshop_id)
+                    and not echo_offen(conn, workshop_id, reply["customer_phone"]))
+
+
 def update_whatsapp_message_status(
     *,
     workshop_id: str,
     wa_message_id: str,
     status: str,
     payload: dict[str, Any] | None = None,
+    phone_number_id: str | None = None,
+    recipient_phone: str | None = None,
 ) -> bool:
     wid = str(workshop_id or "").strip()
     provider_id = str(wa_message_id or "").strip()
@@ -833,10 +862,15 @@ def update_whatsapp_message_status(
     with atomic_database() as conn:
         from app.db import lock_communication_scope
         lock_communication_scope(conn, wid)
+        from app.whatsapp_ereignisse import merke_fruehen_status
+        merke_fruehen_status(conn, wid, phone_number_id, recipient_phone, provider_id, normalized_status, payload or {})
         row = conn.execute("""SELECT * FROM whatsapp_messages
                               WHERE workshop_id = ? AND direction = 'outbound' AND wa_message_id = ? LIMIT 1""",
                            (wid, provider_id)).fetchone()
         if not row:
+            return False
+        if ((phone_number_id and row["phone_number_id"] != phone_number_id)
+                or (recipient_phone and row["customer_phone"] != recipient_phone)):
             return False
         row = dict(row)
         current_payload = _dispatch_payload(row)
@@ -913,6 +947,7 @@ def list_whatsapp_messages(
             ticket_id,
             status,
             payload_json,
+            processing_state,
             created_at
         FROM whatsapp_messages
         WHERE {" AND ".join(filters)}
@@ -935,6 +970,7 @@ def list_whatsapp_messages(
                     "automatic_answer" if role == "assistant" else "workshop_notification"),
                     requires_human_action=bool(metadata.get("requires_human_action")),
                     reply_to_message_id=metadata.get("reply_to_message_id"), resolved_at=metadata.get("resolved_at"))
+        item["echo_zuordnung_offen"] = item.get("processing_state") == "echo_pruefung"
         tid = item.get("ticket_id")
         if tid:
             if tid not in tickets:

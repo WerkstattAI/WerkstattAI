@@ -386,8 +386,12 @@ async def whatsapp_webhook(request: Request):
         return _process_test_whatsapp_webhook(test_payload)
 
     try:
+        from app.whatsapp_ereignisse import aenderungen, nachrichten_zuordnung, verarbeite_echo, verarbeite_konto
+        ereignisse = aenderungen(payload)
         messages = parse_meta_messages(payload)
         statuses = parse_meta_statuses(payload)
+    except OverflowError:
+        raise HTTPException(status_code=413, detail="Zu viele WhatsApp-Ereignisse")
     except (TypeError, ValueError, AttributeError):
         raise HTTPException(status_code=422, detail="Invalid WhatsApp payload structure")
     if len(messages) + len(statuses) > 100 or any(len(message.text or "") > MAX_MESSAGE_LENGTH for message in messages):
@@ -400,12 +404,25 @@ async def whatsapp_webhook(request: Request):
     replies: list[dict] = []
     manual_messages: list[dict] = []
 
+    # Sperren zuerst anwenden, damit ein gemischtes Paket keine neue Sendung freigibt.
+    for feld, eintrag, wert in ereignisse:
+        if feld == "account_update":
+            verarbeite_konto(eintrag, wert)
+    for feld, eintrag, wert in ereignisse:
+        if feld == "smb_message_echoes":
+            verarbeite_echo(eintrag, wert)
+        # history und smb_app_state_sync bleiben bis Aufgabe 4 ohne Import.
+
     for status_event in statuses:
-        workshop_id = find_workshop_id_by_whatsapp_phone_number_id(status_event.phone_number_id)
+        workshop_id = nachrichten_zuordnung(status_event.waba_id, status_event.phone_number_id)
         if not workshop_id:
             ignored += 1
             continue
 
+        bereinigt = {"status": status_event.status}
+        if isinstance(status_event.raw.get("errors"), list):
+            bereinigt["errors"] = [{"code": e["code"]} for e in status_event.raw["errors"]
+                                  if isinstance(e, dict) and type(e.get("code")) is int]
         save_whatsapp_event(
             workshop_id=workshop_id,
             phone_number_id=status_event.phone_number_id,
@@ -415,14 +432,16 @@ async def whatsapp_webhook(request: Request):
             event_type="status",
             message_type=status_event.status,
             text=None,
-            payload=status_event.raw,
+            payload=bereinigt,
         )
 
         if update_whatsapp_message_status(
             workshop_id=workshop_id,
             wa_message_id=status_event.wa_message_id,
             status=status_event.status,
-            payload=status_event.raw,
+            payload=bereinigt,
+            phone_number_id=status_event.phone_number_id,
+            recipient_phone=status_event.recipient_phone,
         ):
             status_updates += 1
         else:
@@ -432,7 +451,7 @@ async def whatsapp_webhook(request: Request):
     import json
 
     for message in messages:
-        workshop_id = find_workshop_id_by_whatsapp_phone_number_id(message.phone_number_id)
+        workshop_id = nachrichten_zuordnung(message.waba_id, message.phone_number_id)
         if not workshop_id:
             ignored += 1
             continue

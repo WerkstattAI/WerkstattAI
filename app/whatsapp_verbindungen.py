@@ -2,6 +2,8 @@
 from __future__ import annotations
 
 import json
+import time
+from datetime import datetime, timezone
 from dataclasses import dataclass, field
 
 from cryptography.fernet import Fernet, InvalidToken
@@ -69,6 +71,11 @@ def migriere_verbindungen(conn, konfiguration) -> None:
     )""")
     conn.execute("""CREATE TABLE IF NOT EXISTS verbindungs_migrationen (
         name TEXT PRIMARY KEY, erstellt_am TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP)""")
+    from app.db import _add_column_if_missing
+    _add_column_if_missing(conn, "whatsapp_verbindungen", "verbunden_seit", "DOUBLE PRECISION NOT NULL DEFAULT 0")
+    for bestand in conn.execute("SELECT workshop_id, updated_at FROM whatsapp_verbindungen WHERE verbunden_seit = 0").fetchall():
+        zeit = datetime.fromisoformat(bestand["updated_at"]).replace(tzinfo=timezone.utc).timestamp()
+        conn.execute("UPDATE whatsapp_verbindungen SET verbunden_seit = ? WHERE workshop_id = ?", (zeit, bestand["workshop_id"]))
     if conn.execute("SELECT 1 FROM verbindungs_migrationen WHERE name = 'm2_1'").fetchone():
         return
     for zeile in conn.execute("SELECT * FROM workshops WHERE whatsapp_phone_number_id IS NOT NULL").fetchall():
@@ -147,6 +154,8 @@ def speichere_verbindungsentwurf(*, workshop_id: str, waba_id: str, phone_number
             if ergebnis.rowcount != 1:
                 # Die gesamte Transaktion einschließlich Nummernreservierung rollt zurück.
                 raise VerbindungsFehler("Die WhatsApp-Verbindung wurde zwischenzeitlich geändert.")
+            conn.execute("UPDATE whatsapp_verbindungen SET verbunden_seit = ? WHERE workshop_id = ? AND version = ?",
+                         (time.time(), workshop_id, version))
     except VerbindungsFehler:
         raise
     except Exception:
@@ -169,6 +178,9 @@ def zugang_fuer_werkstatt(workshop_id: str, *, phone_number_id: str | None = Non
     with get_conn() as conn:
         werkstatt = conn.execute("SELECT * FROM workshops WHERE id = ?", (workshop_id,)).fetchone()
         zeile = conn.execute("SELECT * FROM whatsapp_verbindungen WHERE workshop_id = ?", (workshop_id,)).fetchone()
+        from app.whatsapp_ereignisse import kontopruefung_offen
+        if zeile and kontopruefung_offen(conn, workshop_id, zeile["version"]):
+            raise VerbindungsFehler("Kontotrennung und Neuanschluss sind zeitlich nicht eindeutig. Zugang bis zum erneut verifizierten Anschluss gesperrt.")
         nummer = normalisiere_nummernwert(werkstatt["whatsapp_phone_number_id"]) if werkstatt else None
         zuordnungen = conn.execute("SELECT id FROM workshops WHERE NULLIF(TRIM(whatsapp_phone_number_id), '') = ?",
                                   (nummer,)).fetchall() if nummer else []

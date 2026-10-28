@@ -409,7 +409,7 @@ class AnschlussTests(unittest.TestCase):
         for feld, art in (("messages", "text"), ("history", "text"), ("messages", "image")):
             message = {"id": f"wamid.{feld}.{art}", "from": "4915700012345", "timestamp": str(int(time.time())),
                        "type": art, "text": {"body": "Inspektion"}, "image": {"id": "555"}}
-            payload = {"entry": [{"changes": [{"field": feld, "value": {"metadata": {"phone_number_id": "444"},
+            payload = {"object": "whatsapp_business_account", "entry": [{"id": "333", "changes": [{"field": feld, "value": {"metadata": {"phone_number_id": "444"},
                                                                                   "messages": [message]}}]}]}
             body = json.dumps(payload).encode()
             with patch.object(main, "settings", self.config), patch.object(main, "process_chat_message") as verarbeiten:
@@ -419,7 +419,7 @@ class AnschlussTests(unittest.TestCase):
                     self.assertEqual(antwort.status_code, 200, antwort.text)
                 verarbeiten.assert_not_called()
         with db.get_conn() as conn:
-            self.assertEqual(conn.execute("SELECT COUNT(*) AS n FROM whatsapp_zurueckgehalten").fetchone()["n"], 3)
+            self.assertEqual(conn.execute("SELECT COUNT(*) AS n FROM whatsapp_zurueckgehalten").fetchone()["n"], 2)
             self.assertEqual(conn.execute("SELECT COUNT(*) AS n FROM whatsapp_messages").fetchone()["n"], 0)
             self.assertEqual(conn.execute("SELECT COUNT(*) AS n FROM tickets").fetchone()["n"], 0)
 

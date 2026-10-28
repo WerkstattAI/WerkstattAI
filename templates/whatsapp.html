@@ -1431,6 +1431,7 @@
                   {{ communication.action_label(m) }}
                 </div>
                 <div class="message-text">{{ m.text or "-" }}</div>
+                {% if m.echo_zuordnung_offen %}<div role="status">Die Echo-Zuordnung ist offen. Automatische Antworten bleiben gesperrt. Bitte einen laufenden Versand zuerst klären; andernfalls den Verlauf prüfen und den Assistenten bewusst fortsetzen.</div>{% endif %}
                 {% with nachricht=m %}{% include '_whatsapp_bild.html' %}{% endwith %}
                 {% if m.reply_to_message_id %}<a class="communication-message-link" href="#communication-{{ m.reply_to_message_id }}">Bezug anzeigen</a>{% endif %}
                 {% if m.message_error %}

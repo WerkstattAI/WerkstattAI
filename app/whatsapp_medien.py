@@ -23,10 +23,12 @@ class _KeineWeiterleitung(urllib.request.HTTPRedirectHandler):
 
 
 def medienangaben(nachricht: dict) -> dict | None:
-    if nachricht.get("direction") != "inbound" or nachricht.get("message_type") != "image":
+    if nachricht.get("message_type") != "image":
         return None
     try:
         daten = json.loads(nachricht.get("payload_json") or "{}")
+        if nachricht.get("direction") != "inbound" and daten.get("source") != "whatsapp_business_app":
+            return None
         bild = daten.get("image") if isinstance(daten, dict) else None
         kennung = str(bild.get("id") or "") if isinstance(bild, dict) else ""
         if not re.fullmatch(r"[0-9]{1,128}", kennung):

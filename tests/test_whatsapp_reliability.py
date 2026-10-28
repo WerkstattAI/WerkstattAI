@@ -57,7 +57,7 @@ class WhatsAppReliabilityTests(unittest.TestCase):
         message = {"from": self.phone, "id": message_id, "type": "text", "text": {"body": "Hallo"}}
         if timestamp is not None:
             message["timestamp"] = timestamp
-        return {"entry": [{"changes": [{"value": {"metadata": {"phone_number_id": "reliability-sender"}, "messages": [message]}}]}]}
+        return {"object": "whatsapp_business_account", "entry": [{"id": "synthetische-waba", "changes": [{"field": "messages", "value": {"metadata": {"phone_number_id": "reliability-sender"}, "messages": [message]}}]}]}
 
     def request(self, payload):
         body = json.dumps(payload).encode()

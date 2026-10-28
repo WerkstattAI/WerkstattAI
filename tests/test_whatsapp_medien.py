@@ -92,7 +92,7 @@ class MedienNachrichtenTests(unittest.TestCase):
         self.assertIn('no-store', antwort.headers['cache-control'])
 
     def test_parser_erhaelt_die_bildbeschriftung(self):
-        daten = {'entry': [{'changes': [{'value': {'metadata': {'phone_number_id': '123'}, 'messages': [
+        daten = {"object": "whatsapp_business_account", 'entry': [{"id": "synthetische-waba", 'changes': [{"field": "messages", 'value': {'metadata': {'phone_number_id': '123'}, 'messages': [
             {'from': '49123456789', 'id': 'wamid.bild', 'type': 'image', 'image': {'id': '789', 'caption': 'Mein Fahrzeugschein'}}
         ]}}]}]}
         self.assertEqual(parse_meta_messages(daten)[0].text, 'Mein Fahrzeugschein')
