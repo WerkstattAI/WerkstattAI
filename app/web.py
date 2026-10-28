@@ -549,7 +549,7 @@ def _restore_whatsapp_conversation_control(*, previous_control: dict[str, Any]) 
                 return
             set_whatsapp_conversation_control(workshop_id=wid, customer_phone=phone,
                 conversation_state=previous_control["conversation_state"], active_ticket_id=previous_control.get("active_ticket_id"),
-                pending_workshop_question_id=previous_control.get("pending_workshop_question_id"))
+                pending_workshop_question_id=previous_control.get("pending_workshop_question_id"), ausdrueckliche_freigabe=False)
     except Exception:
         logger.exception("Could not restore manual conversation control")
 

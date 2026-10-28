@@ -4,6 +4,123 @@ Stand: 28. Oktober 2026. Lokale Implementierung mit synthetischen Verbindungen,
 signierten Webhooks und simuliertem Transport. Keine reale Meta- oder
 Coexistence-Betriebsfreigabe.
 
+## Korrekturen nach der unabhängigen Nachprüfung vom 28. Oktober 2026
+
+Ausgangspunkt dieser Korrekturen ist `123f807ce0c8a5d1905f9c9d949576296c6fd2cd`,
+lokal und remote identisch bei sauberem Arbeitsbaum. Eigene Branch:
+`codex/m2-business-app-korrekturen-2026-10-28`. Gelesen wurden der unabhängige
+`PRUEFBERICHT.txt`, `gegenproben.py` und beide Gegenproben-Protokolle unter
+`C:\Users\Mikolaj\Documents\New project\m2-business-app-review-2026-10-28`.
+Die dort bestätigten 618 Python- und 58 JavaScript-Tests sind historische
+Nachweise; die zwei zusätzlichen Gegenproben zeigten trotzdem reale Lücken.
+
+### 1. Verspätete erste Zustellung nach bewusstem Fortsetzen
+
+**Ursache:** Die Verbindungsversion und `verbunden_seit` unterscheiden keine
+manuellen Entscheidungen innerhalb einer Verbindung. Eine erstmals gelieferte
+ältere Provider-ID konnte deshalb eine spätere Assistentenfreigabe überschreiben.
+
+**Korrektur:** Die vorhandene Gesprächskontrolle speichert zusätzlich
+`assistent_freigegeben_am`, ausschließlich bei einer ausdrücklichen Freigabe.
+Der Zeitpunkt wird mit Moduswechsel und Echo-Quittierung in derselben Transaktion
+unter derselben Kommunikationssperre festgehalten, getrennt je Werkstatt und
+Kundengespräch. Er läuft bei zurückgestellter Systemuhr nicht rückwärts.
+Sowohl die Freigabe im Posteingang als auch diejenige am verknüpften Ticket
+werden berücksichtigt. Automatische Wiederherstellung nach Versandfehlern,
+Ticketnotizen und sonstige Statusänderungen setzen keinen Freigabezeitpunkt.
+
+Neue Echo-Datensätze behalten ihren Providerzeitpunkt. Liegt dessen Sekunde
+eindeutig vor der Freigabesekunde, bleibt das Echo sichtbar und dauerhaft als
+`echo_veraltet` quittiert: keine neue Übernahme, Kontrollrevision oder Ticketnotiz.
+Eine eindeutig spätere Telefonantwort darf weiterhin übernehmen, sofern auch
+ihre Herkunft geklärt ist. Die Prüfung erfolgt sowohl beim Empfang als auch
+unmittelbar vor einer späteren fachlichen Übernahme nach Versandklärung.
+
+**Grenze:** In derselben Sekunde oder bei fehlendem gespeicherten Zeitnachweis
+ist die Reihenfolge nicht belegt. Dann bleibt `echo_pruefung` ohne Zustandswechsel
+bestehen und sperrt weitere automatische Antworten. Bewusstes Fortsetzen nach
+Verlaufsprüfung quittiert auch diesen Fall dauerhaft. Ein beliebiges `updated_at`
+wird nicht als manuelle Freigabe ausgegeben. Die additive Migration lässt den
+neuen Zeitpunkt für Altbestände leer; frühere, nicht protokollierte Freigaben
+lassen sich daraus nicht rekonstruieren. Die zeitliche Einordnung setzt
+vergleichbare korrekte System-/Providerzeiten voraus, keine globale Reihenfolge.
+
+### 2. Erfolgsbestätigung ohne Provider-ID
+
+**Ursache:** Das Ende einer `sending`-Reservierung wurde mit ausgeschlossener
+API-Zuordnung verwechselt. Recovery `sent` ohne Provider-ID belegt lediglich den
+Versandstatus, nicht die fremde Herkunft eines Echos.
+
+**Korrektur:** Ein erfolgreicher oder weiterhin unklarer Kandidat ohne Provider-ID
+bleibt für die Echo-Zuordnung relevant, auch wenn Recovery seine Reservierung
+beendet hat oder das Echo erstmals danach eintrifft. Fehlende Kandidatendaten
+liefern ebenfalls keinen Ausschlussbeweis. Erst eine abweichende bekannte
+Provider-ID oder eine eindeutige negative Versandklärung schließt den Kandidaten
+aus. Bei weiterhin möglicher Zuordnung entstehen keine zusätzliche Übernahme
+und keine Ticketnotiz; der Prüfzustand bleibt erhalten.
+
+Die gemeinsame Versandfinalisierung darf eine verspätet belegte Provider-ID
+auch nach manueller Erfolgsbestätigung ergänzen, wenn sie zum selben reservierten
+Transportversuch gehört. Identische Provider-ID führt das Echo in die ursprüngliche
+Sendung zusammen, auch nach vorheriger ausdrücklicher Quittierung. Die manuelle
+Statusentscheidung, Fragen und Kontrollzustände werden dabei nicht nochmals
+ausgeführt. Ein anderer Transportbeginn darf keine Identität nachtragen. Text
+und Zeitähnlichkeit sind weiterhin kein Identitätsnachweis.
+
+**Grenze:** Ohne Identitätsnachweis bleibt die Zuordnung offen. Nach Prüfung kann
+die Werkstatt weiterhin bewusst fortsetzen; erneute Echozustellung hebt diese
+Quittierung nicht auf. Noch laufendes `sending/unknown` muss zuvor über den
+bestehenden Recovery-Weg geklärt werden. Kein automatischer Neuversand, keine
+pauschale Aufhebung anderer Reservierungen. Falsche manuelle Bestätigungen können
+lokal nicht durch Wissen über den tatsächlichen Meta-Transport ersetzt werden.
+
+### Übernommene und ergänzte Regressionen
+
+Beide unabhängigen Methoden stehen mit unveränderten Methodenrümpfen und
+fachlichen Assertions in `tests/test_whatsapp_echo_korrekturen.py`; ein lokaler
+AST-Vergleich bestätigt die Übereinstimmung. Nur Modul-/Fixture-Einbindung und
+Testklassen wurden angepasst, damit die bestehenden Tests nicht zusätzlich
+geerbt und doppelt gezählt werden. Dieselben Fälle laufen auf SQLite und PostgreSQL.
+
+Zusätzliche Nachweise prüfen neue/alte Antworten, gleiche Sekunde, parallele
+Zustellung, angehaltene Freigabetransaktion, neue Provider-ID in einem separaten
+Python-Prozess, Ticketfreigabe, automatische Fehlversand-Wiederherstellung,
+Recovery mit/ohne spätere Provider-Zuordnung, unveränderte Ticketnotizen,
+bewusste Quittierung und Isolation zweier Werkstätten. Events und Barrieren
+ordnen die Konkurrenzfälle; keine zufälligen Sleeps oder automatischen Test-Retries.
+
+Eine bestehende Ticket-Fixture kennzeichnet ihre reine Anfangszuordnung nun als
+`ausdrueckliche_freigabe=False`; ihre fachlichen Assertions bleiben unverändert.
+Die Vorläufe zeigten außerdem eine ungeeignete Freitextsendung in der neuen
+Fehlversand-Fixture. Ein zunächst ergänzter Eingangszeitpunkt reichte nicht:
+`coexistence_bereit=0` sperrt das Fenster weiterhin absichtlich. Die Fixture nutzt
+nun eine simuliert abgelehnte Vorlagensendung, um ohne Bereitschaftsfreigabe die
+eigentlich zu prüfende automatische Wiederherstellung zu erreichen.
+
+### Neue Prüfnachweise dieser Korrektur
+
+- **650/650 Python-Tests** mit Python **3.12.13** in **246,825 Sekunden**
+  bestanden, keine Auslassungen. Darin **35 PostgreSQL-Tests** auf einer frisch
+  angelegten leeren Wegwerfdatenbank mit PostgreSQL **18.6** und psycopg **3.2.3**;
+  SQLite-Version **3.46.1**. Beide unveränderten Gegenproben sowie alle ergänzten
+  Korrekturfälle liefen auf beiden Datenbanken. Prüfcontainer und isoliertes
+  Prüfnetz wurden anschließend entfernt; der Bereinigungsnachweis bestätigt dies.
+- **126/126 gezielte Python-Regressionen** mit Python **3.14.3** bestanden:
+  Korrektur-/Gegenproben auf SQLite, Recovery, Versandfinalisierung,
+  Kommunikationsmodell, Auth-Widerruf und Anschluss.
+- **58/58 JavaScript-Tests** mit Node.js **24.16.0** bestanden, keine Auslassungen.
+- Beide übernommenen Gegenproben wurden per AST-Vergleich auf unveränderte
+  Methodenrümpfe geprüft. Lokaler Nachweis: `gegenproben_vergleich.json`.
+
+Die Gruppen überlappen und werden nicht addiert. Neue lokale Protokolle und
+Prüfstarter liegen ausschließlich unter `artifacts/m2-business-app-korrekturen/`;
+dieses Verzeichnis bleibt von Git und Docker-Images ausgeschlossen. Echtes Meta
+ist nicht geprüft. `coexistence_bereit=0` und die bestehenden Automatik-Sperren
+bleiben unverändert; Aufgabe 4 wurde nicht begonnen.
+
+Die folgenden Abschnitte dokumentieren die **historische Erstimplementierung**.
+Ihre Testergebnisse sind keine neuen Ergebnisse dieser Korrektur.
+
 ## Ausgangspunkt und wiederverwendete Funktionen
 
 Ausgangspunkt war `533c7aeb41db9e7acf07a3bc50615d4fc8c77305`, lokal und auf dem
@@ -198,4 +315,4 @@ Mandantenrechte wurden über die bestehenden HTTP-/Template-Tests geprüft.
 
 ## Nächster Schritt
 
-Unabhängige Nachprüfung von Aufgabe 3.
+Unabhängige Nachprüfung der beiden Korrekturen von Aufgabe 3.

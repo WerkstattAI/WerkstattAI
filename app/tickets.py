@@ -815,7 +815,8 @@ def resolve_customer_information(ticket_id: str, message_id: str, workshop_id: s
     return find_ticket_by_id(ticket_id, workshop_id)
 
 
-def set_ticket_conversation_state(ticket_id: str, state: str, workshop_id: str | None = None) -> dict[str, Any]:
+def set_ticket_conversation_state(ticket_id: str, state: str, workshop_id: str | None = None,
+                                  *, ausdrueckliche_freigabe: bool = True) -> dict[str, Any]:
     wid = str(workshop_id or default_workshop_id()).strip()
     with atomic_database() as conn:
         lock_communication_scope(conn, wid)
@@ -824,6 +825,11 @@ def set_ticket_conversation_state(ticket_id: str, state: str, workshop_id: str |
         if not row:
             raise KeyError("Ticket nicht gefunden")
         _set_ticket_state_in_transaction(conn, wid, ticket_id, state)
+        if state == "assistant_active" and ausdrueckliche_freigabe:
+            from app.db import merke_assistentenfreigabe
+            for kontrolle in conn.execute("SELECT customer_phone FROM whatsapp_conversation_controls WHERE workshop_id = ? AND active_ticket_id = ?",
+                                          (wid, ticket_id)).fetchall():
+                merke_assistentenfreigabe(conn, wid, kontrolle["customer_phone"])
         return _row_to_ticket_dict(conn.execute("SELECT * FROM tickets WHERE workshop_id = ? AND ticket_id = ?",
                                                (wid, ticket_id)).fetchone())
 

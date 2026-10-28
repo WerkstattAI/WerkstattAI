@@ -2,6 +2,51 @@
 
 ## Aktueller Stand vom 28. Oktober 2026
 
+**M2, Aufgabe 3: Die beiden unabhängig nachgewiesenen Echo-Fehler sind korrigiert.**
+Ausgangspunkt war `123f807ce0c8a5d1905f9c9d949576296c6fd2cd`, lokal und remote
+identisch bei sauberem Arbeitsbaum. Eigene Branch:
+`codex/m2-business-app-korrekturen-2026-10-28`.
+
+Eine ausdrückliche Assistentenfreigabe besitzt jetzt einen eigenen dauerhaften
+Zeitpunkt in der bestehenden Gesprächskontrolle. Ein bisher ungesehenes,
+eindeutig älteres Echo bleibt sichtbar, übernimmt aber nicht erneut und erzeugt
+keine Ticketnotiz. Neue Telefonantworten dürfen weiterhin übernehmen. Dieselbe
+Sekunde bleibt ohne erfundene Reihenfolge prüfpflichtig. Automatische
+Wiederherstellung nach Versandfehlern setzt keinen manuellen Freigabezeitpunkt.
+
+Recovery `sent` ohne Provider-ID klärt weiterhin nur den Versandstatus. Ein
+solcher Kandidat bleibt bei der Echo-Zuordnung relevant; die Ungewissheit wird
+nicht in eine zusätzliche Werkstattaktion umgewandelt. Eine später belegte
+Provider-ID desselben Transportversuchs kann die ursprüngliche Sendung und das
+Echo zusammenführen, ohne fachliche Wirkungen zu wiederholen. Bewusstes
+Fortsetzen nach Prüfung bleibt möglich; `sending/unknown` wird nicht umgangen.
+
+Die beiden unabhängigen Gegenproben wurden mit unveränderten Methodenrümpfen
+und Assertions übernommen. Ergänzungen prüfen insbesondere die erste verspätete
+Zustellung, Parallelität, Prozessneustart, Ticketfreigabe, Recovery, spätere
+Provider-Zuordnung und Werkstatttrennung. Ursachen, Nachweise und Grenzen stehen
+im [aktualisierten Bericht](m2-business-app-ereignisse-2026-10-28.md).
+
+Neu bestanden: **650/650 Python-Tests**, darin **35 PostgreSQL-Tests**, ohne
+Auslassungen. Python **3.12.13**, SQLite **3.46.1**, PostgreSQL **18.6** und
+psycopg **3.2.3** auf einer frischen leeren Wegwerfdatenbank. Zusätzlich bestanden
+**126/126 gezielte Python-Regressionen** mit Python **3.14.3** und **58/58
+JavaScript-Tests** mit Node.js **24.16.0**. Gruppen überlappen. Prüfcontainer und
+Prüfnetz wurden entfernt; lokale Nachweise liegen im ignorierten Verzeichnis
+`artifacts/m2-business-app-korrekturen/`.
+
+`coexistence_bereit=0`, HMAC, Dispatcher, Konto-/Nummernbindung, gezielter und
+kontoweiter Widerruf sowie Versand-/Medien- und Recovery-Sperren bleiben erhalten.
+Kein realer Meta-Test und keine vollständige Coexistence-Freigabe. Keine echten
+Nachrichten, Kundenanschlüsse, Produktion, Meta-Konfiguration, Merge oder
+Deployment. Aufgabe 4 wurde nicht begonnen.
+
+### Nächste Schritte
+
+1. **Unabhängige Nachprüfung der beiden Korrekturen von Aufgabe 3.**
+
+## Historischer Stand der M2.3-Erstimplementierung vom 28. Oktober 2026
+
 **M2, Aufgabe 3: Business-App-Echos und Kontolebenszyklus lokal implementiert und
 mit simuliertem Meta-Transport geprüft. Aufgabe 2 ist unabhängig lokal abgenommen.**
 Ausgangspunkt war `533c7aeb41db9e7acf07a3bc50615d4fc8c77305`, lokal und remote
@@ -38,7 +83,7 @@ Kontoeinstellungen, Produktion, Registrierung, Merge oder Deployment. Bereits
 gestartete externe HTTP-Aufrufe sind nicht rückholbar; keine globale
 Exactly-once-Garantie. Aufgabe 4 wurde nicht begonnen.
 
-### Nächste Schritte
+### Damals vorgesehener nächster Schritt (Nachprüfung ergab zwei Korrekturen)
 
 1. **Unabhängige Nachprüfung von Aufgabe 3.**
 

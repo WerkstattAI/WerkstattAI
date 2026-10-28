@@ -695,6 +695,7 @@ def _migrate_customer_communication(conn) -> None:
     control_state_added = not _column_exists(conn, "whatsapp_conversation_controls", "conversation_state")
     _add_column_if_missing(conn, "whatsapp_conversation_controls", "conversation_state", "TEXT NOT NULL DEFAULT 'assistant_active'")
     _add_column_if_missing(conn, "whatsapp_conversation_controls", "pending_workshop_question_id", "TEXT")
+    _add_column_if_missing(conn, "whatsapp_conversation_controls", "assistent_freigegeben_am", "DOUBLE PRECISION")
     _add_column_if_missing(conn, "whatsapp_messages", "message_id", "TEXT")
     if control_state_added:
         conn.execute("""UPDATE whatsapp_conversation_controls SET conversation_state =
@@ -789,6 +790,17 @@ def get_whatsapp_conversation_control(
     return result
 
 
+def merke_assistentenfreigabe(conn, workshop_id: str, customer_phone: str) -> None:
+    """Nur eine ausdrückliche Freigabe quittiert Echos und setzt diese Zeitgrenze."""
+    zeit = datetime.now(timezone.utc).timestamp()
+    conn.execute("""UPDATE whatsapp_conversation_controls SET assistent_freigegeben_am =
+        CASE WHEN assistent_freigegeben_am > ? THEN assistent_freigegeben_am ELSE ? END
+        WHERE workshop_id = ? AND customer_phone = ?""", (zeit, zeit, workshop_id, customer_phone))
+    conn.execute("""UPDATE whatsapp_messages SET processing_state = 'echo_veraltet'
+        WHERE workshop_id = ? AND customer_phone = ? AND processing_state = 'echo_pruefung'""",
+        (workshop_id, customer_phone))
+
+
 def set_whatsapp_conversation_control(
     *,
     workshop_id: str,
@@ -797,6 +809,7 @@ def set_whatsapp_conversation_control(
     conversation_state: str | None = None,
     active_ticket_id: str | None | object = _UNSET_ACTIVE_TICKET,
     pending_workshop_question_id: str | None | object = _UNSET_PENDING_QUESTION,
+    ausdrueckliche_freigabe: bool = True,
 ) -> dict[str, Any]:
     """Change canonical ownership; legacy mode is a compatibility projection.
 
@@ -825,10 +838,6 @@ def set_whatsapp_conversation_control(
                                         AND dispatch_state = 'sending' LIMIT 1""", (wid, phone)).fetchone()
             if sending:
                 raise ValueError("Eine Nachricht wird gerade versendet. Bitte danach den Assistenten aktivieren.")
-            # Bewusstes Fortsetzen entscheidet auch über zeitlich unzuordenbare Echos.
-            # Laufende/unklare Sendungen bleiben durch die Prüfung oben geschützt.
-            conn.execute("""UPDATE whatsapp_messages SET processing_state = 'echo_veraltet'
-                WHERE workshop_id = ? AND customer_phone = ? AND processing_state = 'echo_pruefung'""", (wid, phone))
         previous = conn.execute("SELECT * FROM whatsapp_conversation_controls WHERE workshop_id = ? AND customer_phone = ?" +
                                 (" FOR UPDATE" if is_postgres() else ""), (wid, phone)).fetchone()
         previous = dict(previous) if previous else {}
@@ -855,4 +864,6 @@ def set_whatsapp_conversation_control(
                 pending_workshop_question_id = excluded.pending_workshop_question_id,
                 revision = whatsapp_conversation_controls.revision + 1, updated_at = CURRENT_TIMESTAMP
             """, (wid, phone, projected_mode, state, tid, pending))
+        if state == "assistant_active" and ausdrueckliche_freigabe:
+            merke_assistentenfreigabe(conn, wid, phone)
     return get_whatsapp_conversation_control(workshop_id=wid, customer_phone=phone)

@@ -91,6 +91,22 @@ def echo_offen(conn, wid, kunde):
         AND processing_state = 'echo_pruefung' LIMIT 1""", (wid, kunde)).fetchone())
 
 
+def _freigabe_erlaubt_uebernahme(conn, zeile):
+    kontrolle = conn.execute("""SELECT assistent_freigegeben_am FROM whatsapp_conversation_controls
+        WHERE workshop_id = ? AND customer_phone = ?""", (zeile["workshop_id"], zeile["customer_phone"])).fetchone()
+    freigabe = kontrolle["assistent_freigegeben_am"] if kontrolle else None
+    if freigabe is None:
+        return True
+    zeit = json.loads(zeile["payload_json"]).get("echo_zeit")
+    if type(zeit) is not int or zeit == int(freigabe):
+        # Ohne belegte Reihenfolge bleibt die Zuordnung offen, ohne Zustandswechsel.
+        return False
+    if zeit < int(freigabe):
+        conn.execute("UPDATE whatsapp_messages SET processing_state = 'echo_veraltet' WHERE id = ?", (zeile["id"],))
+        return False
+    return True
+
+
 def _uebernehmen(conn, zeile):
     from app.db import get_whatsapp_conversation_control, set_whatsapp_conversation_control
     from app.tickets import add_ticket_note
@@ -99,6 +115,8 @@ def _uebernehmen(conn, zeile):
                              (" FOR UPDATE" if is_postgres() else ""), (wid,)).fetchone()
     if not verbindung or verbindung["version"] != json.loads(zeile["payload_json"]).get("verbindung_version"):
         conn.execute("UPDATE whatsapp_messages SET processing_state = 'echo_veraltet' WHERE id = ?", (zeile["id"],))
+        return
+    if not _freigabe_erlaubt_uebernahme(conn, zeile):
         return
     kontrolle = get_whatsapp_conversation_control(workshop_id=wid, customer_phone=kunde)
     ticket = kontrolle.get("active_ticket_id")
@@ -154,10 +172,12 @@ def verarbeite_echo(eintrag, wert):
             text = textwert(inhalt.get("body" if typ == "text" else "caption"), 4096)
             kandidaten = [z["message_id"] for z in conn.execute("""SELECT message_id FROM whatsapp_messages
                 WHERE workshop_id = ? AND phone_number_id = ? AND customer_phone = ?
-                  AND direction = 'outbound' AND dispatch_state = 'sending' AND wa_message_id IS NULL""",
+                  AND direction = 'outbound' AND wa_message_id IS NULL
+                  AND (dispatch_state = 'sending' OR status IN ('sent', 'delivered', 'read', 'unknown'))""",
                 (wid, phone, kunde)).fetchall()]
             daten = {"source": "whatsapp_business_app", "sender_role": "workshop", "purpose": "workshop_notification",
-                     "verbindung_version": verbindung["version"], "echo_kandidaten": kandidaten, "echo_bestaetigt": True}
+                     "verbindung_version": verbindung["version"], "echo_kandidaten": kandidaten, "echo_bestaetigt": True,
+                     "echo_zeit": zeit}
             if typ in {"image", "audio", "video", "document", "sticker"}:
                 daten[typ] = {k: v for k, v in inhalt.items() if k in {"id", "mime_type", "sha256", "caption", "filename"}
                               and isinstance(v, str) and len(v) <= 4096}
@@ -168,6 +188,9 @@ def verarbeite_echo(eintrag, wert):
                 message_id="echo:" + hashlib.sha256((phone + ":" + provider).encode()).hexdigest())
             zeile = conn.execute("SELECT * FROM whatsapp_messages WHERE workshop_id = ? AND wa_message_id = ? AND direction = 'outbound'",
                                  (wid, provider)).fetchone()
+            if not _freigabe_erlaubt_uebernahme(conn, zeile):
+                anzahl += 1
+                continue
             if not kandidaten and zeit > int(verbindung["verbunden_seit"]):
                 _uebernehmen(conn, zeile)
             elif not kandidaten:
@@ -184,12 +207,24 @@ def ordne_fruehe_rueckmeldung(conn, zeile, provider, daten):
     if not provider:
         return
     echo = conn.execute("""SELECT * FROM whatsapp_messages WHERE workshop_id = ? AND direction = 'outbound'
-        AND wa_message_id = ? AND processing_state = 'echo_pruefung'""", (zeile["workshop_id"], provider)).fetchone()
+        AND wa_message_id = ? AND processing_state IN ('echo_pruefung', 'echo_veraltet')""", (zeile["workshop_id"], provider)).fetchone()
     if echo and echo["phone_number_id"] == zeile["phone_number_id"] and echo["customer_phone"] == zeile["customer_phone"]:
         kandidaten = json.loads(echo["payload_json"]).get("echo_kandidaten", [])
         if zeile["message_id"] in kandidaten:
             daten["echo_bestaetigt"] = True
             conn.execute("DELETE FROM whatsapp_messages WHERE id = ?", (echo["id"],))
+
+
+def _kandidat_ausgeschlossen(conn, echo, mid):
+    kandidat = conn.execute("""SELECT * FROM whatsapp_messages WHERE workshop_id = ? AND message_id = ?
+        AND phone_number_id = ? AND customer_phone = ? AND direction = 'outbound'""",
+        (echo["workshop_id"], mid, echo["phone_number_id"], echo["customer_phone"])).fetchone()
+    if not kandidat:
+        return False
+    if kandidat["wa_message_id"]:
+        return kandidat["wa_message_id"] != echo["wa_message_id"]
+    # Erfolg ohne ID und ein laufender/unklarer Versand belegen keine fremde Herkunft.
+    return kandidat["status"] == "failed" and kandidat["dispatch_state"] != "sending"
 
 
 def schliesse_rueckmeldungen(conn, wid, kunde, provider):
@@ -208,9 +243,7 @@ def schliesse_rueckmeldungen(conn, wid, kunde, provider):
         if daten.get("echo_zeit_ungeklaert"):
             continue
         kandidaten = daten.get("echo_kandidaten", [])
-        offen = any(conn.execute("SELECT 1 FROM whatsapp_messages WHERE workshop_id = ? AND message_id = ? AND dispatch_state = 'sending'",
-                                 (wid, mid)).fetchone() for mid in kandidaten)
-        if not offen:
+        if all(_kandidat_ausgeschlossen(conn, echo, mid) for mid in kandidaten):
             _uebernehmen(conn, echo)
 
 

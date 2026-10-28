@@ -547,11 +547,13 @@ def _restore_failed_dispatch(conn: Any, row: dict[str, Any], payload: dict[str, 
     previous = claim["previous_control"]
     if row["ticket_id"]:
         if claim.get("previous_ticket_state"):
-            set_ticket_conversation_state(row["ticket_id"], claim["previous_ticket_state"], row["workshop_id"])
+            set_ticket_conversation_state(row["ticket_id"], claim["previous_ticket_state"], row["workshop_id"],
+                                          ausdrueckliche_freigabe=False)
     set_whatsapp_conversation_control(
         workshop_id=row["workshop_id"], customer_phone=row["customer_phone"],
         conversation_state=previous["conversation_state"], active_ticket_id=previous.get("active_ticket_id"),
         pending_workshop_question_id=previous.get("pending_workshop_question_id"),
+        ausdrueckliche_freigabe=False,
     )
 
 
@@ -560,10 +562,11 @@ def finalize_whatsapp_dispatch(
     metadata_updates: dict[str, Any] | None = None, retry: bool = False,
     expected_dispatch_started_at: str | None = None,
 ) -> dict[str, Any]:
-    """One compare-and-set boundary for HTTP, explicit recovery and Meta receipts.
+    """Gemeinsamer Abschluss für HTTP, ausdrückliche Klärung und Meta-Bestätigungen.
 
-    Only a still-owned sending claim may change message/ticket/control state.
-    Unknown outcomes stay reserved, never becoming permission to send again.
+    Nur der weiterhin reservierte Versuch darf fachliche Abschlusswirkungen auslösen.
+    Die belegte Provider-ID desselben Versuchs darf nachträglich ergänzt werden.
+    Unklarer Versand bleibt reserviert und erteilt keine Erlaubnis zum Neuversand.
     """
     if status not in {"sent", "sent_local", "delivered", "read", "failed", "unknown"}:
         raise ValueError("Ungültiger Versandabschluss")
@@ -579,6 +582,20 @@ def finalize_whatsapp_dispatch(
             raise KeyError("Versandversuch wurde nicht gefunden")
         _lock_conversation(conn, workshop_id, row["customer_phone"])
         row = dict(row)
+        from app.whatsapp_ereignisse import ordne_fruehe_rueckmeldung, schliesse_rueckmeldungen
+        if (row["dispatch_state"] == "complete" and row["status"] in {"sent", "delivered", "read"}
+                and not row["wa_message_id"] and wa_message_id and status in {"sent", "delivered", "read"}
+                and expected_dispatch_started_at is not None and row["dispatch_started_at"] == expected_dispatch_started_at):
+            # Eine verspätete Antwort desselben Transportversuchs darf Identität ergänzen,
+            # aber die manuelle Statusentscheidung und fachlichen Wirkungen nicht wiederholen.
+            payload = _dispatch_payload(row)
+            ordne_fruehe_rueckmeldung(conn, row, wa_message_id, payload)
+            conn.execute("""UPDATE whatsapp_messages SET wa_message_id = ?, payload_json = ?
+                WHERE workshop_id = ? AND message_id = ? AND wa_message_id IS NULL""",
+                (wa_message_id, json.dumps(payload, ensure_ascii=False), workshop_id, message_id))
+            schliesse_rueckmeldungen(conn, workshop_id, row["customer_phone"], wa_message_id)
+            return _dispatch_result(conn.execute("SELECT * FROM whatsapp_messages WHERE workshop_id = ? AND message_id = ?",
+                                                 (workshop_id, message_id)).fetchone())
         if (row["dispatch_state"] != "sending" or row["status"] in {"sent", "sent_local", "delivered", "read", "failed"}
                 or (expected_dispatch_started_at is not None and row["dispatch_started_at"] != expected_dispatch_started_at)):
             return _dispatch_result(row)
@@ -586,7 +603,6 @@ def finalize_whatsapp_dispatch(
         payload.update(metadata_updates or {})
         dispatch_state = "pending" if retry else "sending" if status == "unknown" else "complete"
         provider_id = str(wa_message_id or row["wa_message_id"] or "").strip() or None
-        from app.whatsapp_ereignisse import ordne_fruehe_rueckmeldung, schliesse_rueckmeldungen
         ordne_fruehe_rueckmeldung(conn, row, provider_id, payload)
         timestamp_clause = "dispatch_started_at IS NULL" if row["dispatch_started_at"] is None else "dispatch_started_at = ?"
         params = [status, dispatch_state, provider_id, json.dumps(payload, ensure_ascii=False), workshop_id, message_id]

@@ -128,7 +128,9 @@ class EreignisFaelle:
 
     def test_ticket_fragen_und_reparaturstatus_bleiben_erhalten(self):
         tid = save_ticket(IntakeState(telefon=self.kunde, name="Prüfkunde"), workshop_id=self.wid, verified_customer_phone=self.kunde)
-        db.set_whatsapp_conversation_control(workshop_id=self.wid, customer_phone=self.kunde, mode="assistant", active_ticket_id=tid)
+        # Anfangszuordnung des Tickets, keine spätere ausdrückliche Assistentenfreigabe.
+        db.set_whatsapp_conversation_control(workshop_id=self.wid, customer_phone=self.kunde, mode="assistant", active_ticket_id=tid,
+                                            ausdrueckliche_freigabe=False)
         add_ticket_note(tid, "Wie teuer?", workshop_id=self.wid, purpose="customer_question", message_id="frage-offen")
         vorher = find_ticket_by_id(tid, self.wid)
         self.webhook(self.paket())
