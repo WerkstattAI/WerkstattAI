@@ -2,6 +2,58 @@
 
 ## Aktueller Stand vom 29. Oktober 2026
 
+**M2, Aufgabe 5: Lokale Gesamtabnahme bestanden; reale Coexistence nicht geprüft.**
+Geprüfter Produktcode: `1eca6c15d0b1aca020ef2cdcaa22d95c2010a5a6`, zu Beginn
+lokal/remote identisch bei sauberem Arbeitsbaum. Eigene Abnahmebranch:
+`codex/m2-lokale-abnahme-2026-10-29`. Keine Änderungen an App-Code, Migrationen,
+Produktkonfiguration, Oberfläche oder vorhandenen Tests.
+
+Die unabhängige Nachprüfung nimmt inzwischen beide Aufgabe-4-Korrekturen lokal
+an. Ihr historischer Vollverlauf bleibt **753/755** plus ein gesonderter
+erfolgreicher **2/2**-Nachlauf auf frischem PostgreSQL. Der damalige
+`ConnectionTimeout` und die generische HTTP-400-Antwort werden nicht nachträglich
+als grüner Einzellauf bezeichnet; die innere Ursache der alten 400-Antwort bleibt
+unbelegt. Dieser Auftrag erbringt einen neuen vollständigen Nachweis.
+
+Neu bestanden: **761/761 Python-Tests in 347,713 Sekunden**, darin **90
+PostgreSQL** und **671 SQLite-/datenbankunabhängige Fälle**, keine Fehler oder
+Auslassungen. Python **3.12.13**, SQLite **3.46.1**, PostgreSQL **18.6**, psycopg
+**3.2.3**; eigene frische leere Datenbank und gesperrtes echtes HTTP.
+Der einmalige Abschlusslauf wurde von 20:19:15 bis 20:25:03 UTC fortlaufend mit
+Testzeitstempeln protokolliert. Zusätzlicher gezielter Lauf **146/146**, darunter
+**54 PostgreSQL**, einschließlich der unveränderten Originalgegenproben
+**3/3 je Datenbank**. Diese überlappenden Gruppen werden nicht addiert.
+
+Sechs neue Integrationsausführungen (drei je Datenbank) verbinden zwei künstliche
+Werkstätten über echte autorisierte Routen und prüfen Synchronisierung,
+Neustart, dauerhaft zurückgehaltenen Eingang, Kundenannahme, genau eine lokale
+Sendung, manuelle Antwort, Telefonübernahme, Widerruf und Kontentrennung.
+Phase 1 behält `coexistence_bereit=0`; ausschließlich Phase 2 setzt die Flagge
+in isolierten Fixtures künstlich auf 1. Das ist keine betriebliche Freigabe.
+Bestehende Konkurrenz- und Korrekturtests bleiben unverändert.
+
+Außerdem **62/62 JavaScript-Tests**, Node.js **24.16.0**. Getrennter
+Chrome-Nachweis **156.0.8078.73** für neun Zustände auf Desktop **1200 px** und
+Mobil **390 px**, mit tatsächlichen Templates/CSP, Origin-Prüfung und abgefangenem
+Transport. SDK, OAuth-Popup und reales Telefon sind nicht geprüft.
+Die drei fehlgeschlagenen Vorläufe betrafen falsche Annahmen der neuen Testquelle;
+sie sind samt Korrekturen ausschließlich am Harness im
+[Abnahmebericht](m2-lokale-abnahme-2026-10-29.md) offengelegt. Kein neuer
+bestätigter blockierender Produktfehler; keine automatischen Test-Retries.
+
+Eigene Prüfcontainer und Netze entfernt und deren Abwesenheit per Docker
+bestätigt; eigener Browser geschlossen. Diff- und Geheimnisprüfung ohne Befund.
+Rohlogs, Screenshots und lokale Werkzeuge bleiben außerhalb von Git und Images.
+Keine Kundendaten, echte Nachrichten, Meta-Kontoeinstellungen, Merge oder
+Deployment. Produktflagge bleibt 0; bereits gestartetes externes HTTP ist nicht
+rückholbar. Reale Eignung, Freigaben und vollständige Coexistence bleiben offen.
+
+### Nächste Schritte
+
+1. **Unabhängige Bewertung dieses M2-Abnahmeberichts.**
+
+## Historischer Stand der Aufgabe-4-Korrekturen vom 29. Oktober 2026
+
 **M2, Aufgabe 4: Die beiden unabhängig nachgewiesenen P2-Fehler sind lokal
 korrigiert; unabhängige Nachprüfung steht aus. Aufgabe 4 ist noch nicht abgenommen.**
 Basis war `ee4127fa4a652772b305ec38f6ecb6c2155de47e`, vor Änderungen lokal/remote
@@ -54,7 +106,7 @@ später niemals automatisch nachverarbeitet. Keine unabhängige Abnahme, kein re
 Meta-/Lasttest, keine Kundendaten, Kontokonfiguration, Merge oder Deployment;
 Aufgabe 5 nicht begonnen. Bereits gestartetes externes HTTP bleibt nicht rückholbar.
 
-### Nächste Schritte
+### Damaliger nächster Schritt (Nachprüfung inzwischen erfolgt, lokal angenommen)
 
 1. **Unabhängige Nachprüfung dieser beiden Korrekturen von Aufgabe 4.**
 
