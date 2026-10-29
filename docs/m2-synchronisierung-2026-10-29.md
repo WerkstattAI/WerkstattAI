@@ -1,8 +1,124 @@
 # M2, Aufgabe 4: Historie, Kontakte und sichere Synchronisierung
 
-Stand: 29. Oktober 2026. Lokale Implementierung mit synthetischen Werkstätten
-und simuliertem Meta-Transport. Unabhängige Prüfung von Aufgabe 4 und realer
-Meta-Anschluss stehen aus. `coexistence_bereit` bleibt 0. Keine Betriebsfreigabe.
+Stand: 29. Oktober 2026. Die unabhängige Prüfung von `ee4127f` hat zwei P2-Fehler
+nachgewiesen; Aufgabe 4 ist noch nicht abgenommen. Beide Ursachen sind lokal
+korrigiert. Die unabhängige Nachprüfung der Korrekturen und der reale Meta-Nachweis
+stehen aus. `coexistence_bereit` bleibt 0. Keine Betriebsfreigabe.
+
+## Zwei enge Korrekturen nach dem unabhängigen Review
+
+Korrekturbasis: `ee4127fa4a652772b305ec38f6ecb6c2155de47e`, vor Änderungen lokal
+und remote identisch, Arbeitsbaum sauber. Eigene Aufgabenbranch:
+`codex/m2-synchronisierung-korrekturen-2026-10-29`.
+Gelesen wurden der unabhängige `PRUEFBERICHT.txt` und `gegenproben.py` unter
+`C:\Users\Mikolaj\Documents\New project\m2-synchronisierung-review-2026-10-29\`.
+Die dort bestandenen **719 Python-Tests (69 PostgreSQL)** und **62 JavaScript-Tests**
+sind historische Reviewnachweise. Drei zusätzliche Gegenproben scheiterten dort
+auf beiden Datenbanken. Aufgaben 1–3 einschließlich der Echo-Korrekturen bleiben
+die vorhandene Grundlage; daraus folgt keine Abnahme von Aufgabe 4.
+
+**P2-1, bekannte offene Importarbeit:** `erfasse` speicherte `sync_offen` dauerhaft,
+doch `technisch_bereit` prüfte nur die bereits verarbeiteten Auftragszustände.
+Dadurch konnten Status, normaler Eingang und automatische Versandprüfung vor
+dem Hintergrundlauf noch Bereitschaft sehen. Jetzt gehört das Fehlen aktueller
+offener Journaleinträge zur technischen Bereitschaft. Werkstatt, Nummer und
+Versionspräfix werden abgegrenzt; dieselbe Version ist über die zuvor geprüften
+Aufträge an die aktuelle WABA und Nummer gebunden. Capture und Erledigung stehen
+unter derselben Kommunikationssperre wie Eingang und letzte Versandprüfung.
+Der bestehende Journaleintrag ist selbst die atomare Sperre, ohne zusätzliche
+Flagge, Tabelle, Migration oder zweite Queue.
+
+Erledigte identische Lieferungen werden durch den bestehenden eindeutigen
+Ereignisschlüssel nicht wieder offen. Unverarbeitete Duplikate, Abschlussmeldungen
+und Neustarts beseitigen aktuelle Arbeit nicht. Nach atomarem Import und
+Erledigungsvermerk gilt wieder der fachliche Auftragszustand: vollständige
+widerspruchsfreie Historie kann bereit sein, Lücken und Konflikte bleiben gesperrt.
+Einträge einer alten Version sperren kein anderes verifiziertes Nummern-/Kontopaar
+und werden bei Recovery ohne Import erledigt. Der bestehende strengere Schutz
+für nicht unterscheidbare Wiederanschlüsse desselben Paares bleibt erhalten.
+Einmal zurückgehaltene Live-Eingänge werden auch nach späterer Bereitschaft nicht
+nachverarbeitet; abgebrochene reservierte Antworten werden nicht erneut gesendet.
+
+**P2-2, Lieferung bei 0 Prozent:** Die alte Bedingung `not fortschritt` deutete
+bereits importierte Daten fälschlich als fehlende Lieferung und erlaubte danach
+`nicht_geteilt`. Jetzt werden die gespeicherten Teile derselben Werkstatt/Version
+und der dauerhafte History-Verarbeitungszustand berücksichtigt. `laufend` und
+`abgeschlossen` entstehen atomar mit der Verarbeitung, auch bei Medien vor einem
+Thread oder Medien zu einer schon bekannten Nachricht. Deshalb bleiben diese
+Nachweise nach Neustart erhalten, selbst wenn kein Medien-Journaleintrag mehr
+existiert und der Prozentwert 0 ist. Eine spätere Ablehnung führt zu `pruefung`,
+ohne Nachrichten zu löschen oder normale Kundenannahme auszulösen.
+
+Auch eine früher akzeptierte leere Lieferung wird vorsichtshalber als Widerspruch
+behandelt; sie beweist nicht, dass keine Lieferung stattfand. Eine tatsächlich
+erstmalige Ablehnung ohne vorherige Lieferung sowie deren identische Wiederholung
+bleiben zulässig. Daten und Ablehnung innerhalb desselben `value` weist der
+bestehende Parser in beiden Reihenfolgen vor Wirkungen ab; getrennte `changes`
+im selben signierten Paket führen in beiden Reihenfolgen zu `pruefung`.
+Es wurden keine Providerfelder, neue Providerannahmen oder externen Ereignisse
+eingeführt; die Korrektur betrifft ausschließlich lokale Nachweise und Sperren.
+Ein erneuter Dokumentationsabruf war dafür nicht erforderlich.
+
+Wiederverwendet bleiben `atomic_database`, Kommunikationssperre, Versionsbindung,
+Journal-Deduplizierung, Kontrollrevisionen, Dispatch-Reservierung, Finalisierung
+und Recovery. Die verbindlichen Eingangs- und Versandprüfungen nutzen bereits
+`automatik_gesperrt` und damit die korrigierte Bereitschaft; dort war keine weitere
+Produktänderung nötig. Oberfläche und Signup bleiben unverändert.
+
+## Neue Prüfungen der beiden Korrekturen vom 29. Oktober
+
+Die drei Originalmethoden wurden auf der unveränderten Basis zuerst namentlich
+geladen: **SQLite 3/3 erwartete Assertion-Fehlschläge**, **PostgreSQL 3/3 erwartete
+Assertion-Fehlschläge**, keine Fixture-/Importfehler oder Auslassungen. Die externe
+Datei ist unverändert; ihre lokale Prüfkopie ist bytegleich. AST-Vergleich bestätigt
+unveränderte Methodenrümpfe und Assertions in der dauerhaften Regression.
+Die neue Testklasse übernimmt nur Fixture-Helfer, keine geerbten Bestandsfälle.
+
+Nach der Korrektur bestanden die Originale getrennt: **3/3 SQLite** unter Python
+**3.14.3**, SQLite **3.50.4**, sowie **3/3 PostgreSQL** unter Python **3.12.13**.
+Der gezielte Containerlauf bestand mit **39/39 Fällen in 49,696 Sekunden**:
+18 neue SQLite-Regressionsfälle, dieselben 18 auf PostgreSQL sowie die drei extern
+geladenen PostgreSQL-Originale. Diese Gruppen überlappen fachlich und werden
+nicht zur Gesamtsuite addiert. Ein früherer lokaler Entwicklungslauf mit 17 noch
+nicht vollständig ergänzten SQLite-Fällen war ebenfalls erfolgreich.
+
+Zusätzliche Regressionen prüfen Capture-Rollback, Halt vor Hintergrundlauf,
+Neustart in einem frischen Prozess, Abschluss/Lücken und Duplikate, Kontaktarbeit,
+zwei Werkstätten, neue Versionen, Medien bei 0 Prozent, echte erste Ablehnung
+und gemischte Lieferungen. Deterministische Events ordnen Capture gegen normalen
+Eingang sowie Capture nach Dispatch-Reservierung vor der letzten lokalen
+Versandprüfung; keine Zufallssleeps oder automatischen Test-Retries.
+
+Vollständiger Abschlusslauf: **755/755 Python-Tests in 448,350 Sekunden bestanden**,
+darin **87 tatsächlich ausgeführte PostgreSQL-Fälle** und **668 SQLite-/datenbank-
+unabhängige Fälle**. Keine Fehler, Fehlschläge oder Auslassungen. Python **3.12.13**,
+SQLite **3.46.1**, PostgreSQL **18.6**, psycopg **3.2.3**. Der Lauf verwendet eine
+erneut eigens angelegte leere PostgreSQL-Wegwerfdatenbank und gesperrten echten
+HTTP-Transport. Das ist keine vollständige Anwendungssuite nur auf PostgreSQL.
+**62/62 JavaScript-Tests bestanden**, Node.js **24.16.0**, ebenfalls ohne Auslassungen.
+Nach der Produktkorrektur gab es keine fehlgeschlagenen Testvorläufe; die sechs
+erwarteten Baseline-Fehlschläge sind oben getrennt ausgewiesen. Eine absichtlich
+simulierte Ausnahme im bestehenden Zuverlässigkeitstest erscheint im Vollprotokoll,
+ist aber kein fehlgeschlagener Test. Keine automatischen Wiederholungen.
+
+Die komplette Datei `tests/test_whatsapp_echo_korrekturen.py` bleibt gegenüber
+der Basis unverändert. Diff-/Whitespace-Prüfung und begrenzter Geheimnisscan über
+alle vier geänderten/neuen Dateien ohne Befund; kein vollständiger Sicherheitsaudit.
+Alle eigenen Prüfcontainer und Netze der Baseline-, gezielten und vollständigen
+PostgreSQL-Läufe wurden im jeweiligen `finally` entfernt. Die separaten
+Bereinigungsnachweise und der anschließende Docker-Abgleich bestätigen: keine
+zugehörigen Container (auch keine gestoppten) oder Netze verbleiben.
+
+Grenzen: Diese lokalen Prüfungen sind keine unabhängige Abnahme und kein realer
+Meta-, Last- oder Produktionsnachweis. Kein neuer Browserlauf für die unveränderte
+Oberfläche; der unten dokumentierte Chrome-Lauf bleibt ein historischer Nachweis.
+Keine globale Exactly-once-Zusage: ein bereits begonnener externer HTTP-Aufruf
+ist nicht rückholbar, die Sperre gilt am bestehenden letzten lokalen Übergabepunkt.
+Provider-Generationen ohne unterscheidbare Kennung, fehlender globaler
+Kontaktabschluss und nicht verfügbare Medien bleiben die bestehenden Grenzen.
+Keine echten Konten, Kundendaten, Meta-Konfiguration, Merge, Deployment oder
+Aufgabe 5. Lokale Artefakte liegen ausschließlich im ignorierten Verzeichnis
+`artifacts/m2-synchronisierung-korrekturen/`, außerhalb von Git und Docker-Images.
 
 ## Ausgangspunkt
 
@@ -174,9 +290,10 @@ Medien. Betriebliche Bereitschaft bleibt separat und geschlossen. Eine isolierte
 wird nicht an diese Coexistence-Bedingung gebunden; einmal zurückgehaltene Eingänge
 bleiben auch nach späterer Bereitschaft und Wiederzustellung ausgeschlossen.
 
-## Prüfnachweise
+## Historische Prüfnachweise der Erstimplementierung
 
-Abschließender Stand vom 29. Oktober, nach allen beschriebenen Korrekturen:
+Damals abschließender Stand vom 29. Oktober vor dem unabhängigen Review;
+keine Prüfergebnisse der oben beschriebenen beiden P2-Korrekturen:
 
 - **719/719 Python-Tests bestanden**, **362,645 Sekunden**, keine übersprungenen
   Tests. Python **3.12.13**, SQLite **3.46.1**, PostgreSQL **18.6**, psycopg **3.2.3**.
@@ -266,4 +383,4 @@ Keine vollständige Coexistence-Freigabe, kein Merge/Deployment, kein Beginn von
 
 ## Nächster Schritt
 
-Unabhängige Prüfung von Aufgabe 4.
+Unabhängige Nachprüfung dieser beiden Korrekturen von Aufgabe 4.

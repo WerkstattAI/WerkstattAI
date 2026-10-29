@@ -95,7 +95,14 @@ def technisch_bereit(conn, v):
     return (len(a) == 2 and not any(z["generation_offen"] for z in a.values())
             and a["history"]["zustand"] in {"abgeschlossen", "nicht_geteilt", "verzicht"}
             and bool(a["smb_app_state_sync"]["request_id"])
-            and a["smb_app_state_sync"]["zustand"] in {"angenommen", "laufend"})
+            and a["smb_app_state_sync"]["zustand"] in {"angenommen", "laufend"}
+            # Capture und Erledigung verwenden dieselbe Kommunikationssperre wie
+            # Eingang/Versand. Der Journaleintrag selbst ist die atomare Sperre.
+            # Die Version gehört zur oben geprüften WABA-/Nummern-Auftragsbindung.
+            and not conn.execute("""SELECT 1 FROM whatsapp_events WHERE workshop_id = ?
+                AND phone_number_id = ? AND event_type = 'sync_offen'
+                AND ereignis_schluessel LIKE ? LIMIT 1""",
+                (v["workshop_id"], v["phone_number_id"], f"sync:{v['version']}:%")).fetchone())
 
 
 def status(wid):
@@ -330,7 +337,16 @@ def _historie(conn, v, z, d):
         return
     for t in d["teile"]:
         if "fehler" in t:
-            _zustand(conn, z, "nicht_geteilt" if t["fehler"] == [2593109] and not z["fortschritt"] else "pruefung", t["fehler"][0])
+            teile_vorhanden = conn.execute("""SELECT 1 FROM whatsapp_sync_teile
+                WHERE workshop_id = ? AND version = ? LIMIT 1""",
+                (v["workshop_id"], v["version"])).fetchone()
+            # Auch leere Teile und Medien bei 0 Prozent sind Lieferungen.
+            # Laufend/abgeschlossen wird erst mit der verarbeiteten Lieferung
+            # atomar gespeichert, auch bei Medien zu schon bekannten Nachrichten.
+            # Eine frühere leere Lieferung bleibt vorsichtshalber ebenfalls ein
+            # Widerspruch; fehlender Prozentfortschritt beweist keine Abwesenheit.
+            geliefert = teile_vorhanden or z["zustand"] in {"laufend", "abgeschlossen"} or z["fortschritt"]
+            _zustand(conn, z, "nicht_geteilt" if t["fehler"] == [2593109] and not geliefert else "pruefung", t["fehler"][0])
             return
         alt = conn.execute("SELECT pruefsumme FROM whatsapp_sync_teile WHERE workshop_id = ? AND version = ? AND phase = ? AND teil = ?",
                            (v["workshop_id"], v["version"], t["phase"], t["teil"])).fetchone()

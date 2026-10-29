@@ -2,6 +2,64 @@
 
 ## Aktueller Stand vom 29. Oktober 2026
 
+**M2, Aufgabe 4: Die beiden unabhängig nachgewiesenen P2-Fehler sind lokal
+korrigiert; unabhängige Nachprüfung steht aus. Aufgabe 4 ist noch nicht abgenommen.**
+Basis war `ee4127fa4a652772b305ec38f6ecb6c2155de47e`, vor Änderungen lokal/remote
+identisch und Arbeitsbaum sauber. Eigene Aufgabenbranch:
+`codex/m2-synchronisierung-korrekturen-2026-10-29`.
+
+Der unabhängige Review vom 29. Oktober bestand mit 719 Python-Tests, davon 69 auf
+PostgreSQL, und 62 JavaScript-Tests. Drei zusätzliche Gegenproben belegten dennoch
+zwei Fehler auf beiden Datenbanken: dauerhaft erfasste offene Importarbeit sperrte
+die Bereitschaft nicht sofort, und Datenlieferung bei 0 Prozent wurde bei späterer
+Ablehnung fälschlich als fehlende Lieferung behandelt. Diese Zahlen sind frühere
+Reviewnachweise. Aufgaben 1–3 einschließlich ihrer Korrekturen bleiben Grundlage.
+
+Die Bereitschaft berücksichtigt jetzt aktuelle `sync_offen`-Einträge im bestehenden
+Journal, begrenzt auf Werkstatt, Nummer und die an WABA/Nummer gebundene Version.
+Damit wirkt die Annahme unter derselben Kommunikationssperre atomar gegen normalen
+Eingang und letzte lokale Versandprüfung. Erledigte Duplikate erzeugen keine neue
+Sperre; Recovery kann nach widerspruchsfreier Verarbeitung freigeben, während
+bekannte Lücken oder Konflikte sperren. Alte Versionen werden abgegrenzt.
+
+Gespeicherte History-Teile und der dauerhafte Verarbeitungszustand belegen eine
+frühere Lieferung unabhängig vom Prozentwert, auch für Medien vor einem Thread
+oder zu einer bekannten Nachricht. Eine folgende Ablehnung bleibt prüfpflichtig;
+Nachrichten werden erhalten. Ein echter erster Verzicht ohne vorherige Lieferung
+und identische Wiederholungen bleiben möglich. Bestehende Transaktionen,
+Kontrollrevisionen, Dispatch-Reservierungen, Finalisierung und Recovery werden
+wiederverwendet. Keine Migration, zweite Nachrichtenablage oder neue Providerannahme.
+
+Die drei Originalgegenproben wurden zunächst auf unveränderter Basis mit jeweils
+drei erwarteten Assertion-Fehlschlägen auf SQLite und PostgreSQL reproduziert.
+Danach bestanden sie auf beiden Datenbanken mit unveränderten Methodenrümpfen
+und Assertions; die externe Belegdatei blieb unverändert. 18 neue dauerhafte
+Regressionsfälle bestehen auf jeder Datenbank einschließlich deterministischer
+Konkurrenz, Neustart, Medien, Duplikate und Versions-/Werkstatttrennung.
+Die gesamte Datei der Aufgabe-3-Echo-Gegenproben blieb unverändert.
+
+Neu bestanden: **755/755 Python-Tests in 448,350 Sekunden**, davon **87 PostgreSQL**
+und **668 SQLite-/datenbankunabhängige Fälle**, keine Fehler oder Auslassungen.
+Python **3.12.13**, SQLite **3.46.1**, PostgreSQL **18.6**, psycopg **3.2.3**;
+eigene frische leere PostgreSQL-Datenbank und gesperrter echter HTTP-Transport.
+Zusätzlich **62/62 JavaScript-Tests**, Node.js **24.16.0**. Nach der Korrektur keine
+fehlgeschlagenen Vorläufe oder automatischen Retries. Prüfcontainer und Netze
+entfernt, durch Docker-Abgleich bestätigt; Diff- und Geheimnisprüfung ohne Befund.
+Lokale Prüfartefakte bleiben von Git und Docker-Images ausgeschlossen.
+Einzelheiten und historische Nachweise stehen im
+[aktualisierten Synchronisierungsbericht](m2-synchronisierung-2026-10-29.md).
+
+`coexistence_bereit=0` bleibt im Produkt erhalten. Zurückgehaltene Eingänge werden
+später niemals automatisch nachverarbeitet. Keine unabhängige Abnahme, kein realer
+Meta-/Lasttest, keine Kundendaten, Kontokonfiguration, Merge oder Deployment;
+Aufgabe 5 nicht begonnen. Bereits gestartetes externes HTTP bleibt nicht rückholbar.
+
+### Nächste Schritte
+
+1. **Unabhängige Nachprüfung dieser beiden Korrekturen von Aufgabe 4.**
+
+## Historischer Stand der Aufgabe-4-Erstimplementierung vom 29. Oktober 2026
+
 **M2, Aufgabe 4: Historie, Kontakte und sichere Synchronisierung lokal umgesetzt;
 unabhängige Prüfung und reale Meta-Erprobung stehen aus.** Ausgangspunkt war
 `326f0007e0c474481cd50005ae336e179aa3cfee`, lokal/remote identisch bei sauberem
@@ -46,7 +104,7 @@ Prüfartefakte bleiben von Git und Docker-Images ausgeschlossen.
 Keine echten Nachrichten, Kundendaten oder Meta-Kontoeinstellungen, kein Merge
 oder Deployment. Aufgabe 5 wurde nicht begonnen.
 
-### Nächste Schritte
+### Damaliger nächster Schritt (Review inzwischen erfolgt, zwei P2-Befunde)
 
 1. **Unabhängige Prüfung von Aufgabe 4.**
 
