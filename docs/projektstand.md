@@ -2,6 +2,55 @@
 
 ## Aktueller Stand vom 29. Oktober 2026
 
+**M2-Veröffentlichung vor Produktionsänderung blockiert: autorisierter
+Railway-Zugriff in dieser Sitzung nicht verfügbar.** Der vollständige
+Veröffentlichungsauftrag liegt vor; keine neue allgemeine Freigabe erforderlich.
+Remote-Abgleich bestätigt weiterhin Produktion
+`aa965e481f62ad34ee752d5b3cd89f365c4d30fb` auf
+`codex/kundenkommunikation-2026-09-26` und abgenommenes M2
+`4eb8e3899314dc12d4af1d60fb0cf7b42e093b32`, 16 voraus und 0 zurück.
+Sauberer Ausgangsbaum, kein Produktionspush, Deployment oder Produktionsmigration.
+
+Die unabhängige Gesamtabnahme ist inzwischen positiv abgeschlossen; der frühere
+nächste Schritt unten ist erledigt. 761/761 Python sowie unabhängige 80/80,
+62/62 JavaScript und Chrome bleiben frühere Nachweise, keine neu ausgeführten Suiten.
+
+Neu geprüft: beide exakten Commitarchive mit vorhandenem Dockerfile gebaut,
+Python 3.12.16 und Zielabhängigkeit cryptography 50.0.2. Künstlichen
+PostgreSQL-Altbestand gesichert und getrennt wiederhergestellt, M2-Migration mit
+Erhalt bisheriger Spaltenwerte in fünf geprüften Tabellen, M1-Zugang, geschlossenen
+Signup/Coexistence, wiederholten Start und alten Code auf migrierter Kopie geprüft.
+Normalisierte doppelte Nummernbindung sperrt die Migration ohne Zuordnungsauswahl.
+Lokale Health-/Login-/Dashboard-/Einstellungs-/Anschluss-/Medienschutzkontrollen
+bestanden. Anschließender Fehler im lokalen Bereinigungslogger offengelegt;
+Exitcode 1 nicht als grüner Gesamtlauf ausgegeben, Bereinigung separat abgeschlossen.
+Keine vollständige Suite wiederholt oder Produktreparatur vorgenommen.
+
+**Offen:** echte Produktionssicherung und deren Wiederherstellung, aktuelle
+Nummernkonflikte/M1/Konfiguration, Railway-Quelle, ausstehende Änderungen und
+Wiederherstellbarkeit des guten Deployments. Browserinventur leer, In-App-Browser
+nicht verfügbar; native Fenstersteuerung scheitert auch nach Reset an
+`CreateProcessWithLogonW failed: 2`. Die gesperrte Railway CLI wurde nicht umgangen.
+Die Hilfe des Nutzers beim Login konnte mangels steuerbarer Oberfläche nicht
+genutzt werden. Kein fehlgeschlagener Kontologin behauptet.
+
+Öffentliches `/health` und `/login` erreichbar, Medienroute ohne Anmeldung zur
+Loginseite umgeleitet. Das bestätigt weder laufenden SHA noch Datenbankmigration.
+Letzte historisch bestätigte Railway-ID bleibt
+`e81fee99-9838-4ee3-9639-ba2674b3537b`; kein neuer Panelnachweis oder Deployment-ID.
+Eigene Prüfcontainer, Netz und Bildtags entfernt und Abwesenheit bestätigt.
+Notion-Projektzentrum und M2-Karte aktualisiert; nur bereinigte Dokumentation auf
+`codex/m2-veroeffentlichungsbericht-2026-10-29`, keine zweite Produktionsauslösung.
+Details und Grenzen im [Veröffentlichungsbericht](m2-veroeffentlichung-2026-10-29.md).
+
+### Nächste Schritte
+
+1. **Funktionsfähigen autorisierten Railway-Zugriff für diese Sitzung bereitstellen,
+   um die fehlende Produktionsvorprüfung und die bereits beauftragte Veröffentlichung
+   fortzusetzen.**
+
+## Historischer Stand der lokalen M2-Gesamtabnahme vom 29. Oktober 2026
+
 **M2, Aufgabe 5: Lokale Gesamtabnahme bestanden; reale Coexistence nicht geprüft.**
 Geprüfter Produktcode: `1eca6c15d0b1aca020ef2cdcaa22d95c2010a5a6`, zu Beginn
 lokal/remote identisch bei sauberem Arbeitsbaum. Eigene Abnahmebranch:
@@ -48,7 +97,7 @@ Keine Kundendaten, echte Nachrichten, Meta-Kontoeinstellungen, Merge oder
 Deployment. Produktflagge bleibt 0; bereits gestartetes externes HTTP ist nicht
 rückholbar. Reale Eignung, Freigaben und vollständige Coexistence bleiben offen.
 
-### Nächste Schritte
+### Damaliger nächster Schritt (Gesamtabnahme inzwischen unabhängig angenommen)
 
 1. **Unabhängige Bewertung dieses M2-Abnahmeberichts.**
 
