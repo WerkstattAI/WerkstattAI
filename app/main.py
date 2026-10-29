@@ -3,7 +3,7 @@ from __future__ import annotations
 import logging
 from typing import Annotated
 
-from fastapi import FastAPI, HTTPException, Query, Request, Response
+from fastapi import BackgroundTasks, FastAPI, HTTPException, Query, Request, Response
 from fastapi.exceptions import RequestValidationError
 from fastapi.responses import JSONResponse, PlainTextResponse, RedirectResponse
 from pydantic import BaseModel, Field, ValidationError
@@ -359,7 +359,7 @@ def _save_or_send_whatsapp_reply(
 
 
 @app.post("/webhooks/whatsapp")
-async def whatsapp_webhook(request: Request):
+async def whatsapp_webhook(request: Request, background_tasks: BackgroundTasks = None):
     if is_production(settings) and not settings.whatsapp_app_secret:
         raise HTTPException(status_code=403, detail="WhatsApp webhook is not configured")
     body = await request.body()
@@ -388,6 +388,8 @@ async def whatsapp_webhook(request: Request):
     try:
         from app.whatsapp_ereignisse import aenderungen, nachrichten_zuordnung, verarbeite_echo, verarbeite_konto
         ereignisse = aenderungen(payload)
+        if len(body) > 256 * 1024 and not any(feld in {"history", "smb_app_state_sync"} for feld, _, _ in ereignisse):
+            raise OverflowError("Live-Lieferung zu groß")
         messages = parse_meta_messages(payload)
         statuses = parse_meta_statuses(payload)
     except OverflowError:
@@ -411,7 +413,14 @@ async def whatsapp_webhook(request: Request):
     for feld, eintrag, wert in ereignisse:
         if feld == "smb_message_echoes":
             verarbeite_echo(eintrag, wert)
-        # history und smb_app_state_sync bleiben bis Aufgabe 4 ohne Import.
+        if feld in {"history", "smb_app_state_sync"}:
+            from app.whatsapp_synchronisierung import erfasse, verarbeite_offene
+            wid = erfasse(wert)
+            if wid:
+                if background_tasks is not None:
+                    background_tasks.add_task(verarbeite_offene, wid)
+                else:
+                    verarbeite_offene(wid)
 
     for status_event in statuses:
         workshop_id = nachrichten_zuordnung(status_event.waba_id, status_event.phone_number_id)

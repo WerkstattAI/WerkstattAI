@@ -1,6 +1,56 @@
 # WerkstattAI – Projektstand und nächste Schritte
 
-## Aktueller Stand vom 28. Oktober 2026
+## Aktueller Stand vom 29. Oktober 2026
+
+**M2, Aufgabe 4: Historie, Kontakte und sichere Synchronisierung lokal umgesetzt;
+unabhängige Prüfung und reale Meta-Erprobung stehen aus.** Ausgangspunkt war
+`326f0007e0c474481cd50005ae336e179aa3cfee`, lokal/remote identisch bei sauberem
+Arbeitsbaum. Eigene Branch: `codex/m2-synchronisierung-2026-10-29`.
+
+Aufgabe 3 einschließlich beider Echo-Korrekturen wurde laut unabhängigem Bericht
+vom 28. Oktober lokal abgenommen. Dessen 650 Python-Tests (35 PostgreSQL) und
+58 JavaScript-Tests sind frühere Nachweise; die damalige Aufforderung zur
+Aufgabe-3-Nachprüfung ist erledigt.
+
+Der bestätigte Anschluss legt jetzt dauerhafte, versionsgebundene Aufträge für
+Kontakte und Historie an. Das Anschlussdashboard startet beide einmalig und setzt
+nach Neustart lokale Arbeit mit aktueller Berechtigung fort. Vor HTTP wird
+dauerhaft reserviert, außerhalb von Datenbanksperren transportiert und danach
+die aktuelle Version geprüft. Timeout/Crash erlauben keinen blinden Neuversuch.
+
+Signierte Importfelder verwenden das bestehende Ereignisjournal und den
+vorhandenen Nachrichtenbestand. Historie bleibt chronologisch erkennbar, ohne
+Ticket, Intake, heutige Zuständigkeit oder Kundenservice-Fenster zu erzeugen.
+Provider-Identität ergänzt bekannte Nachrichten, Medien können getrennt folgen.
+Kontakte besitzen werkstattgebundene Änderungszeiten und Remove-Tombstones;
+unklare Gleichstände werden nicht als sichere Änderungen ausgegeben.
+
+Technische Synchronisierung und betriebliche Freigabe sind getrennt.
+`coexistence_bereit=0` bleibt erhalten. Kontaktvollständigkeit ist nicht durch
+Meta belegt; Medienverfügbarkeit ist kein Nachrichtenabschluss. Ein Neuanschluss
+mit nicht unterscheidbaren alten Lieferungen bleibt prüfpflichtig. Altanschlüsse
+ohne initialen Nachweis erhalten keine neue 24-Stunden-Frist. M1 bleibt unabhängig;
+zurückgehaltene Eingänge werden niemals nachträglich automatisch verarbeitet.
+
+Quellen, Vertragsmatrix, Testvorläufe, tatsächliche Abschlussnachweise und
+Protokollgrenzen stehen im [Synchronisierungsbericht](m2-synchronisierung-2026-10-29.md).
+Neu bestanden: **719/719 Python-Tests**, darin **69 PostgreSQL-Tests**, keine
+Auslassungen; Python **3.12.13**, SQLite **3.46.1**, PostgreSQL **18.6**, psycopg
+**3.2.3**. Außerdem **62/62 JavaScript-Tests** mit Node.js **24.16.0**. Getrennter
+Chrome-Nachweis (**156.0.8078.73**) für fünf Sync-Zustände, Statusaktion,
+Mobilansicht und importierten Verlauf mit aktiver CSP und abgefangener Netzkommunikation.
+Die beiden Aufgabe-3-Gegenproben sind unverändert. Prüfcontainer und Netz wurden
+entfernt; Docker-Abgleich, Diff- und Geheimnisprüfung ohne Befund. Alle lokalen
+Prüfartefakte bleiben von Git und Docker-Images ausgeschlossen.
+
+Keine echten Nachrichten, Kundendaten oder Meta-Kontoeinstellungen, kein Merge
+oder Deployment. Aufgabe 5 wurde nicht begonnen.
+
+### Nächste Schritte
+
+1. **Unabhängige Prüfung von Aufgabe 4.**
+
+## Historischer Stand der Aufgabe-3-Korrekturen vom 28. Oktober 2026
 
 **M2, Aufgabe 3: Die beiden unabhängig nachgewiesenen Echo-Fehler sind korrigiert.**
 Ausgangspunkt war `123f807ce0c8a5d1905f9c9d949576296c6fd2cd`, lokal und remote
@@ -41,7 +91,7 @@ Kein realer Meta-Test und keine vollständige Coexistence-Freigabe. Keine echten
 Nachrichten, Kundenanschlüsse, Produktion, Meta-Konfiguration, Merge oder
 Deployment. Aufgabe 4 wurde nicht begonnen.
 
-### Nächste Schritte
+### Damaliger nächster Schritt (inzwischen unabhängig abgeschlossen)
 
 1. **Unabhängige Nachprüfung der beiden Korrekturen von Aufgabe 3.**
 

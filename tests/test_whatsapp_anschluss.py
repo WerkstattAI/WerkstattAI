@@ -411,6 +411,11 @@ class AnschlussTests(unittest.TestCase):
                        "type": art, "text": {"body": "Inspektion"}, "image": {"id": "555"}}
             payload = {"object": "whatsapp_business_account", "entry": [{"id": "333", "changes": [{"field": feld, "value": {"metadata": {"phone_number_id": "444"},
                                                                                   "messages": [message]}}]}]}
+            if feld == "history":
+                # Die frühere Feldtrennungs-Fixture erhält die dokumentierte Verlaufsstruktur.
+                payload["entry"][0]["changes"][0]["value"] = {"messaging_product": "whatsapp",
+                    "metadata": {"phone_number_id": "444"}, "history": [{"metadata": {
+                        "phase": 0, "chunk_order": 1, "progress": 100}, "threads": [{"id": message["from"], "messages": [message]}]}]}
             body = json.dumps(payload).encode()
             with patch.object(main, "settings", self.config), patch.object(main, "process_chat_message") as verarbeiten:
                 for _ in range(2):

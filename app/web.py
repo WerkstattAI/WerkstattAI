@@ -1437,6 +1437,9 @@ def whatsapp_bild(request: Request, nachrichten_id: int, workshop_id: str | None
         raise HTTPException(404, "Bild nicht gefunden")
     try:
         zugang = zugang_fuer_werkstatt(wid, phone_number_id=str(zeile["phone_number_id"] or ""))
+        historie = json.loads(zeile["payload_json"]).get("historie")
+        if historie and historie.get("version") != zugang.version:
+            raise VerbindungsFehler("Dieses importierte Bild gehört zu einem früheren Anschluss.")
         inhalt, typ = lade_bild(medien_id=bild["id"], nummer_id=str(zeile["phone_number_id"] or ""),
                                 zugang=zugang.token, version=settings.whatsapp_graph_api_version)
     except (MedienFehler, VerbindungsFehler) as fehler:

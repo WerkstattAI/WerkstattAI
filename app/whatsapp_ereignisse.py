@@ -32,7 +32,7 @@ def aenderungen(payload):
     """Gesamte Lieferung vor Seiteneffekten prüfen; unbekannte Felder bleiben getrennt."""
     if payload.get("object") != "whatsapp_business_account" or not isinstance(payload.get("entry"), list):
         raise ValueError("Ungültige Meta-Lieferung")
-    ergebnis, anzahl = [], 0
+    ergebnis, anzahl, import_anzahl = [], 0, 0
     for eintrag in payload["entry"]:
         if not isinstance(eintrag, dict) or not isinstance(eintrag.get("changes"), list):
             raise ValueError("Ungültiger Meta-Eintrag")
@@ -42,6 +42,12 @@ def aenderungen(payload):
             feld, wert = aenderung.get("field"), aenderung.get("value")
             anzahl += 1
             if not isinstance(feld, str) or not isinstance(wert, dict):
+                continue
+            if feld in {"history", "smb_app_state_sync"}:
+                from app.whatsapp_synchronisierung import validiere
+                bereinigt, menge = validiere(feld, eintrag, wert)
+                import_anzahl += menge
+                ergebnis.append((feld, eintrag, bereinigt))
                 continue
             for name in ("messages", "statuses", "message_echoes"):
                 if name in wert:
@@ -60,7 +66,7 @@ def aenderungen(payload):
                                     if len(daten[schluessel]) > 4096:
                                         raise OverflowError("Nachricht überschreitet die Eingabegrenze")
             ergebnis.append((feld, eintrag, wert))
-    if anzahl > 100:
+    if anzahl > 100 or import_anzahl > 5000:
         raise OverflowError("Zu viele Meta-Ereignisse")
     return ergebnis
 
@@ -88,7 +94,7 @@ def _verbindung(conn, waba, phone):
 
 def echo_offen(conn, wid, kunde):
     return bool(conn.execute("""SELECT 1 FROM whatsapp_messages WHERE workshop_id = ? AND customer_phone = ?
-        AND processing_state = 'echo_pruefung' LIMIT 1""", (wid, kunde)).fetchone())
+        AND processing_state IN ('echo_pruefung', 'historie_pruefung') LIMIT 1""", (wid, kunde)).fetchone())
 
 
 def _freigabe_erlaubt_uebernahme(conn, zeile):
@@ -207,11 +213,18 @@ def ordne_fruehe_rueckmeldung(conn, zeile, provider, daten):
     if not provider:
         return
     echo = conn.execute("""SELECT * FROM whatsapp_messages WHERE workshop_id = ? AND direction = 'outbound'
-        AND wa_message_id = ? AND processing_state IN ('echo_pruefung', 'echo_veraltet')""", (zeile["workshop_id"], provider)).fetchone()
+        AND wa_message_id = ? AND processing_state IN ('echo_pruefung', 'echo_veraltet', 'historie_pruefung')""", (zeile["workshop_id"], provider)).fetchone()
     if echo and echo["phone_number_id"] == zeile["phone_number_id"] and echo["customer_phone"] == zeile["customer_phone"]:
-        kandidaten = json.loads(echo["payload_json"]).get("echo_kandidaten", [])
+        rueckmeldung = json.loads(echo["payload_json"])
+        kandidaten = rueckmeldung.get("echo_kandidaten", [])
         if zeile["message_id"] in kandidaten:
-            daten["echo_bestaetigt"] = True
+            if rueckmeldung.get("source") == "whatsapp_business_app" or rueckmeldung.get("echo_bestaetigt"):
+                daten["echo_bestaetigt"] = True
+            if rueckmeldung.get("historie"):
+                daten["historie"] = rueckmeldung["historie"]
+            for typ in ("image", "audio", "video", "document", "sticker"):
+                if typ in rueckmeldung and typ not in daten:
+                    daten[typ] = rueckmeldung[typ]
             conn.execute("DELETE FROM whatsapp_messages WHERE id = ?", (echo["id"],))
 
 

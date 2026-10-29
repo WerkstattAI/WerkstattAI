@@ -22,7 +22,7 @@ MELDUNGEN = {
     "austausch": "Code wird einmalig geprüft. Bei Unterbrechung ist ein neuer Anschlussversuch erforderlich.",
     "abonnement": "Kundenzugang geprüft; Kontoabonnement wird bestätigt.",
     "teilfehler": "Kontoabonnement noch nicht bestätigt. Prüfung ohne erneuten Codeaustausch fortsetzen.",
-    "abgeschlossen": "Zugang autorisiert. Automatik bleibt bis zum Echo- und Synchronisierungsschutz gesperrt.",
+    "abgeschlossen": "Zugang autorisiert. Bitte Kontakte und Verlauf synchronisieren; die betriebliche Automatik bleibt gesperrt.",
     "abgebrochen": "Anschluss abgebrochen. Ein externer Meta-Schritt kann bereits erfolgt sein.",
     "abgelaufen": "Anschlussversuch abgelaufen. Bitte neu starten.",
     "fehlgeschlagen": "Anschluss nicht bestätigt. Bitte neu starten.",
@@ -242,6 +242,9 @@ def _abonnement(cookie, wid, ursprung, kennung, adapter, geprueft):
         if bestaetigung.rowcount != 1:
             raise VerbindungsFehler("Die Verbindung wurde zwischenzeitlich geändert.")
         _zustand(conn, versuch, "abgeschlossen", version=version)
+        from app.whatsapp_synchronisierung import anlegen
+        verbindung = dict(conn.execute("SELECT * FROM whatsapp_verbindungen WHERE workshop_id = ?", (wid,)).fetchone())
+        anlegen(conn, verbindung, versuch["ablauf"] - 600)
 
 
 def fortsetzen(cookie, wid, ursprung, kennung):
@@ -264,11 +267,15 @@ def fortsetzen(cookie, wid, ursprung, kennung):
 
 def automatik_gesperrt(workshop_id):
     with get_conn() as conn:
-        zeile = conn.execute("SELECT herkunft, coexistence_bereit, autorisierung, version FROM whatsapp_verbindungen WHERE workshop_id = ?",
+        zeile = conn.execute("SELECT * FROM whatsapp_verbindungen WHERE workshop_id = ?",
                              (workshop_id,)).fetchone()
         from app.whatsapp_ereignisse import kontopruefung_offen
         if zeile and kontopruefung_offen(conn, workshop_id, zeile["version"]):
             return True
+        if zeile and zeile["herkunft"] == HERKUNFT:
+            from app.whatsapp_synchronisierung import technisch_bereit
+            if zeile["zustand"] != "verbunden" or not technisch_bereit(conn, zeile):
+                return True
     return bool(zeile and zeile["herkunft"] == HERKUNFT
                 and (not zeile["coexistence_bereit"] or zeile["autorisierung"] != "bestaetigt"))
 

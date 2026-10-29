@@ -1439,6 +1439,9 @@
                 {% endif %}
                 <div class="message-footer">
                   <span>{{ m.created_at_display }}</span>
+                  {% if m.historisch %}<span>Importierter Verlauf · keine aktuelle Anfrage</span>{% endif %}
+                  {% if m.message_type == 'media_placeholder' %}<span>Medieninhalt fehlt oder ist nicht mehr verfügbar.</span>{% endif %}
+                  {% if m.historisch and m.message_type not in ['text', 'image', 'media_placeholder'] %}<span>Importierter Medien- oder Sonderinhalt · hier nicht darstellbar.</span>{% endif %}
                   {% if m.ticket_id %}<a href="/dashboard/ticket/{{ m.ticket_id }}?workshop_id={{ workshop_id }}">Ticket {{ m.ticket_id }}</a>{% endif %}
                 </div>
               </div>

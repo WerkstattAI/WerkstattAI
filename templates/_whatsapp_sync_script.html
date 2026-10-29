@@ -1,0 +1,45 @@
+function starteSynchronisierung(werkstatt, anfang) {
+  const feld = document.getElementById('sync-status');
+  const start = document.getElementById('sync-start');
+  const pruefen = document.getElementById('sync-pruefen');
+  const verzicht = document.getElementById('sync-verzicht');
+  let lauf = 0;
+  let zustand = anfang;
+  function zeigen(daten) {
+    zustand = daten;
+    feld.replaceChildren();
+    const zeile = text => { const p = document.createElement('p'); p.textContent = text; feld.appendChild(p); };
+    if (!daten.autorisiert) zeile('Kein aktuell autorisierter Business-App-Anschluss.');
+    for (const s of daten.schritte || []) {
+      zeile((s.art === 'history' ? 'Verlauf: ' : 'Kontakte: ') + s.meldung +
+        (s.art === 'history' ? ' Fortschritt: ' + s.fortschritt + ' %.' : ''));
+    }
+    if (daten.autorisiert) {
+      zeile(daten.technisch_bereit ? 'Technische Synchronisierungsbedingungen erfüllt. Die Vollständigkeit der Kontaktliste ist von Meta nicht nachgewiesen.' : 'Technische Synchronisierung noch nicht bereit.');
+      zeile('Betriebliche Automatikfreigabe bleibt geschlossen. Zurückgehaltene Eingänge werden nicht nachverarbeitet.');
+      zeile('Fehlende Medien: ' + (daten.medien_offen || 0) + '. Medien können nachkommen oder nicht mehr verfügbar sein.');
+    }
+    start.disabled = !daten.autorisiert;
+    verzicht.disabled = !(daten.schritte || []).some(s => s.art === 'history' && s.startbar);
+  }
+  async function anfordern(aktion) {
+    const bezug = ++lauf;
+    start.disabled = pruefen.disabled = verzicht.disabled = true;
+    try {
+      const antwort = await fetch('/dashboard/whatsapp/synchronisierung/' + aktion, {
+        method: 'POST', headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify({workshop_id: werkstatt})
+      });
+      const daten = await antwort.json();
+      if (bezug !== lauf) return;
+      if (!antwort.ok) throw new Error(daten.detail || 'Synchronisierung nicht bestätigt.');
+      zeigen(daten);
+    } catch (fehler) {
+      if (bezug === lauf) { zeigen(zustand); feld.appendChild(document.createTextNode(fehler.message)); }
+    } finally { if (bezug === lauf) pruefen.disabled = false; }
+  }
+  start.addEventListener('click', () => anfordern('fortsetzen'));
+  pruefen.addEventListener('click', () => anfordern('status'));
+  verzicht.addEventListener('click', () => anfordern('verzicht'));
+  zeigen(anfang);
+}

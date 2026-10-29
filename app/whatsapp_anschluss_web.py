@@ -9,6 +9,7 @@ from app import whatsapp_anschluss as anschluss
 from app.whatsapp_verbindungen import VerbindungsFehler
 from app.db import get_conn
 from app.workshops import get_workshop_identity
+from app import whatsapp_synchronisierung as synchronisierung
 
 router = APIRouter()
 templates = Jinja2Templates(directory="templates")
@@ -43,6 +44,7 @@ def seite(request: Request, workshop_id: str | None = None):
     return templates.TemplateResponse(request, "whatsapp_verbinden.html", {
         "workshop": werkstatt, "workshop_id": wid, "eingerichtet": bereit,
         "zurueckgehalten": zurueckgehalten,
+        "synchronisierung": synchronisierung.status(wid),
         "konfiguration": {"appId": anschluss.settings.whatsapp_app_id,
             "configId": anschluss.settings.whatsapp_signup_config_id,
             "version": anschluss.settings.whatsapp_signup_graph_version,
@@ -88,3 +90,36 @@ async def schritt(request: Request, aktion: str):
     except Exception:
         # Keine Eingabe, Codes, Providerantworten oder Transportausnahmen zurückgeben.
         return JSONResponse({"detail": "Der Anschlussschritt konnte nicht bestätigt werden. Status prüfen."}, status_code=400)
+
+
+@router.post("/dashboard/whatsapp/synchronisierung/{aktion}")
+async def synchronisieren(request: Request, aktion: str):
+    try:
+        if request.headers.get("content-type", "").split(";")[0] != "application/json":
+            raise VerbindungsFehler("Ungültige Synchronisierungsanfrage.")
+        daten = await request.json()
+        if not isinstance(daten, dict) or set(daten) != {"workshop_id"}:
+            raise VerbindungsFehler("Ungültige Synchronisierungsanfrage.")
+        wid = daten["workshop_id"]
+        _werkstatt(request, wid)
+        cookie, ursprung = request.cookies.get(SESSION_COOKIE), request.headers.get("origin")
+        if aktion not in {"status", "fortsetzen", "verzicht"}:
+            raise VerbindungsFehler("Unbekannter Synchronisierungsschritt.")
+        return JSONResponse(await run_in_threadpool(_synchronisieren, cookie, wid, ursprung, aktion))
+    except VerbindungsFehler as fehler:
+        return JSONResponse({"detail": str(fehler)}, status_code=409)
+    except Exception:
+        return JSONResponse({"detail": "Synchronisierung nicht bestätigt. Bitte den Status prüfen."}, status_code=400)
+
+
+def _synchronisieren(cookie, wid, ursprung, aktion):
+    from app.db import atomic_database
+    with atomic_database() as conn:
+        anschluss._berechtigt(conn, cookie, wid, ursprung)
+    if aktion == "verzicht":
+        synchronisierung.schritt(cookie, wid, ursprung, "history", verzichten=True)
+    if aktion == "fortsetzen":
+        for art in synchronisierung.ARTEN:
+            synchronisierung.schritt(cookie, wid, ursprung, art)
+    synchronisierung.verarbeite_offene(wid)
+    return synchronisierung.status(wid)

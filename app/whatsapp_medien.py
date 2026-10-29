@@ -27,7 +27,7 @@ def medienangaben(nachricht: dict) -> dict | None:
         return None
     try:
         daten = json.loads(nachricht.get("payload_json") or "{}")
-        if nachricht.get("direction") != "inbound" and daten.get("source") != "whatsapp_business_app":
+        if nachricht.get("direction") != "inbound" and daten.get("source") not in {"whatsapp_business_app", "whatsapp_historie"}:
             return None
         bild = daten.get("image") if isinstance(daten, dict) else None
         kennung = str(bild.get("id") or "") if isinstance(bild, dict) else ""

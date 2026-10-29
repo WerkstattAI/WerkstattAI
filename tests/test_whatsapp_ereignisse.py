@@ -96,6 +96,13 @@ class EreignisFaelle:
 
     def vorbereiten(self):
         with db.get_conn() as conn:
+            # Ausschließlich synthetische Betriebsfreigabe mit den nun nötigen technischen Nachweisen.
+            from app.whatsapp_synchronisierung import anlegen
+            v = dict(conn.execute("SELECT * FROM whatsapp_verbindungen WHERE workshop_id = ?", (self.wid,)).fetchone())
+            anlegen(conn, v, time.time() - 60)
+            conn.execute("""UPDATE whatsapp_sync SET generation_offen = 0, zustand = CASE WHEN art = 'history'
+                THEN 'abgeschlossen' ELSE 'angenommen' END, request_id = 'synthetischer-sync-nachweis'
+                WHERE workshop_id = ? AND version = ?""", (self.wid, v["version"]))
             conn.execute("UPDATE whatsapp_verbindungen SET coexistence_bereit = 1 WHERE workshop_id = ?", (self.wid,))
             conn.commit()
         nachricht = wa.WhatsAppInboundMessage(self.nummer, self.betrieb, self.kunde, "wamid.eingang",
@@ -155,7 +162,7 @@ class EreignisFaelle:
             if art == "historie": change["field"] = "history"
             if art == "kontakte": change["field"] = "smb_app_state_sync"
             change["value"]["messages"] = [{"from": self.kunde, "id": "wamid.falsch", "type": "text", "text": {"body": "Hallo"}}]
-            self.webhook(payload)
+            self.webhook(payload, 422 if art in {"historie", "kontakte"} else 200)
         self.webhook(self.paket(), 403, "sha256=falsch")
         self.assertEqual(self.nachrichten(), [])
 
@@ -163,7 +170,11 @@ class EreignisFaelle:
         payload = self.paket()
         wert = {"metadata": {"phone_number_id": self.nummer}, "messages": [{"id": "wamid.gesperrt", "from": self.kunde,
             "timestamp": str(int(time.time())), "type": "text", "text": {"body": "Inspektion"}}]}
-        payload["entry"][0]["changes"] += [{"field": feld, "value": wert} for feld in ("messages", "history", "smb_app_state_sync")]
+        payload["entry"][0]["changes"].append({"field": "messages", "value": wert})
+        # Dokumentierte Importformen bleiben ohne gestarteten Synchronisierungsauftrag wirkungslos.
+        for feld, inhalt in (("history", {"history": []}), ("smb_app_state_sync", {"state_sync": []})):
+            payload["entry"][0]["changes"].append({"field": feld, "value": {
+                "messaging_product": "whatsapp", "metadata": {"phone_number_id": self.nummer}, **inhalt}})
         with patch.object(main, "process_chat_message") as verarbeiten:
             self.webhook(payload)
             self.fortsetzen()

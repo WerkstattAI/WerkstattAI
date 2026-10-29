@@ -986,7 +986,8 @@ def list_whatsapp_messages(
                     "automatic_answer" if role == "assistant" else "workshop_notification"),
                     requires_human_action=bool(metadata.get("requires_human_action")),
                     reply_to_message_id=metadata.get("reply_to_message_id"), resolved_at=metadata.get("resolved_at"))
-        item["echo_zuordnung_offen"] = item.get("processing_state") == "echo_pruefung"
+        item["echo_zuordnung_offen"] = item.get("processing_state") in {"echo_pruefung", "historie_pruefung"}
+        item["historisch"] = metadata.get("source") == "whatsapp_historie"
         tid = item.get("ticket_id")
         if tid:
             if tid not in tickets:

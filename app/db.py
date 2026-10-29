@@ -352,6 +352,8 @@ def init_db() -> None:
         migriere_verbindungen(conn, settings)
         from app.whatsapp_anschluss import migriere_anschluss
         migriere_anschluss(conn)
+        from app.whatsapp_synchronisierung import migriere_synchronisierung
+        migriere_synchronisierung(conn)
 
         conn.execute(
             """
@@ -797,7 +799,7 @@ def merke_assistentenfreigabe(conn, workshop_id: str, customer_phone: str) -> No
         CASE WHEN assistent_freigegeben_am > ? THEN assistent_freigegeben_am ELSE ? END
         WHERE workshop_id = ? AND customer_phone = ?""", (zeit, zeit, workshop_id, customer_phone))
     conn.execute("""UPDATE whatsapp_messages SET processing_state = 'echo_veraltet'
-        WHERE workshop_id = ? AND customer_phone = ? AND processing_state = 'echo_pruefung'""",
+        WHERE workshop_id = ? AND customer_phone = ? AND processing_state IN ('echo_pruefung', 'historie_pruefung')""",
         (workshop_id, customer_phone))
 
 

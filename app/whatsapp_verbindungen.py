@@ -224,7 +224,7 @@ def verbindungsstatus(workshop_id: str) -> dict:
         status.update(versand_bereit=True, meldung=("Eigene M1-Altverbindung; keine Coexistence-Freigabe."
                       if status["herkunft"] == "m1_legacy" else "Autorisierte WhatsApp-Verbindung."))
         if status["herkunft"] == "embedded_signup_coexistence" and not status["coexistence_bereit"]:
-            status["meldung"] = "Zugang autorisiert; Coexistence-Automatik bis zum Echo- und Synchronisierungsschutz gesperrt."
+            status["meldung"] = "Zugang autorisiert; die betriebliche Automatik bleibt gesperrt."
     except VerbindungsFehler as fehler:
         status.update(versand_bereit=False, meldung=str(fehler))
     return status

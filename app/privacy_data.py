@@ -20,6 +20,7 @@ TABLE_KEYS = {
     "whatsapp_messages": "id",
     "whatsapp_events": "id",
     "whatsapp_conversation_controls": "customer_phone",
+    "whatsapp_kontakte": "kundenrufnummer",
     "dashboard_events": "id",
 }
 MAX_EXPORT_ROWS = 10000
@@ -145,6 +146,8 @@ def select_records(records: dict, selection: dict) -> dict:
         if (phone and normalize_phone(row["from_phone"]) == phone) or row["wa_message_id"] in message_ids]
     result["whatsapp_conversation_controls"] = [row for row in records["whatsapp_conversation_controls"]
         if (phone and normalize_phone(row["customer_phone"]) == phone) or row["active_ticket_id"] in ticket_ids]
+    result["whatsapp_kontakte"] = [row for row in records["whatsapp_kontakte"]
+        if phone and normalize_phone(row["kundenrufnummer"]) == phone]
     return result
 
 

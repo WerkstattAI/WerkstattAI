@@ -16,8 +16,8 @@
   <h1>WhatsApp verbinden</h1><p>{{ workshop.name }}</p>
   <p>Verbinden Sie Ihre bestehende WhatsApp Business-App. Ihre Nummer und die App bleiben erhalten. Löschen Sie Ihr WhatsApp-Konto nicht.</p>
   <ol><li>Verbindung in Meta und Ihrer Business-App erlauben.</li><li>WerkstattAI prüft den Kundenzugang, die Nummer und das Kontoabonnement.</li><li>Autorisierung anzeigen; die Automatik bleibt vorerst gesperrt.</li></ol>
-  <p class="hinweis">Bis Echo- und Synchronisierungsschutz freigegeben sind, bearbeitet WerkstattAI keine neuen WhatsApp-Eingänge automatisch. Zurückgehaltene Eingänge werden nicht später automatisch nachverarbeitet. Verwenden Sie weiterhin Ihre Business-App.</p>
-  <p>Zurückgehaltene Eingänge: <strong>{{ zurueckgehalten.anzahl }}</strong>{% if zurueckgehalten.zuletzt %} · Zuletzt: {{ zurueckgehalten.zuletzt }}{% endif %}. Es werden nur Ereigniskennungen und Sperrgrund gespeichert, keine Nachrichtentexte oder Medien importiert.</p>
+  <p class="hinweis">Bis zur betrieblichen Freigabe bearbeitet WerkstattAI keine neuen WhatsApp-Eingänge automatisch. Zurückgehaltene Eingänge werden nicht später automatisch nachverarbeitet. Verwenden Sie weiterhin Ihre Business-App.</p>
+  <p>Zurückgehaltene Eingänge: <strong>{{ zurueckgehalten.anzahl }}</strong>{% if zurueckgehalten.zuletzt %} · Zuletzt: {{ zurueckgehalten.zuletzt }}{% endif %}. Von diesen Eingängen werden nur Ereigniskennungen und Sperrgrund gespeichert. Der ausdrücklich angeforderte Verlaufsimport ist davon getrennt.</p>
   {% if eingerichtet %}
   <p id="fortschritt" role="status" aria-live="polite">Meta-Anmeldung wird geladen …</p>
   <button type="button" id="start" disabled>WhatsApp verbinden</button>
@@ -32,4 +32,17 @@
   {% else %}
   <p class="hinweis">WhatsApp verbinden ist noch nicht eingerichtet. Die öffentliche App-/Login-Konfiguration oder der geschützte Serverzugang fehlt. Ihre bestehende Verbindung wird nicht verändert.</p>
   {% endif %}
+  <section aria-labelledby="sync-titel">
+    <h2 id="sync-titel">Kontakte und Verlauf</h2>
+    <p>Nach dem bestätigten Anschluss bitte sofort starten. Die einmalige Anforderung ist nur innerhalb von 24 Stunden nach dem Meta-Anschluss möglich. Über das Teilen Ihres Verlaufs entscheiden Sie in Meta und der Business-App.</p>
+    <div id="sync-status" role="status" aria-live="polite"></div>
+    <button type="button" id="sync-start">Synchronisierung starten / lokal fortsetzen</button>
+    <button type="button" id="sync-pruefen">Synchronisierungsstatus prüfen</button>
+    <button type="button" id="sync-verzicht">Auf lokalen Verlaufsimport verzichten</button>
+    <p>Ein lokaler Verzicht ändert Ihre Meta-Einstellungen nicht. Bereits angeforderte Importe lassen sich hier nicht zurücknehmen. Kontakte dienen nur zur Information und erlauben keinen Nachrichtenversand.</p>
+    <script nonce="{{ request.state.csp_nonce }}">
+      {% include '_whatsapp_sync_script.html' %}
+      starteSynchronisierung({{ workshop_id | tojson }}, {{ synchronisierung | tojson }});
+    </script>
+  </section>
 </main></body></html>

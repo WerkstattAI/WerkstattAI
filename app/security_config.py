@@ -11,7 +11,8 @@ MAX_PHONE_LENGTH = 32
 MAX_PASSWORD_LENGTH = 128
 MAX_BODY_BYTES = 64 * 1024
 MAX_CHAT_BODY_BYTES = 32 * 1024
-MAX_WEBHOOK_BODY_BYTES = 256 * 1024
+# Historie kann tausende Einträge enthalten; Live-Pakete behalten zusätzlich ihre alte Grenze.
+MAX_WEBHOOK_BODY_BYTES = 4 * 1024 * 1024
 
 
 def is_production(config: Settings) -> bool:
