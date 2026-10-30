@@ -1,5 +1,50 @@
 # M2: Veröffentlichungsversuche vom 29. und 30. Oktober 2026
 
+## Nachtrag vom 30. Oktober, ab 17:28 CET: Railway-Paket übernommen
+
+Das Paket des Beraterchats unter
+`.m2-private/railway-bestaetigung-20261030T1607Z/BESTAETIGUNGSPAKET.md`
+und `bestaetigung-ergebnis.json` ist ausgewertet. Seine Panelabrufe erfolgten
+17:08–17:19 CET, der tatsächliche M1-Abgleich über TLS/READ ONLY um 17:14:51 CET.
+Standardwerkstatt nicht demonstrativ, separate Demo, konfigurierte Nummer genau
+einer Werkstatt zugeordnet, bestehendes M1-Token nicht leer. Keine reale
+Meta-Token-/Berechtigungsprüfung oder Nachricht. Fehlende optionale Signup-Werte
+blockieren das reine Code-Deployment bei nachgewiesen geschlossenem Signup nicht.
+
+Private effektive Default-/Demo-/Nummernwerte für aktiven und Zielcommit lokal
+mit der erfolgreichen Klonkonfiguration verglichen: alle drei identisch.
+Keine Werte veröffentlicht. Erster eigener Vergleich behandelte die
+`value`/`source`-Objekte fälschlich als Werte und stoppte mit `AssertionError`;
+nach korrekter Strukturauswertung Vergleich erfolgreich. Kein Produktfehler.
+
+Vorbereiteter gewöhnlicher Anwendungsrückweg unabhängig geprüft:
+`6ea2fdc9dbac6cabaed07d391f598fafb0a9657a`, einziger Parent
+`4eb8e3899314dc12d4af1d60fb0cf7b42e093b32`, vollständiger Baum exakt wie
+`aa965e481f62ad34ee752d5b3cd89f365c4d30fb`. Privates Bare-Repository
+`anwendungsrueckweg.git` im Paketordner. Der dokumentierte Push-Trockenlauf des
+Beraterchats war erfolgreich; er garantiert keinen späteren Deployment-Erfolg.
+Die bereits bestandene Laufzeitprobe des alten Codes auf migrierter echter Kopie
+wird weiterverwendet. Nur im Incident-Fall nach erneutem Remote-Abgleich auf
+exakt M2 den privaten Ref fetchen und den Folgecommit normal auf die bestehende
+Produktionsbranch pushen. Keine Datenbankrücksicherung und kein Force-Push.
+
+Quelle/Auto-Deploy/Wait-for-CI und ACTIVE-Deployment e81fee99 auf vollem aa965e4
+sind durch das Paket zeitgebunden belegt; kein sichtbarer offener Änderungsstand
+beim damaligen Abruf. Erneuter eigener Git-Abgleich bestätigt unverändert
+Produktion aa965e4, Ziel 4eb8e38, 0/16. Der Beraterchat hat Zugang zu Übersicht,
+Deploymentdetails und Logs; seine Beobachtung des neuen Rollouts muss tatsächlich
+erfolgen. Kein eigener Browserzugriff daraus abgeleitet.
+
+**Noch kein Produktionspush:** Der ausdrücklich geforderte unmittelbare
+Panelabgleich wurde um 17:28 CET über Mikołaj angefragt, einschließlich verfügbarer
+Rolloutbeobachtung. Keine neue allgemeine Veröffentlichungsfreigabe verlangt.
+Sicherung, Klonmigration und Laufzeitnachweise aus bf008e13 bleiben gültig;
+ihre Aktualität ist vor Promotion zu berücksichtigen. `coexistence_bereit=0` bleibt.
+
+**Genau ein nächster Schritt:** Den angefragten aktuellen Panelabruf übernehmen
+und bei unverändertem Ausgangsstand den beauftragten Fast-forward/Produktionspush
+durchführen.
+
 ## Fortsetzung vom 30. Oktober 2026: Produktionskopie geprüft, Promotion offen
 
 **Kein Produktionspush, kein neues Deployment und keine Produktionsmigration.**

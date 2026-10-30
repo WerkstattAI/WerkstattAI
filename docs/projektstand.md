@@ -2,6 +2,24 @@
 
 ## Aktueller Stand vom 30. Oktober 2026
 
+**Nachtrag ab 17:28 CET:** Railway-Nachweispaket des Beraterchats übernommen.
+Tatsächlicher M1-Konfigurationsabgleich bestanden; die drei effektiven
+Default-/Demo-/Nummernwerte stimmen lokal mit der erfolgreichen Klonkonfiguration
+überein. Private Werte nicht veröffentlicht. Gewöhnlicher Rückweg unabhängig
+bestätigt: Commit `6ea2fdc9dbac6cabaed07d391f598fafb0a9657a`, Parent exakt M2,
+Baum exakt alter Produktionscode; keine Datenbankrücksicherung. Vorhandene
+Kopie-/Migrations-/Laufzeitnachweise weiterverwendet. Paket belegt Quelle und
+aktives Deployment zeitgebunden bis 17:19 CET; Remote-Produktion weiterhin aa965e4.
+Unmittelbaren Panelabgleich samt verfügbarer Rolloutbeobachtung über Mikołaj
+angefragt. Keine neue allgemeine Freigabe erforderlich; noch kein Produktionspush.
+
+### Nächste Schritte
+
+1. **Den angefragten aktuellen Panelabruf übernehmen und bei unverändertem
+   Ausgangsstand den beauftragten Fast-forward/Produktionspush durchführen.**
+
+### Vorheriger Stand dieses Tages vor Eingang des Railway-Pakets
+
 **Auftrag 06: echte Produktionskopie erfolgreich migriert und Rückweg im Klon
 geprüft; Produktionspromotion mangels konkreter Railway-Nachweise weiterhin offen.**
 Kein Produktionspush, Deployment oder produktiver Schreibzugriff. Die bestehende
