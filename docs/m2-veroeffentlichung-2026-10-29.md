@@ -1,4 +1,135 @@
-# M2: Veröffentlichungsversuch vom 29. Oktober 2026
+# M2: Veröffentlichungsversuche vom 29. und 30. Oktober 2026
+
+## Fortsetzung vom 30. Oktober 2026: Produktionskopie geprüft, Promotion offen
+
+**Kein Produktionspush, kein neues Deployment und keine Produktionsmigration.**
+Der direkte Datenbankzugang funktioniert; fehlende Railway-Nachweise blockieren
+weiterhin die Promotion. Die folgenden Ergebnisse ergänzen die unverändert
+erhaltene Historie vom 29. Oktober. Keine erneute allgemeine Freigabe erforderlich.
+
+### Tatsächliche Produktionsdaten und Sicherung
+
+Am 30.10. um 17:06 CET erneut PostgreSQL **18.6**, TLS und ausdrücklich
+READ ONLY bestätigt: **2 Werkstätten, 1 Demo, 1 nicht leere Phone Number ID**.
+Exakte Python-strip-Normalisierung: **0 Konfliktgruppen, 0 Änderungen an Phone
+Number IDs**. Dies ist kein Abgleich mit den tatsächlichen Railway-App-Werten.
+Keine Kundendublettenbereinigung oder Produktionsänderung vorgenommen.
+
+Neue Sicherung abgeschlossen **17:06:21 CET**, Custom-Archiv **56.878 Bytes**,
+SHA-256 `3a609eaf7be4472e18a0a659671961b62010814d7b79a9149c92af8631489018`.
+Private Ablage außerhalb des Repositories unter
+`C:\Users\Mikolaj\Documents\New project\.m2-private\ausfuehrung-20261030T160555Z\sicherung-20261030T160555Z\produktion.dump`.
+Git-Ausschluss vor Nutzung bestätigt. `pg_restore --exit-on-error --no-owner
+--no-acl` erfolgreich; **11 Tabellen, 365 Zeilen** lesbar. Ergebnis und Rohbelege
+liegen ausschließlich privat. Ältere Sicherung mit 364 Zeilen und SHA-256
+`0133f853903a3a227217a44b2c40bd2a9252655f51a453d914330319a41aa2fc` erhalten.
+Die unterschiedliche Zeilenzahl ist keine Behauptung über ihre Ursache.
+Keine clusterweite Rollen-/PITR-Sicherung; kein Recht, neuere Schreibvorgänge
+durch Rücksicherung zu überschreiben. Vor späterer Promotion Aktualität bewerten.
+
+### Migration der echten Kopie und Anwendungsrückweg im Klon
+
+Vorige Prüfimages waren entfernt; deshalb beide exakten Gitarchive mit dem
+unveränderten Dockerfile erneut gebaut, jeweils Exitcode 0 (17:05 CET):
+
+| Stand | Image-ID |
+| --- | --- |
+| M2 `4eb8e3899314dc12d4af1d60fb0cf7b42e093b32` | `sha256:9ef95bd106b87ad93352d96419f740f5fdf9feb85bda039cbbfbb327cd994cd5` |
+| Vorgänger `aa965e481f62ad34ee752d5b3cd89f365c4d30fb` | `sha256:0cfa95725e14f0ff8dd7e7f149c0243f3b8d94e02a3b48c1c88b02bb0973ceec` |
+
+Revisionslabels geprüft, Ziel-cryptography **50.0.2** bestätigt. Bildtags
+`werkstattai-m2-veroeffentlichung-{ziel,vorgaenger}:20261029` bleiben zur
+Fortsetzung lokal erhalten; ihr Datum bezeichnet nicht diesen neuen Bauzeitpunkt.
+Nur getrackte Commitquellen im Buildkontext; keine Sicherungen oder Geheimnisse.
+
+Frische interne Docker-Netze ohne Hostports, PostgreSQL im tmpfs; echte Kopie
+mit aus der Datenbank abgeleiteten Test-IDs und synthetischen Geheimnissen.
+Kein externer Meta-/WhatsApp-/KI-Zugriff. Diese Testkonfiguration beweist keine
+produktive App-Konfiguration.
+
+**Originalfehler erhalten:** Erster Lauf 17:11 CET startete M2 erfolgreich,
+stoppte aber beim strikten Vergleich alter Spaltenwerte mit `AssertionError`,
+Exitcode 1. Nur `workshops` abweichend, Zeilenzahlen und Sequenzen gleich.
+Keine Produktkorrektur. Die getrennte Diagnose berücksichtigte ausschließlich
+die bereits implementierte Normalisierung der beiden Nummernfelder
+(`normalisiere_nummernwert` in `app/whatsapp_verbindungen.py`).
+
+**Getrennter erfolgreicher Lauf 17:12–17:13 CET, Exitcode 0:** genau **1**
+Normalisierung von `whatsapp_display_phone_number`, weiterhin **0** Änderungen
+an `whatsapp_phone_number_id`. Nach dieser vorgesehenen Normalisierung stimmen
+alle bisherigen Spaltenwerte einschließlich IDs in allen **11** alten Tabellen
+und sämtliche Sequenzpositionen überein. Es wird kein bytegleicher Erhalt des
+einen normalisierten Anzeigefeldes behauptet.
+
+Zusätzlich bestanden:
+
+- Sieben M2-Tabellen vorhanden; M1 im Klon als `m1_legacy`/`altbestand`
+  auflösbar und Zugang verwendet das synthetische M1-Token der Testkonfiguration.
+- Getrennte Default-/Demo-Werkstatt, Signup ohne optionale Konfiguration geschlossen,
+  alle vorhandenen Verbindungen mit `coexistence_bereit=0`.
+- Wiederholter M2-Start ohne weitere Änderung am geprüften Altbestand.
+- Exakter Vorgängercode auf derselben migrierten Kopie startet und bleibt nutzbar;
+  kein Schema-Downgrade und keine Datenbankrücksicherung erforderlich.
+- Lokale HTTP-Kontrollen für M2 und Vorgänger: Health/Loginseite/Dashboard/
+  Einstellungen erfolgreich; Medien ohne Anmeldung 303, angemeldet für nicht
+  vorhandenes Medium 404. M2-Anschlussansicht zeigt fehlende Einrichtung.
+
+Angemeldete Klonprüfungen nutzten ausschließlich lokal signierte Testsitzungen
+mit synthetischem Schlüssel. **Kein Passwortlogin und keine angemeldete
+Produktionsprüfung**. Bestehendes Benutzerpasswort nicht ersetzt.
+
+Alle eigenen Sicherungs-, ersten und zweiten Migrationscontainer sowie Netze
+entfernt; Abwesenheit jeweils bestätigt. Private Archive und Originalprotokolle
+erhalten, temporäre Verbindungs-/Passwort-/Env-Dateien entfernt. Belege in
+`ausfuehrung-20261030T160555Z/{migrationsprobe,migrationsprobe-normalisierung}`;
+ignorierte Helfer und Buildprotokolle in `artifacts/m2-veroeffentlichung-2026-10-30`.
+
+### Produktionsstand und konkret fehlende Railway-Nachweise
+
+Erneuter Remote-Abgleich um 17:13 CET bestätigt unverändert:
+
+- Produktion `codex/kundenkommunikation-2026-09-26`:
+  `aa965e481f62ad34ee752d5b3cd89f365c4d30fb`.
+- M2 `codex/m2-lokale-abnahme-2026-10-29`:
+  `4eb8e3899314dc12d4af1d60fb0cf7b42e093b32`, 16 voraus/0 zurück,
+  Produktion direkter Vorfahr. Berichtsbranch zu Beginn sauber auf
+  `0aa7831c166953a1c0d4db9be1fb488e55ad8692`.
+
+Öffentliche Livekontrolle 17:13 CET: `/health` 200, `/login` 200,
+`/dashboard/whatsapp/medien/0` ohne Anmeldung 303 zur Loginseite. Das beweist
+weder aktuellen Deployment-SHA noch Migration oder produktive M1-Auflösung.
+Letzte übergebene Railway-ID weiterhin
+`e81fee99-9838-4ee3-9639-ba2674b3537b`, damals ACTIVE/successful auf dem Vorgänger;
+heute in dieser Sitzung nicht neu bestätigt. Keine neue Deployment-ID.
+[Bestehende App](https://werkstattai-whatsapp.up.railway.app).
+
+Auch eine neue In-App-Karte meldet in dieser Sitzung
+`The browser access host is unavailable`. Die funktionierende Sitzung des
+Beraterchats bleibt getrennt. Native Chrome-Sicherheit, Windows-Anwendungskontrolle
+und Ausführungsrichtlinie unangetastet; keine Railway-CLI oder Tokenumgehung.
+
+**Benötigtes gemeinsames Nachweispaket für den Beraterchat:**
+
+1. Tatsächlich wirksame `DEFAULT_WORKSHOP_ID`/`DEMO_WORKSHOP_ID` gegen die
+   bestehende nicht demonstrative M1-Werkstatt und Demo prüfen; gespeicherte
+   normalisierte Nummer gegen `WHATSAPP_DEFAULT_PHONE_NUMBER_ID` vergleichen.
+   Vorhandenes verwendetes M1-Token und effektive Signup-Konfiguration bestätigen.
+   Geheimnisse, vorhandenen Verschlüsselungsschlüssel und Graph-Version erhalten;
+   Werte nur lokal privat, im Bericht nur Prüfurteile und Anzahlen.
+2. Aktuelle Railway-Quelle, Auto-Deploy/Wait-for-CI, vollständigen aktiven SHA,
+   Deployment-ID und fehlende fremde ausstehende Änderungen belegen; unmittelbar
+   vor dem beauftragten Produktionspush erneut abgleichen.
+3. Gewöhnlichen ausführbaren Rückweg zum geprüften Vorgänger sowie verfügbaren
+   Zugang zur Beobachtung und Abschlussprüfung des neuen Deployments konkret
+   bestätigen. Ein Redeploy-Menü allein genügt nicht. Die Eignung des alten Codes
+   auf der migrierten Kopie ist jetzt belegt; die Railway-Ausführung noch nicht.
+
+**Genau ein nächster Schritt:** Dieses konkrete Railway-Nachweispaket über den
+bereits autorisierten Beraterchat beschaffen und damit Auftrag 06 ab der
+verbliebenen Produktionsvorprüfung fortsetzen. Bis dahin keine Promotion;
+`coexistence_bereit=0`, reale Coexistence bleibt separat offen.
+
+## Historischer Veröffentlichungsversuch vom 29. Oktober 2026
 
 ## Ergebnis
 

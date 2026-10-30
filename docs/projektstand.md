@@ -1,6 +1,53 @@
 # WerkstattAI – Projektstand und nächste Schritte
 
-## Aktueller Stand vom 29. Oktober 2026
+## Aktueller Stand vom 30. Oktober 2026
+
+**Auftrag 06: echte Produktionskopie erfolgreich migriert und Rückweg im Klon
+geprüft; Produktionspromotion mangels konkreter Railway-Nachweise weiterhin offen.**
+Kein Produktionspush, Deployment oder produktiver Schreibzugriff. Die bestehende
+Veröffentlichungsbeauftragung gilt weiter; keine neue allgemeine Freigabe nötig.
+
+Produktionsdaten erneut über TLS/READ ONLY geprüft: PostgreSQL 18.6,
+2 Werkstätten/1 Demo/1 nicht leere Phone Number ID, keine normalisierten
+Nummernkonflikte. Neue private Sicherung vom 30.10., 17:06:21 CET:
+56.878 Bytes, SHA-256
+`3a609eaf7be4472e18a0a659671961b62010814d7b79a9149c92af8631489018`;
+isoliert wiederhergestellt, 11 Tabellen/365 Zeilen. Vorige Sicherung erhalten.
+
+Beide exakten Commitimages erneut gebaut, da vorherige Bilder entfernt waren.
+Erster Klonlauf stoppte beim strikten Datenvergleich, Originalfehler bleibt.
+Separate Diagnose bestätigt genau eine vorgesehene Normalisierung des
+Anzeigenummerfeldes; keine Änderung an Phone Number IDs. Alle übrigen alten
+Spaltenwerte, IDs und Sequenzpositionen erhalten. Zweiter Lauf Exitcode 0:
+M2-Migration, M1-Auflösung mit synthetischem Token, geschlossener Signup,
+`coexistence_bereit=0`, wiederholter Start und Vorgängercode auf derselben
+migrierten Produktionskopie erfolgreich. Lokale HTTP-Kontrollen bestanden;
+Testsitzungen lokal signiert, kein Passwortlogin oder angemeldeter Produktionstest.
+Eigene Container/Netze entfernt und Abwesenheit bestätigt; private Archive,
+Originalprotokolle und zwei Prüfimages zur Fortsetzung erhalten.
+
+Remote-Produktion unverändert `codex/kundenkommunikation-2026-09-26` auf
+`aa965e481f62ad34ee752d5b3cd89f365c4d30fb`; Ziel
+`4eb8e3899314dc12d4af1d60fb0cf7b42e093b32`, 16 voraus/0 zurück.
+Live öffentlich: Health/Login 200, Medien ohne Anmeldung 303 zur Loginseite.
+Kein Beweis des laufenden SHA oder einer neuen Migration. Letzte übergebene
+Railway-ID `e81fee99-9838-4ee3-9639-ba2674b3537b`, heute nicht neu bestätigt.
+
+**Offen:** tatsächlicher Railway-M1-Konfigurationsabgleich, aktuelle Quelle/
+Deployment/fremde ausstehende Änderungen und konkret ausführbarer Anwendungsrückweg
+samt Deploymentbeobachtung. Neue In-App-Karte weiterhin
+`The browser access host is unavailable`; Zugang im Beraterchat getrennt bewerten.
+Keine Schutzmechanismen umgangen. Paket benötigter Nachweise und alle Grenzen im
+[Veröffentlichungsbericht](m2-veroeffentlichung-2026-10-29.md).
+Die aktuelle Dokumentation bleibt auf der separaten Berichtsbranch.
+
+### Nächste Schritte
+
+1. **Das im Veröffentlichungsbericht gebündelte Railway-Nachweispaket über den
+   bereits autorisierten Beraterchat beschaffen und damit Auftrag 06 ab der
+   verbliebenen Produktionsvorprüfung fortsetzen.**
+
+## Historischer Stand vom 29. Oktober 2026
 
 **M2-Veröffentlichung vor Produktionsänderung blockiert: autorisierter
 Railway-Zugriff in dieser Sitzung nicht verfügbar.** Der vollständige
