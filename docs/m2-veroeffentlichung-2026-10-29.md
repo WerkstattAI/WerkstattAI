@@ -1,5 +1,67 @@
 # M2: Veröffentlichung vom 29. bis 31. Oktober 2026
 
+## 31. Oktober 2026, 18:05–18:19 CET: unabhängige technische Live-Abnahme bestanden
+
+Der Beraterchat hat die noch ausstehende Panel- und Loginprüfung abgeschlossen.
+Railway-Dienstübersicht und Deploymentdetails bestätigen
+`91354e93-67c1-478f-b440-9b3af6f85fda` als **ACTIVE / Deployment successful**,
+voller SHA `4eb8e3899314dc12d4af1d60fb0cf7b42e093b32` aus dem GitHub-Href.
+Build mit Export/Image-Push abgeschlossen; Startlog vom 31.10., 05:52:15 CET:
+`Application startup complete`, Uvicorn auf Port 8080. App und PostgreSQL Online.
+Die zunächst unvollständig geladene Übersicht wurde vollständig abgewartet und
+bestätigt dieselbe aktive ID. Vorgängerdeployment ist inzwischen REMOVED;
+Verfügbarkeit seines Images nicht als Rückweg voraussetzen.
+
+Mikołaj meldete sich selbst regulär an; der Prüfer las oder übernahm kein Passwort.
+Dashboard, Einstellungen und M1-Altverbindung erreichbar. Signup bleibt wegen
+fehlender vollständiger Konfiguration geschlossen; kein aktuell autorisierter
+Business-App-Anschluss, Synchronisierungsstart gesperrt. Statusabfrage bestätigt
+fehlende Einrichtung für diesen Ursprung.
+
+Sechs neue öffentliche GET-Kontrollen bestanden: `/health` und `/login` 200;
+`/dashboard`, `/dashboard/settings`, `/dashboard/whatsapp/verbinden` und
+`/dashboard/whatsapp/medien/0` ohne Anmeldung jeweils 303 nach `/login`.
+Nach Anmeldung liefert Medien-ID 0 nur `Bild nicht gefunden`. Die Navigation
+meldete zunächst Timeout; die tatsächlich geladene Antwort wurde anschließend
+im bestehenden Tab geprüft. Umfang: Zugriffssperre ohne Anmeldung und ungültige
+ID nach Anmeldung, keine erneute vollständige Medien-/Mandantenregression.
+
+Eigene SQL-Nachprüfung des Beraterchats, **18:16:20 CET, TLS/READ ONLY**:
+`m2_1`, sieben M2-Tabellen, zwei Werkstätten/eine Demo, eine Verbindung
+`m1_legacy`/`altbestand`, null aktive Coexistence-Flags und null Signup-Versuche.
+Keine Gesprächsinhalte oder Token gelesen. Vorhandene Sicherung erneut gehasht:
+`d629b2bc11887ce6077212f8f89507327becc4fbe0f9b997e39782f109143acd` passt.
+Vorhandenes Restore-Ergebnis 11 Tabellen/364 Zeilen, Exit 0 gelesen;
+keine neue Sicherung, Wiederherstellung oder Gesamtregression.
+
+Private Übergabe außerhalb Git:
+`.m2-private/railway-bestaetigung-20261030T1607Z/rollout-ergebnis.json`
+und `rollout-http-ergebnis.json`; aggregierte SQL-Belege im privaten Stammordner.
+Git-Ausschluss aller neuen Nachweise bestätigt. In dieser Dokumentation stehen
+keine Geheimnisse, persönlichen Kundendaten oder privaten Rohprotokolle.
+Ergebnis ebenso in Notion-Projektzentrum und M2-Karte festgehalten.
+
+**Technische Veröffentlichung abgenommen.** Kein belegter Rolloutfehler und
+kein ausgeführter Rollback. Reale Meta-Berechtigungen, Signup-Konfiguration und
+autorisierter Kundennummerntest bleiben offen; `coexistence_bereit=0` bleibt.
+
+### Zusammenführung der Projektstände in master
+
+Auf ausdrücklichen Wunsch von Mikołaj wurden sämtliche 18 zum Abgleich
+vorhandenen Remote-Branches gegen
+`276e7d714e81460e9769ca0caea455cf9b5446f2` geprüft: jeder Stand ist dessen
+Vorfahr oder identisch. Der Berichtsstand enthält den vollständigen produktiven
+Code plus die vier neueren Berichtscommits. Die Hauptbranch übernimmt diese
+Historie samt vorliegender Dokumentation durch gewöhnlichen Fast-forward;
+keine einzelne ältere Branch muss separat gemergt werden.
+
+Diese Ergänzung ändert nur die beiden Projektdokumente. Bereits abgenommener
+Anwendungscode und Konfiguration bleiben erhalten. Die nachstehenden früheren
+offenen Abnahmepunkte sind historische Zwischenstände.
+
+**Nächster Schritt:** Aktuelle Meta-Voraussetzungen für M2/F2 feststellen und
+den echten Anschluss eines berechtigten Testkontos vorbereiten.
+
 ## 31. Oktober 2026: Produktionspush erfolgt, abschließender Panelnachweis offen
 
 **Normaler Fast-forward/Produktionspush erfolgreich, Remote-Ziel bestätigt.**
