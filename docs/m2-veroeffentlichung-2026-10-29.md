@@ -1,4 +1,90 @@
-# M2: Veröffentlichungsversuche vom 29. und 30. Oktober 2026
+# M2: Veröffentlichung vom 29. bis 31. Oktober 2026
+
+## 31. Oktober 2026: Produktionspush erfolgt, abschließender Panelnachweis offen
+
+**Normaler Fast-forward/Produktionspush erfolgreich, Remote-Ziel bestätigt.**
+Am **05:51:34–05:51:36 CET** wurde die bestehende Produktionsbranch
+`codex/kundenkommunikation-2026-09-26` von
+`aa965e481f62ad34ee752d5b3cd89f365c4d30fb` auf exakt
+`4eb8e3899314dc12d4af1d60fb0cf7b42e093b32` gepusht, Exitcode 0.
+Kein Force, Squash, zusätzlicher Produktcommit oder Wechsel der Railway-Quelle.
+Der direkte Vorfahr, 0/16, beide Remote-Refs und sauberer Arbeitsbaum wurden
+unmittelbar vor dem Push erneut geprüft. Der Berichtsarbeitsbaum blieb auf seiner
+separaten Branch; gepusht wurde ausdrücklich der abgenommene Ziel-SHA.
+
+Der aktuelle Panelnachweis des Beraterchats
+`railway-bestaetigung-20261030T1607Z/aktualnosc-przed-pushem.json` wurde übernommen:
+31.10., **05:44:33–05:45:47 CET**, erwartete Quelle, Auto-Deploy an, Wait for CI aus,
+altes Deployment e81fee99/aa965e4 ACTIVE, keine sichtbaren ausstehenden Änderungen
+oder anderen laufenden Deployments, Beobachter bereit. Bei der letzten Kontrolle
+vor dem Push war dieser abgeschlossene Abruf **345 Sekunden** alt. Zeitgebundene
+Übergabe, keine Garantie später unveränderten Zustands und kein eigener UI-Zugriff.
+
+### Aktuelle Sicherung vor der Promotion
+
+Wegen der Nachtpause wurde die Sicherung begründet erneuert, vorhandene Prüfungen
+nicht pauschal wiederholt. TLS/READ ONLY, PostgreSQL 18.6, zwei Werkstätten/eine Demo,
+eine nicht leere Phone Number ID, null Konfliktgruppen und null Änderungen dieser ID.
+Die drei effektiven M1-Konfigurationswerte stimmen weiter mit den Produktionsdaten
+überein; Vergleich lokal ohne Ausgabe der Werte.
+
+Neue Sicherung fertig **05:51:02 CET**, **56.837 Bytes**, SHA-256
+`d629b2bc11887ce6077212f8f89507327becc4fbe0f9b997e39782f109143acd`.
+Private Ablage außerhalb Git:
+`.m2-private/ausfuehrung-20261031T045036Z/sicherung-20261031T045036Z/produktion.dump`.
+Isolierte Wiederherstellung erfolgreich, **11 Tabellen/364 Zeilen**, eigene
+Sicherungscontainer und Netz entfernt und Abwesenheit bestätigt. Ältere Archive
+und ursprüngliche Fehlerbelege bleiben erhalten. Die tatsächliche M2-Migration,
+Neustart- und Vorgängercodeprobe auf der echten Kopie vom 30.10. werden weiterverwendet.
+Keine erneute Gesamtregression oder neue Produktreparatur.
+
+### Beobachtete Produktion nach dem Push
+
+**05:52:39 CET, eigene TLS/READ-ONLY-Kontrolle:** Migrationsmarke `m2_1` vorhanden,
+alle sieben M2-Tabellen vorhanden, weiterhin zwei Werkstätten mit getrennter Demo;
+M1-Nummer eindeutig und korrekter Standardwerkstatt zugeordnet, eine Verbindung
+als `m1_legacy`/`altbestand`. **Null Verbindungen mit `coexistence_bereit<>0`**,
+null Signup-Versuche. Dies belegt den produktiven Datenbankzustand, nicht allein
+den aktuell gerouteten Commit. Keine direkte Produktmigration ausgeführt;
+die Migration erfolgte durch den ausgelösten Anwendungsstart.
+
+**05:53 CET, öffentliche HTTP-Kontrolle:** `/health` und `/login` 200;
+Dashboard, Einstellungen, Anschlussansicht und geschützte Medien ohne Anmeldung
+jeweils 303 zur Loginseite. Keine geschützten Inhalte ausgegeben.
+Eine vorbereitete reguläre Loginprüfung stoppte vor jedem HTTP-Aufruf, weil
+explizite lokale Administrator-Zugangsdaten fehlen. Keine Standardwerte versucht,
+kein fehlgeschlagener Produktionslogin und keine Passwortänderung.
+Angemeldete Produktionsprüfung bleibt beim Beraterchat angefragt.
+
+GitHub-Commitstatus für exakt `4eb8e3899314dc12d4af1d60fb0cf7b42e093b32`:
+Kontext **surprising-warmth - WerkstattAI**, **success**. Der Railway-Link
+identifiziert das neue Deployment **`91354e93-67c1-478f-b440-9b3af6f85fda`**.
+[Deploymentdetails](https://railway.com/project/42bbbeae-632d-44e5-b55b-f676745f4ad6/service/2aad2b8f-467f-49f2-856a-c3a8e717d1dc?id=91354e93-67c1-478f-b440-9b3af6f85fda&environmentId=a3b4ca72-5547-4f24-9216-41342c577e2e),
+[laufende App](https://werkstattai-whatsapp.up.railway.app).
+**Noch keine vollständige Live-Abnahme:** explizite ACTIVE-/Voll-SHA-Bestätigung,
+Build-/Startlogs und angemeldete Funktionen aus dem Panel noch nicht übergeben.
+GitHub-success und öffentliche Health-Antwort ersetzen diese Nachweise nicht.
+
+Auch die neue In-App-Karte vom 31.10. mit der konkreten Deployment-URL scheitert
+weiterhin mit `The browser access host is unavailable`. Keine Chrome-/Windows-
+Sperre umgangen. Die angefragte Ergebnisdatei mit Panel-/Loginbefunden liegt
+zu diesem Berichtsstand noch nicht vor.
+
+Erwarteter voller SHA, Pushzeit und neue Deployment-ID wurden über Mikołaj an den
+bereiten Beraterchat zur Beobachtung gegeben. Angefragt ist `rollout-ergebnis.json`
+im bestehenden privaten Paketordner. Ignorierte eigene Nachweise/Helfer unter
+`artifacts/m2-veroeffentlichung-2026-10-31`, private SQL-Rohbelege unter
+`.m2-private/nachpruefung-20261031T045233Z` (Zeitstempel des lokalen Prüflaufs).
+Keine echten Meta-/WhatsApp-Nachrichten oder neuen Anschlüsse; Coexistence bleibt 0.
+
+Vorbereiteter Anwendungsrückweg unverändert:
+`6ea2fdc9dbac6cabaed07d391f598fafb0a9657a`, Parent exakt M2, Baum exakt Vorgänger.
+Nur bei belegtem Fehlschlag und erneutem Remote-Abgleich gewöhnlich pushen;
+keine blinde Datenbankrücksicherung. Bisher kein Rückweg ausgelöst.
+
+**Genau ein nächster Schritt:** Die tatsächliche Live-Abnahme des neuen Deployments
+mit dem Beraterchat abschließen; bei belegtem Fehlschlag den vorbereiteten sicheren
+Anwendungsrückweg ausführen.
 
 ## Nachtrag vom 30. Oktober, ab 17:28 CET: Railway-Paket übernommen
 

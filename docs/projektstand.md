@@ -1,6 +1,43 @@
 # WerkstattAI – Projektstand und nächste Schritte
 
-## Aktueller Stand vom 30. Oktober 2026
+## Aktueller Stand vom 31. Oktober 2026
+
+**M2 auf die Produktionsbranch gepusht; vollständige Live-Abnahme noch offen.**
+Normaler Fast-forward am 31.10. um 05:51:36 CET auf exakt
+`4eb8e3899314dc12d4af1d60fb0cf7b42e093b32`, Remote bestätigt.
+Quelle unverändert `codex/kundenkommunikation-2026-09-26`; kein Force oder
+zusätzlicher Produktcommit. Frischen Panelabruf des Beraterchats bis 05:45:47 CET
+und erneut geprüfte Git-/Konfigurationsvoraussetzungen verwendet.
+
+Sicherung wegen Nachtpause erneuert: 05:51:02 CET, 56.837 Bytes,
+SHA-256 `d629b2bc11887ce6077212f8f89507327becc4fbe0f9b997e39782f109143acd`;
+isolierter Restore 11 Tabellen/364 Zeilen erfolgreich, eigene Ressourcen entfernt.
+Bisherige echte Klonmigration, Neustart und alter Code auf migrierter Kopie gelten
+weiter. Keine unbegründete Gesamtwiederholung oder Produktkorrektur.
+
+Eigene produktive TLS/READ-ONLY-Prüfung um 05:52:39 CET bestanden: Migrationsmarke,
+sieben M2-Tabellen, erhaltene eindeutige M1-Altverbindung, getrennte Demo,
+`coexistence_bereit=0`, keine Signup-Versuche. Öffentlich Health/Login 200;
+Dashboard/Einstellungen/Anschluss/Medien ohne Anmeldung zur Loginseite gesperrt.
+Lokale Loginprüfung vor HTTP gestoppt, weil explizite Administrator-Zugangsdaten
+fehlen; kein Passwortversuch mit Defaults und keine Passwortänderung.
+
+GitHub meldet Railway-Commitstatus **success** für den Ziel-SHA, neues Deployment
+**91354e93-67c1-478f-b440-9b3af6f85fda**. Noch offen sind expliziter ACTIVE-/Voll-SHA-
+Nachweis, Build-/Startlogs und angemeldete Live-Funktionen aus dem Railway-Panel.
+Diese Prüfung mit vollständigem SHA und neuer ID über Mikołaj beim bereiten
+Beraterchat angefragt. Kein vollständiger Veröffentlichungserfolg behauptet;
+reale Coexistence bleibt separat offen. Kein Rollback ausgelöst; vorbereiteter
+normaler Rückweg 6ea2fdc ist weiterhin vorhanden, ohne Datenbankrücksicherung.
+Details im [Veröffentlichungsbericht](m2-veroeffentlichung-2026-10-29.md).
+
+### Nächste Schritte
+
+1. **Die tatsächliche Live-Abnahme des neuen Deployments mit dem Beraterchat
+   abschließen; bei belegtem Fehlschlag den vorbereiteten sicheren Anwendungsrückweg
+   ausführen.**
+
+## Historischer Stand vom 30. Oktober 2026
 
 **Nachtrag ab 17:28 CET:** Railway-Nachweispaket des Beraterchats übernommen.
 Tatsächlicher M1-Konfigurationsabgleich bestanden; die drei effektiven
