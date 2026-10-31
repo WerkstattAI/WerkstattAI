@@ -1,6 +1,47 @@
 # WerkstattAI – Projektstand und nächste Schritte
 
-## Aktueller Stand vom 31. Oktober 2026
+## Aktueller Stand vom 31. Oktober 2026 nach technischer Live-Abnahme
+
+**M2 ist produktiv und technisch abgenommen. Die Hauptbranch übernimmt den
+aktuellen Produktstand und sämtliche bisher veröffentlichten Projektberichte.**
+Die unabhängige Prüfung im Beraterchat erfolgte am 31.10., 18:05–18:19 CET:
+Railway-Deployment `91354e93-67c1-478f-b440-9b3af6f85fda` ACTIVE / Deployment
+successful, voller SHA `4eb8e3899314dc12d4af1d60fb0cf7b42e093b32` aus dem
+Commit-Link bestätigt; Build und Anwendungsstart erfolgreich.
+
+Nach regulärer Anmeldung durch Mikołaj wurden Dashboard, Einstellungen,
+bestehende M1-Altverbindung und geschlossener Signup geprüft. Sechs öffentliche
+GET-Prüfungen bestanden: Health/Login 200, Dashboard/Einstellungen/Anschluss/Medien
+ohne Anmeldung 303 zum Login. Eine ungültige Medien-ID liefert nach Anmeldung
+kein Bild. Vorhandene vollständige Regressionsnachweise wurden nicht wiederholt.
+
+Eigene SQL-Prüfung des Beraterchats um 18:16:20 CET, TLS/READ ONLY:
+Migration `m2_1`, sieben M2-Tabellen, zwei Werkstätten/eine Demo, eine
+`m1_legacy`/`altbestand`-Verbindung, null aktive Coexistence-Flags und
+null Signup-Versuche. Sicherungsarchiv vorhanden und SHA-256 erneut passend;
+gespeichertes erfolgreiches Restore-Ergebnis 11 Tabellen/364 Zeilen gelesen,
+ohne erneute Wiederherstellung. Einzelheiten und Grenzen im
+[Veröffentlichungsbericht](m2-veroeffentlichung-2026-10-29.md).
+
+**Zusammenführung auf ausdrücklichen Wunsch von Mikołaj:** Alle 18 zum Abgleich
+vorhandenen Remote-Branches sind Vorfahren des Berichtsstands
+`276e7d714e81460e9769ca0caea455cf9b5446f2` oder identisch damit. Dieser Stand
+enthält den produktiven Code und vier zusätzliche Berichtscommits. Die
+Hauptbranch wird ohne Umschreiben der Historie darauf samt dieser
+Dokumentationsaktualisierung vorgezogen. Die Anwendung bleibt beim bereits
+abgenommenen Produktcode; diese Ergänzung ändert ausschließlich Dokumentation.
+
+**Gesamtes M2 weiterhin offen:** Echte Meta-Berechtigungen, vollständige
+Signup-Konfiguration und autorisierter Kundennummerntest sind separat
+nachzuweisen. `coexistence_bereit=0` bleibt; technische Veröffentlichung
+bedeutet keine Freigabe realer Coexistence.
+
+### Nächste Schritte
+
+1. Aktuellen Meta-Zugang und fehlende Voraussetzungen für M2/F2 feststellen;
+   danach den tatsächlichen Anschluss eines berechtigten Testkontos planen.
+
+## Historischer Stand vom 31. Oktober 2026 vor technischer Live-Abnahme
 
 **M2 auf die Produktionsbranch gepusht; vollständige Live-Abnahme noch offen.**
 Normaler Fast-forward am 31.10. um 05:51:36 CET auf exakt
