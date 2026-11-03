@@ -1,6 +1,87 @@
 # WerkstattAI – Projektstand und nächste Schritte
 
-## Aktueller Plan vom 3. November 2026: Bedarfsgespräche und Demo zuerst
+## Aktueller Schwerpunkt vom 3. November 2026: Produktauftritt für Werkstätten
+
+**Mikołaj hat die Priorität konkretisiert:** Chat und Gesprächsspeicherung
+funktionieren nach seiner heutigen Rückmeldung; eine Beispielkonversation aus
+WhatsApp kann für den späteren Produktnachweis vorbereitet werden. Jetzt sollen
+die Anwendung, die Website, die Präsentation und die Zusammenarbeit mit den
+ersten Werkstätten professionell ausgearbeitet werden. Dies ist eine
+Nutzerbestätigung, kein neuer vollständiger Test.
+
+### Nächste Schritte
+
+1. **D1: einheitliche Anwendungsoberfläche.** Dashboard, Ticketliste und
+   Ticketdetail zuerst gestalten, anschließend Login, Kundenchat und
+   WhatsApp-Unterhaltungen mit demselben visuellen System überarbeiten.
+   Gewünschter Charakter: modern, professionell, markant, einfach und intuitiv.
+   Farbpalette und konkrete Entwürfe sind noch auszuarbeiten.
+2. **S1: Website und Angebot.** Nach dem visuellen Grundkonzept der Anwendung
+   Website-Aufbau und Inhalte ausarbeiten: Nutzen für die Werkstatt,
+   bestätigte Funktionen, echte Produktansichten, nachvollziehbarer Ablauf
+   und Kontakt. Anwendung und Website sollen gemeinsam präsentiert werden.
+3. **C1: Preise, Abonnement und Einstiegsbedingungen parallel vorbereiten.**
+   Die bestehende B4-Karte wurde erweitert und in den Pilotplan vorgezogen:
+   Kosten und Leistungsumfang, Einrichtung, laufender Preis, mögliche Grenzen
+   und externe Gebühren, erste Zusammenarbeit beziehungsweise Pilot,
+   Unterstützung, Kündigung und Abrechnung klären. Vor endgültigen Preisen
+   auf der Website und in der Präsentation entscheiden; heute keine Preise
+   oder Rabatte festgelegt.
+4. **R1: Präsentation und Werkstattgespräche.** Kurze deutschsprachige
+   Präsentation, nachvollziehbare Demo, vorbereitete Beispielkonversation,
+   Antworten zum Angebot und Gesprächsnotizen. Danach den vorgesehenen
+   ersten Zyklus von fünf Gesprächen durchführen und auswerten.
+5. Reales M2-Onboarding und ein betreuter P1-Pilot folgen mit bestätigtem
+   Kundenumfang und den erforderlichen tatsächlichen Startbedingungen.
+
+### Erster konkreter D1-Schritt
+
+Aktuelle Bildschirme erfassen und einen zusammenhängenden Entwurf für Dashboard
+und Ticketdetail vorbereiten. Direkt erkennbar machen, welche Anfrage wichtig
+ist, wer die Unterhaltung führt, welchen Status sie hat und wie geantwortet wird.
+Typografie, Abstände, ein markanter Akzent, Icons und Bedienelemente konsistent
+verwenden. Desktop- und Mobilansicht sowie Lade-, Leer-, Fehler- und Sendestatus
+berücksichtigen. W1 kontrolliert dabei den bestehenden Ablauf; funktionale
+Neuentwicklung setzt einen neuen konkreten Bedarf voraus.
+
+Figma wurde als passende Integration im Katalog gefunden und zum Hinzufügen
+vorgeschlagen; beim Abruf war sie nicht installiert oder verbunden. Figma für
+Entwurf und wiederverwendbare Komponenten, Lucide als Kandidat für konsistente
+SVG-Icons sowie die Browserkontrolle der echten Ansichten werden empfohlen.
+Die Briefvorbereitung hängt nicht von der Installation ab.
+Quellen: [Figma](https://help.figma.com/hc/en-us/articles/34855090823063-MCP-server-best-practices),
+[Lucide](https://lucide.dev/guide/).
+
+### Planstruktur und Grenzen
+
+Die bestehenden 13 Notion-Karten bleiben erhalten. B4 heißt jetzt C1, enthält
+aber weiterhin Abrechnung, Ablauf und Beendigung des Zugangs einschließlich
+des offenen Themas `subscription_ends_at`. Vor bezahltem Betrieb bleibt die
+Prüfung dieser Regeln erforderlich. R1 wurde als neue eigenständige Karte
+ergänzt; insgesamt 14 Karten. D1 ist das einzige Thema mit „Teraz“.
+
+Neue Marke und Domain bleiben eine gesonderte N1-Entscheidung; Entwürfe dürfen
+vorläufig den vorhandenen Namen verwenden. Die Vorlage einer Konversation
+setzt ihre geeignete Vorbereitung für den gezeigten Zweck voraus.
+
+F1/Gewerbe und F2/Meta laufen parallel. Gewerbe wurde laut Mikołaj noch nicht
+angemeldet; der erforderliche Anmeldezeitpunkt darf nicht bis zur ersten Rechnung
+oder einem positiven Pilot verschoben werden. Die Abgrenzung von
+Bedarfsgesprächen, aktiver Akquise und Betrieb sowie die tatsächliche
+Kundenfreigabe bleiben wie im bisherigen Plan zu klären.
+`coexistence_bereit=0` bleibt die bestehende Entscheidung.
+
+Diese Änderung aktualisiert den Arbeitsplan. Es wurden noch keine neue
+Oberfläche, Website, Folien, Preise oder Zahlungsfunktion umgesetzt.
+Bisherige technische Abnahme und Git-Zusammenführung bleiben historische
+Nachweise; Produktion und Datenbank wurden heute nicht erneut geprüft.
+
+Operativer Einstieg:
+[D1](https://app.notion.com/p/3fffa727c11d812fafd8fd9b69b5091f),
+[C1](https://app.notion.com/p/3fffa727c11d8188a890d5f15ce668ea),
+[R1](https://app.notion.com/p/40dfa727c11d81418fc0e027ff4a6975).
+
+## Historischer Plan vom 3. November 2026: Bedarfsgespräche und Demo zuerst
 
 **Mikołaj hat den Plan nach dem Vergleich mit der bisherigen Reihenfolge
 angepasst.** Vorrang haben kurze Bedarfsgespräche mit Werkstätten und eine
