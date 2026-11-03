@@ -1,6 +1,82 @@
 # WerkstattAI – Projektstand und nächste Schritte
 
-## Aktueller Stand vom 31. Oktober 2026 nach technischer Live-Abnahme
+## Aktueller Plan vom 3. November 2026: Bedarfsgespräche und Demo zuerst
+
+**Mikołaj hat den Plan nach dem Vergleich mit der bisherigen Reihenfolge
+angepasst.** Vorrang haben kurze Bedarfsgespräche mit Werkstätten und eine
+Vorführung des bestehenden Produkts mit fiktiven Daten. Formalitäten werden
+parallel vorbereitet; ein echter Kundenbetrieb hat eigene Startbedingungen.
+
+Bisher lag die Reihenfolge bei M2, W1, neuer Marke, vollständigem
+Figma-Dashboard, S1 und Pilot. Jetzt rückt der Gesprächs- und Demoteil von S1
+nach vorne. Vollständige neue Marke und vollständiger Redesign sind keine
+automatischen Voraussetzungen für erste Gespräche oder einen begrenzten Pilot.
+Fehler, die eine sichere und verständliche Bedienung verhindern, bleiben vor
+dem jeweiligen Einsatz zu beheben.
+
+### Nächste Schritte
+
+1. **S1: Gesprächspaket vorbereiten:** Fragen zum tatsächlichen Arbeitsablauf,
+   ehrliche Beschreibung bestätigter Funktionen und offener Grenzen, kurzes
+   Demo-Szenario sowie Vorlage für Gesprächsnotizen.
+2. **W1 im Mindestumfang:** In einer Testumgebung mit fiktiven Daten einen Ablauf
+   prüfen: Kundenanfrage, Ticket in der Übersicht, Antwort beziehungsweise
+   Übernahme durch einen Mitarbeiter. Keine neue große Umstrukturierung;
+   vollständige Sprachnachrichten gehören nicht zum Mindestumfang.
+3. **Ziel: fünf Bedarfsgespräche dokumentieren.** Bestehenden Ablauf,
+   wiederkehrendes Problem, Reaktion auf die Demo, Bedingungen des Interesses
+   und konkreten nächsten Schritt festhalten. Die Zahl ist ein Ziel, kein
+   Bericht bereits geführter Gespräche.
+4. Ergebnisse auswerten und einen eng begrenzten Anwendungsfall auswählen.
+   Bei fehlendem konkretem Interesse Annahmen überarbeiten, statt automatisch
+   weitere Funktionen zu bauen.
+5. Für eine interessierte Werkstatt M2 und einen beaufsichtigten P1-Pilot
+   vorbereiten. Vor dem echten Start müssen die erforderlichen Meta-Zugriffe,
+   Formalitäten, Grundfunktion, Daten-/Zugriffsschutz, Sicherung und Reaktion
+   auf Fehler nachgewiesen sein. Vor einem bezahlten Abonnement ist zusätzlich
+   B4 zu klären.
+
+### Parallel: Gewerbe und Meta
+
+Mikołaj bestätigte am 03.11., dass die Gewerbeanmeldung noch nicht eingereicht
+wurde. Diese Planänderung verschiebt eine erforderliche Anmeldung nicht bis
+zur ersten Rechnung oder einem positiven Marktfeedback. Marktforschung und
+aktive Kundenakquise sind unterschiedlich zu bewerten. Vor aktiver Vermarktung,
+Auftragsannahme oder tatsächlicher Leistungserbringung den maßgeblichen
+Betriebsbeginn mit dem Gewerbeamt klären; dabei auch die bestehende öffentliche
+Angebotsseite angeben. Ein kostenloser Pilot ist keine automatische Ausnahme.
+Grundlagen: [§ 14 GewO](https://www.gesetze-im-internet.de/gewo/__14.html),
+[IHK: Vorbereitung und Marktforschung](https://www.ihk.de/blueprint/servlet/maihk24/gruendung/finanzierung/foerderprogramme/gruendungszuschuss-947662)
+und [IHK: Beginn und Akquise](https://www.ihk.de/aachen/gruendung/gruendung/gewerbeanmeldung-und-handelsregistereintrag-607248);
+am 03.11. nachgelesen.
+
+Heutiger angemeldeter Meta-Abruf: App Live, Unternehmensportfolio nicht
+verifiziert und ohne hinterlegte Unternehmensstammdaten; WhatsApp-Berechtigungen
+`whatsapp_business_management` und `whatsapp_business_messaging` jeweils
+`Bereit zum Testen`, keine sichtbare bestehende Business-Login-Konfiguration.
+Tech-Provider-Einführung erreichbar, kein erfolgreicher Abschluss bestätigt.
+M2/F2 warten im realen Onboarding-Teil auf diese Voraussetzungen und ein
+berechtigtes Konto beziehungsweise eine Nummer. Das blockiert die Vorbereitung
+einer Demo auf fiktiven Daten nicht.
+
+### Fortbestehende Nachweise und Grenzen
+
+M1 bleibt geprüft. Technische Live-Abnahme von M2 und Zusammenführung nach
+master vom 31.10. bleiben frühere Nachweise; heute wurden Produktion und
+Datenbank nicht erneut geprüft. `coexistence_bereit=0` bleibt die bestehende
+Entscheidung. Namensprüfung, Figma, OCR, Archiv und weitere Integrationen bleiben
+im Plan und werden nach Bedarf beziehungsweise Feedback eingeordnet.
+
+Das Notion-Projektzentrum und alle 13 vorhandenen Karten bleiben die operative
+Übersicht; es wurden keine Karten gelöscht oder dupliziert. S1 ist nun das
+einzige mit „Teraz“ markierte Thema, M2 und F2 stehen für den realen Teil auf
+„Czeka“. Diese Dokumentationsänderung führt keine Gespräche, Anmeldung,
+Konfigurationsänderung oder Freigabe durch.
+
+Aktueller Einstieg: [S1 in Notion](https://app.notion.com/p/3fffa727c11d81ecbf75fe2287608e20),
+[Projektzentrum](https://app.notion.com/p/3fffa727c11d814f9cebc28cc54f98ce).
+
+## Historischer Stand vom 31. Oktober 2026 nach technischer Live-Abnahme
 
 **M2 ist produktiv und technisch abgenommen. Die Hauptbranch übernimmt den
 aktuellen Produktstand und sämtliche bisher veröffentlichten Projektberichte.**
