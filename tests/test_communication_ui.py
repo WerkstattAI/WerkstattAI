@@ -215,7 +215,7 @@ class CommunicationPageTests(unittest.TestCase):
     def assert_fresh_selection(self, markup):
         fields = FormFields(markup).selects
         for name in ("purpose", "reply_to_message_id"):
-            self.assertEqual([option["value"] for option in fields[name]["options"] if "selected" in option], [""])
+            self.assertEqual([option["value"] for option in fields[name]["options"] if "selected" in option], ["workshop_notification" if name == "purpose" else ""])
         self.assertIn("Diese Antwort schließt die ausgewählte Kundenfrage nach erfolgreichem Versand.", markup)
 
     def test_dashboard_delivers_question_targets_to_contact_modal(self):

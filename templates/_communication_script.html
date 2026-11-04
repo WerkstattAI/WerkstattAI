@@ -21,7 +21,7 @@
         help.textContent = {
           workshop_answer: help.dataset?.answerHelp || "Diese Antwort schließt die ausgewählte Kundenfrage nach erfolgreichem Versand.",
           workshop_question: "Der Assistent pausiert. Die nächste Kundenantwort wird dieser Frage zugeordnet.",
-          workshop_notification: "Eine Information ändert weder offene Kundenfragen noch den Ticketstatus."
+          workshop_notification: "Offene Kundenfragen bleiben bestehen. Zum Abschließen direkt an der Frage auf Antworten klicken."
         }[purpose.value] || "Bitte wählen Sie den Zweck der Nachricht.";
       }
       function saveDraft() {
@@ -82,9 +82,9 @@
             const date = question.created_at_display || question.created_at || "";
             target.add(new Option(`${date}${date ? " · " : ""}${question.text || "Kundenfrage"}`, question.message_id));
           }
-          purpose.value = "";
+          purpose.value = purpose.dataset?.standard || "";
           target.value = "";
-          purposeChosen = false;
+          purposeChosen = Boolean(purpose.value);
           targetChosen = false;
           messageId.value = freshId();
           try {
@@ -107,6 +107,8 @@
               }
             }
           } catch (_) {}
+          const optionsPanel = form.querySelector(".nachrichtenoptionen");
+          if (optionsPanel) optionsPanel.open = purpose.value !== "workshop_notification";
           refreshPurpose();
           saveDraft();
         }

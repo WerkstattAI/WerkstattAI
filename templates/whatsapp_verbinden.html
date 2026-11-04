@@ -10,8 +10,10 @@
     button:disabled{opacity:.5;cursor:default}.hinweis{background:#fff6dc;border-left:4px solid #b77b16;padding:16px}
     #fortschritt{padding:16px;background:#eef4f2;min-height:3em}ol{padding-left:25px}
   </style>
+<link rel="stylesheet" href="/static/arbeitsplatz/verwaltung.css">
 </head>
-<body><main>
+<body class="produkt verwaltung">
+{% set aktive_navigation = '/dashboard/settings' %}{% include '_arbeitsplatz_kopf.html' %}<main>
   <a href="/dashboard/settings?workshop_id={{ workshop_id | urlencode }}">← Einstellungen</a>
   <h1>WhatsApp verbinden</h1><p>{{ workshop.name }}</p>
   <p>Verbinden Sie Ihre bestehende WhatsApp Business-App. Ihre Nummer und die App bleiben erhalten. Löschen Sie Ihr WhatsApp-Konto nicht.</p>

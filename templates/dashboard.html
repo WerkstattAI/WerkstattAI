@@ -9,6 +9,7 @@
   <style>{{ communication.styles() }}</style>
 
 <link rel="stylesheet" href="/static/arbeitsplatz/arbeitsplatz.css?v=20261104">
+<link rel="stylesheet" href="/static/arbeitsplatz/feinschliff.css">
 </head>
 <body class="arbeitsplatz">
   <a class="skip-link" href="#main-content">Direkt zu den Tickets</a>
@@ -39,25 +40,25 @@
       <section class="dashboard-summary" aria-label="Ticket-Kennzahlen">
       <div class="cards cards-primary">
         <a class="card kpi kpi-primary kpi-order-1" data-kpi="offen" href="{{ kpi_links.offen }}">
-          <div class="label">Offen</div>
+          <div class="label">Offen<span class="kennzahl-icon"><img src="/static/arbeitsplatz/symbole/clipboard-list.svg" alt="" width="22" height="22"></span></div>
           <div class="value">{{ stats.offen or 0 }}</div>
           <div class="hint">Neue oder noch unbehandelte Anfragen</div>
         </a>
 
         <a class="card kpi kpi-primary kpi-order-2" data-kpi="in_bearbeitung" href="{{ kpi_links.in_bearbeitung }}">
-          <div class="label">In Bearbeitung</div>
+          <div class="label">In Bearbeitung<span class="kennzahl-icon"><img src="/static/arbeitsplatz/symbole/wrench.svg" alt="" width="22" height="22"></span></div>
           <div class="value">{{ stats.in_bearbeitung or 0 }}</div>
           <div class="hint">Mechaniker oder Team arbeitet bereits daran</div>
         </a>
 
         <a class="card kpi kpi-customer kpi-primary kpi-order-3" data-kpi="kundenfragen_offen" href="{{ kpi_links.kundenfragen_offen }}">
-          <div class="label">Antwort erforderlich</div>
+          <div class="label">Antwort erforderlich<span class="kennzahl-icon"><img src="/static/arbeitsplatz/symbole/message-circle-question.svg" alt="" width="22" height="22"></span></div>
           <div class="value">{{ stats.kundenfragen_offen or 0 }}</div>
           <div class="hint">Kundenfragen ohne Antwort vom Team</div>
         </a>
 
         <a class="card kpi kpi-hot kpi-primary kpi-order-4" data-kpi="hoch" href="{{ kpi_links.hoch }}">
-          <div class="label">Hohe Priorität</div>
+          <div class="label">Hohe Priorität<span class="kennzahl-icon"><img src="/static/arbeitsplatz/symbole/clock-3.svg" alt="" width="22" height="22"></span></div>
           <div class="value">{{ stats.hoch or 0 }}</div>
           <div class="hint">Sofort prüfen oder zuerst bearbeiten</div>
         </a>
@@ -246,6 +247,8 @@
               {% for t in tickets %}
               <tr
                 id="ticket-{{ t.ticket_view_id }}"
+                data-ticket-karte
+                data-ticket-url="/dashboard/ticket/{{ t.ticket_view_id }}?workshop_id={{ workshop_id }}&amp;return_to={{ list_url|urlencode }}"
                 class="
                   {% if t.priority == 'hoch' %}row-high{% endif %}
                   {% if t.request_type == 'notfall' %}row-notfall{% endif %}
@@ -575,7 +578,7 @@
             </div>
           </div>
 
-          {{ communication.purpose_controls('dashboardMessage') }}
+          {{ communication.purpose_controls('dashboardMessage', einfach=true) }}
 
           <div class="message-field">
             <label for="messageText">Nachricht</label>
@@ -999,5 +1002,7 @@
     installDashboardLive({initialCursor: {{ event_cursor|tojson }}, workshopId: {{ workshop_id|tojson }}, scope: {{ event_scope|tojson }}, list: true});
   {% include '_arbeitsplatz_script.html' %}
 </script>
+<script nonce="{{ request.state.csp_nonce }}" src="/static/arbeitsplatz/bildbetrachter.js" defer></script>
+<script nonce="{{ request.state.csp_nonce }}" src="/static/arbeitsplatz/nachrichtenkomfort.js" defer></script>
 </body>
 </html>

@@ -8,6 +8,7 @@
   <title>WerkstattAI – Ticket</title>
   <style>{{ communication.styles() }}</style>
 <link rel="stylesheet" href="/static/arbeitsplatz/arbeitsplatz.css?v=20261104">
+<link rel="stylesheet" href="/static/arbeitsplatz/feinschliff.css">
 </head>
 <body class="arbeitsplatz ticketseite">
 <a class="skip-link" href="#main-content">Direkt zum Ticket</a>
@@ -111,6 +112,7 @@
                 Im Webchat antworten
               {% endif %}
             </h3>
+            <details class="gespraechdetails" {% if ticket.dispatch_blocked or ((ticket.has_whatsapp_conversation or ticket.source == 'whatsapp') and (not whatsapp_readiness.can_send or not ticket.whatsapp_phone or not ticket.service_window_open)) %}open{% endif %}><summary>Verbindung und Assistent</summary>
             <div style="margin-bottom:10px;">
               <span class="channel-badge {{ ticket.source or 'web_chat' }}">
                 {% if ticket.source == "whatsapp" %}
@@ -184,12 +186,13 @@
               </div>
             {% endif %}
 
+            </details>
             {{ communication.dispatch_recovery(ticket.dispatch_blocked, ticket.stale_dispatches|default([]), workshop_id, ticket.ticket_view_id, ticket.whatsapp_phone, 'ticket') }}
             <form class="note-form customer-reply-form" method="post" action="/dashboard/ticket/{{ ticket.ticket_view_id }}/notes">
               <input type="hidden" name="workshop_id" value="{{ workshop_id }}" />
               <input type="hidden" name="return_to" value="{{ list_url }}" />
               <input type="hidden" name="note_type" value="customer_reply">
-              {{ communication.purpose_controls('ticketMessage', ticket.open_customer_questions|default([]), ticket.has_whatsapp_conversation or ticket.source == 'whatsapp') }}
+              {{ communication.purpose_controls('ticketMessage', ticket.open_customer_questions|default([]), ticket.has_whatsapp_conversation or ticket.source == 'whatsapp', einfach=true) }}
               <div class="note-form-row">
                 <label for="ticketCustomerReplyText">Nachricht an den Kunden</label>
                 <textarea
@@ -547,5 +550,7 @@
     });
   {% include '_arbeitsplatz_script.html' %}
 </script>
+<script nonce="{{ request.state.csp_nonce }}" src="/static/arbeitsplatz/bildbetrachter.js" defer></script>
+<script nonce="{{ request.state.csp_nonce }}" src="/static/arbeitsplatz/nachrichtenkomfort.js" defer></script>
 </body>
 </html>

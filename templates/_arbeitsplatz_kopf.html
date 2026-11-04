@@ -1,11 +1,11 @@
 {% set aktive_navigation = aktive_navigation|default('/dashboard/archive' if archive_mode|default(false) else '/dashboard') %}
 <header class="arbeitsplatz-kopf">
-  <div class="markenzeile"><a class="wortmarke" href="/dashboard?workshop_id={{ workshop_id }}"><img src="/static/arbeitsplatz/symbole/wrench.svg" alt="" width="24" height="24">WerkstattAI</a><div class="werkstattname">{{ workshop.name or 'Werkstattbereich' }} <span>Werkstattbereich</span></div></div>
+  <div class="markenzeile"><a class="wortmarke" href="/dashboard?workshop_id={{ workshop_id }}"><img src="/static/arbeitsplatz/symbole/wrench.svg" alt="" width="24" height="24">WerkstattAI</a><div class="werkstattname">{{ workshop.name if workshop is defined and workshop.name else 'Werkstattbereich' }} <span>Werkstattbereich</span></div></div>
   <nav class="hauptnavigation" aria-label="Hauptnavigation">
     {% for pfad, name, symbol in [('/dashboard','Tickets und Aufgaben','layout-dashboard'),('/dashboard/whatsapp','WhatsApp','messages-square'),('/dashboard/intake','Direktannahme','clipboard-pen'),('/dashboard/archive','Archiv','archive'),('/dashboard/settings','Einstellungen','settings-2'),('/dashboard/billing','Abo','credit-card')] %}
     <a class="nav-btn {% if pfad == aktive_navigation %}active{% endif %}" href="{{ pfad }}?workshop_id={{ workshop_id }}" {% if pfad == aktive_navigation %}aria-current="page"{% endif %}><img src="/static/arbeitsplatz/symbole/{{ symbol }}.svg" alt="" width="17" height="17">{{ name }}</a>
     {% endfor %}
-    {% if current_user and current_user.role == 'admin' %}<a class="nav-btn" href="/dashboard/admin/workshops"><img src="/static/arbeitsplatz/symbole/shield-check.svg" alt="" width="17" height="17">Admin</a>{% endif %}
+    {% if current_user and current_user.role == 'admin' %}<a class="nav-btn {% if aktive_navigation == "/dashboard/admin/workshops" %}active{% endif %}" {% if aktive_navigation == "/dashboard/admin/workshops" %}aria-current="page"{% endif %} href="/dashboard/admin/workshops"><img src="/static/arbeitsplatz/symbole/shield-check.svg" alt="" width="17" height="17">Admin</a>{% endif %}
     <form method="post" action="/logout"><button class="nav-btn" type="submit"><img src="/static/arbeitsplatz/symbole/log-out.svg" alt="" width="17" height="17">Abmelden</button></form>
   </nav>
 </header>

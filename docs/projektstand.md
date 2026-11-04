@@ -1,5 +1,39 @@
 # WerkstattAI – Projektstand und nächste Schritte
 
+## D1 – Markenbezogene Fahrzeugbilder vom 4. November 2026
+
+Die freigegebenen realistischen Illustrationen ersetzen die zuvor vorgesehenen
+Karosseriesymbole. 18 ausdrücklich genannte Marken erhalten jeweils ein festes
+Bild, unabhängig vom Modell. VW/Volkswagen, Mercedes-Benz/Benz, Groß-/Kleinschreibung
+und Akzente werden vereinheitlicht. Unbekannte, fehlende oder mehrere verschiedene
+Marken erhalten das neutrale Bild; aus Modellnamen allein wird keine Marke geraten.
+Die ursprünglichen Fahrzeugdaten bleiben unverändert. Dashboardvorschau und Ticket
+verwenden dieselbe Vorlage und lokal gespeicherte Bildtafel ohne Beschriftungen.
+Die Herkunft und Einordnung als Symbolbilder stehen in `static/arbeitsplatz/QUELLEN.md`.
+
+Prüfung: 16 gezielte Python-Tests bestanden; darunter alle Marken, Aliasnamen,
+Mehrdeutigkeiten, 19 verschiedene Bildausschnitte und bestehende Oberflächenverträge.
+Der erweiterte Test für die lokale Bildauslieferung wurde anschließend erneut
+erfolgreich ausgeführt. Lokale Browserkontrolle der Dashboardvorschau sowie der
+Ticketkarte bei 390 px Breite mit erfundenen Daten bestanden.
+Veröffentlichung weiterhin separat: PR #4 ist noch nicht zusammengeführt.
+Die zuvor angeforderte ausdrückliche Freigabe für Merge/Produktionsveröffentlichung
+steht wegen der automatischen Freigabeprüfung weiterhin aus.
+
+## D1 – Feinschliff der fünf Rückmeldungen vom 4. November 2026
+
+Restliche Menüseiten übernehmen den gemeinsamen Stil. Ticketkarten öffnen über
+ihre freie Fläche; Hauptkennzahlen sind überarbeitet. Fahrzeugbilder werden als
+grobe lokale Karosseriesymbole statt als gemeinsames Golf-Bild dargestellt.
+Normale Nachrichten benötigen keine Zweckauswahl; gezielte Antworten bleiben
+explizit. Empfangene Bilder erhalten einen Dialog und einen Fehlerzustand.
+[Umfang, Grenzen und Prüfung](d1-feinschliff-2026-11-04.md): 54 gezielte Python-
+und 64 JavaScript-Tests bestanden, lokale Desktop-/Mobilkontrolle erfolgt.
+Aktuelle Veröffentlichung wird separat im PR und Notion nachgewiesen.
+Nächster Schritt: konkreten Bildfehler in der angemeldeten Produktion prüfen;
+Anmeldung war beim letzten Versuch erforderlich. Anschließend visuelle Abnahme.
+Die folgenden Einträge bleiben als Verlauf erhalten.
+
 ## D1 – Anmeldung und Chatansichten vom 4. November 2026
 
 Mikołaj hat die Fortsetzung hier im bestehenden Repository gewählt. Anmeldung,

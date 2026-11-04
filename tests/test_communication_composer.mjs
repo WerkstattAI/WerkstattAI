@@ -45,6 +45,31 @@ function fixture(storage = new Map(), text = "Nachricht an den Kunden") {
 const questions = [{message_id: "customer-one", text: "Wie lange dauert die Reparatur?"},
   {message_id: "customer-two", text: "Was kostet sie?"}];
 
+test("einfacher Modus startet als Nachricht, ohne offene Fragen zu beantworten", () => {
+  const form = fixture();
+  form.purpose.dataset = {standard: "workshop_notification"};
+  form.controller.configure(questions, "ticket:einfach", true);
+  assert.equal(form.purpose.value, "workshop_notification");
+  assert.equal(form.target.disabled, true);
+  assert.equal(form.target.value, "");
+  assert.equal(form.submit().defaultPrevented, false);
+  choose(form, "workshop_answer", "");
+  assert.equal(form.submit().defaultPrevented, true);
+});
+
+test("einfacher Modus deutet einen veralteten Antwortentwurf nicht als Nachricht um", () => {
+  const first = fixture();
+  first.purpose.dataset = {standard: "workshop_notification"};
+  first.controller.configure(questions, "ticket:einfach-alt", false);
+  choose(first);
+  const revisit = fixture(first.storage);
+  revisit.purpose.dataset = {standard: "workshop_notification"};
+  revisit.controller.configure([], "ticket:einfach-alt", false);
+  assert.equal(revisit.purpose.value, "");
+  assert.equal(revisit.submit().defaultPrevented, true);
+  assert.equal(revisit.textarea.value, first.textarea.value);
+});
+
 function choose(form, purpose = "workshop_answer", target = "customer-one") {
   form.purpose.value = purpose;
   form.purpose.change();

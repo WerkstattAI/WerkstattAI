@@ -668,8 +668,10 @@
       }
     }
   </style>
+<link rel="stylesheet" href="/static/arbeitsplatz/verwaltung.css">
 </head>
-<body>
+<body class="produkt verwaltung">
+{% with workshop_id=account.id, workshop=account %}{% set aktive_navigation = '/dashboard/admin/workshops' %}{% include '_arbeitsplatz_kopf.html' %}{% endwith %}
   <div class="wrap">
     <div class="topbar">
       <div>
@@ -680,21 +682,7 @@
         </div>
       </div>
 
-      <nav class="top-actions" aria-label="Hauptnavigation">
-        <div class="nav-section-label">Anfragen</div>
-        <a class="nav-btn" href="/dashboard?workshop_id={{ account.id }}">Aktive Tickets</a>
-        <a class="nav-btn" href="/dashboard/whatsapp?workshop_id={{ account.id }}">WhatsApp</a>
-        <a class="nav-btn" href="/dashboard/intake?workshop_id={{ account.id }}">+ Direktannahme</a>
 
-        <div class="nav-section-label">Verwaltung</div>
-        <a class="nav-btn" href="/dashboard/archive?workshop_id={{ account.id }}">Archiv</a>
-        <a class="nav-btn" href="/dashboard/settings?workshop_id={{ account.id }}">Einstellungen</a>
-        <a class="nav-btn" href="/dashboard/billing?workshop_id={{ account.id }}">Abo</a>
-        <a class="nav-btn active" href="/dashboard/admin/workshops" aria-current="page">Admin</a>
-        <form method="post" action="/logout" style="margin:0;">
-          <button class="nav-btn" type="submit">Abmelden</button>
-        </form>
-      </nav>
     </div>
 
     <div class="grid">

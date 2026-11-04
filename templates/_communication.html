@@ -14,16 +14,17 @@
 <span class="communication-state {{ state }}">{{ state_label(state) }}</span>
 {%- endmacro %}
 
-{% macro purpose_controls(prefix, questions=[], uses_whatsapp=true) %}
+{% macro purpose_controls(prefix, questions=[], uses_whatsapp=true, einfach=false) %}
 {% set answer_help = 'Diese Antwort schließt die ausgewählte Kundenfrage nach erfolgreichem Versand.' if uses_whatsapp else 'Diese Antwort schließt die ausgewählte Kundenfrage beim Speichern für den Web-Chat. Das bedeutet nicht, dass der Kunde sie bereits gelesen hat.' %}
 <div class="communication-controls" data-communication-controls>
+  {% if einfach %}<details class="nachrichtenoptionen"><summary>Nachrichtenoptionen</summary>{% endif %}
   <div class="communication-field">
-    <label for="{{ prefix }}Purpose">Was möchten Sie senden?</label>
-    <select id="{{ prefix }}Purpose" name="purpose" required data-message-purpose aria-describedby="{{ prefix }}PurposeHelp">
-      <option value="" disabled selected>Zweck auswählen …</option>
+    <label for="{{ prefix }}Purpose">{{ 'Nachrichtentyp' if einfach else 'Was möchten Sie senden?' }}</label>
+    <select id="{{ prefix }}Purpose" name="purpose" required data-message-purpose {% if einfach %}data-standard="workshop_notification"{% endif %} aria-describedby="{{ prefix }}PurposeHelp">
+      <option value="" disabled {% if not einfach %}selected{% endif %}>Bitte auswählen …</option>
       <option value="workshop_answer" {% if not questions %}disabled{% endif %}>Auf Kundenfrage antworten</option>
       <option value="workshop_question">Frage an Kunden stellen</option>
-      <option value="workshop_notification">Information an Kunden senden</option>
+      <option value="workshop_notification" {% if einfach %}selected{% endif %}>{{ "Nachricht senden" if einfach else "Information an Kunden senden" }}</option>
     </select>
   </div>
   <div class="communication-field" data-reply-target-field hidden>
@@ -35,8 +36,9 @@
       {% endfor %}
     </select>
   </div>
+  {% if einfach %}</details>{% endif %}
   <p class="communication-help" id="{{ prefix }}PurposeHelp" data-purpose-help data-answer-help="{{ answer_help }}">
-    Bitte wählen Sie den Zweck der Nachricht. {{ answer_help }}
+    {% if einfach %}Für eine offene Kundenfrage wählen Sie „Antworten“ an der Nachricht.{% else %}Bitte wählen Sie den Zweck der Nachricht. {{ answer_help }}{% endif %}
   </p>
   <input type="hidden" name="message_id" value="" data-client-message-id />
 </div>

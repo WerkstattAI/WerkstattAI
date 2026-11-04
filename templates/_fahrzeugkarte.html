@@ -5,7 +5,18 @@
     <div class="fahrzeugwert"><img src="/static/arbeitsplatz/symbole/calendar-days.svg" alt="" width="18" height="18"><span>Baujahr</span><strong>{{ t.baujahr if t.baujahr is not none and t.baujahr != '' else 'Nicht angegeben' }}</strong></div>
     <div class="fahrzeugwert"><img src="/static/arbeitsplatz/symbole/gauge.svg" alt="" width="18" height="18"><span>Kilometerstand</span><strong>{{ t.kilometerstand|kilometeranzeige }}</strong></div>
   </div>
-  <figure class="fahrzeugbild"><img src="/static/arbeitsplatz/fahrzeug-symbolbild.png" alt="Neutrale Illustration eines Autos" width="600" height="400"><figcaption>Symbolbild</figcaption></figure>
+  {% set symbol = t.fahrzeug|fahrzeugsymbol %}
+  {# Ausschnitte der freigegebenen Bildtafel, ohne Beschriftung oder Herstellerembleme. #}
+  {% set ausschnitt = {'volkswagen':(0,150),'bmw':(1,150),'mercedes':(2,150),'audi':(3,150),'skoda':(4,150),
+                      'opel':(0,385),'ford':(1,385),'toyota':(2,385),'renault':(3,385),'peugeot':(4,385),
+                      'citroen':(0,610),'seat':(1,610),'hyundai':(2,610),'kia':(3,610),'volvo':(4,610),
+                      'nissan':(0,830),'mazda':(1,830),'dacia':(2,830),'neutral':(3,830)}[symbol] %}
+  <figure class="fahrzeugbild markenbild" data-fahrzeugmarke="{{ symbol }}">
+    <svg class="fahrzeuggrafik" viewBox="0 0 307.2 190" width="600" height="371" role="img" aria-label="{% if symbol == 'neutral' %}Neutrales Fahrzeug-Symbolbild{% else %}Symbolbild zur Fahrzeugmarke, keine exakte Modellabbildung{% endif %}">
+      <image href="/static/arbeitsplatz/fahrzeuge/markenbilder-v1.png" x="{{ -307.2 * ausschnitt[0] }}" y="{{ -ausschnitt[1] }}" width="1536" height="1024" />
+    </svg>
+    <figcaption>Symbolbild · keine exakte Modellabbildung</figcaption>
+  </figure>
   <dl class="fahrzeugmerkmale">
     {% for feld, name, symbol in [('fahrbereit','Fahrbereit','circle-check'),('abschleppdienst','Abschleppdienst','truck')] %}
     <div><dt><img src="/static/arbeitsplatz/symbole/{{ symbol }}.svg" alt="" width="17" height="17">{{ name }}</dt><dd class="{% if t[feld] is sameas true %}ja{% elif t[feld] is sameas false %}nein{% else %}unbekannt{% endif %}">{% if t[feld] is sameas true %}Ja{% elif t[feld] is sameas false %}Nein{% else %}Unbekannt{% endif %}</dd></div>
