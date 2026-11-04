@@ -111,7 +111,7 @@ function installDashboardLive({workshopId, scope, list, initialCursor = 0}) {
   document.addEventListener('click', event => {
     const link = event.target.closest('a[href]');
     if (!link) return;
-    const row = link.closest('tr[id]');
+    const row = link.closest('tr[id]') || document.getElementById(link.closest('#ticket-vorschau')?.dataset.auswahl);
     const position = {y:scrollY, anchor:row?.id, top:row?.getBoundingClientRect().top};
     write(positionKey(here()), position);
     const target = new URL(link.href, location.origin);
@@ -160,7 +160,9 @@ function installDashboardLive({workshopId, scope, list, initialCursor = 0}) {
         const fresh = await fetch(here(), {cache:'no-store', signal:controller.signal});
         if (!fresh.ok || fresh.redirected) throw new Error('Status gespeichert. Die Anzeige konnte nicht aktualisiert werden. Bitte die Liste erneut öffnen.');
         const doc = new DOMParser().parseFromString(await fresh.text(), 'text/html');
-        const row = form.closest('tr'), replacement = doc.getElementById(row.id);
+        const row = form.closest('tr') || document.getElementById(form.dataset.previewTicket);
+        if (!row) throw new Error('Status gespeichert. Bitte die Liste erneut öffnen.');
+        const replacement = doc.getElementById(row.id);
         const neighbor = row.nextElementSibling || row.previousElementSibling;
         preserveAnchor(neighbor, () => {
           document.querySelectorAll('[data-kpi]').forEach(kpi => {
@@ -173,7 +175,10 @@ function installDashboardLive({workshopId, scope, list, initialCursor = 0}) {
           }
           if (replacement) {
             row.replaceWith(replacement);
-            const nextForm = replacement.querySelector('form.quick');
+            window.aktualisiereTicketVorschau?.();
+            const nextForm = form.dataset.previewTicket
+              ? document.querySelector('#ticket-vorschau form.quick')
+              : replacement.querySelector('form.quick');
             feedback(nextForm, 'Status gespeichert.');
             nextForm.querySelector('button')?.focus({preventScroll:true});
           } else {
@@ -181,6 +186,7 @@ function installDashboardLive({workshopId, scope, list, initialCursor = 0}) {
             const cell = document.createElement('td'); cell.colSpan = 7;
             cell.textContent = 'Status gespeichert. Dieses Ticket passt nicht mehr zu den aktuellen Filtern oder zur aktuellen Seite.';
             cell.setAttribute('role','status'); cell.tabIndex = -1; row.append(cell); cell.focus({preventScroll:true});
+            window.aktualisiereTicketVorschau?.();
           }
         });
       } else {
@@ -190,7 +196,12 @@ function installDashboardLive({workshopId, scope, list, initialCursor = 0}) {
         preserveAnchor(anchor, () => {
           for (const id of ['communication-history']) {
             const old = document.getElementById(id), next = doc.getElementById(id);
-            if (old && next && !old.contains(form)) old.replaceWith(next);
+            if (old && next && !old.contains(form)) {
+              const atEnd = old.scrollHeight - old.scrollTop - old.clientHeight < 64;
+              const scroll = old.scrollTop;
+              old.replaceWith(next);
+              next.scrollTop = atEnd ? next.scrollHeight : scroll;
+            }
           }
           if (form.action.endsWith('/information-resolve')) {
             const card = form.closest('.note-card'), next = doc.getElementById(card.id);
@@ -201,6 +212,13 @@ function installDashboardLive({workshopId, scope, list, initialCursor = 0}) {
           } else if (form.action.endsWith('/status')) {
             const next = doc.querySelector('.status-value');
             if (next) document.querySelector('.status-value').replaceWith(next);
+            const management = document.querySelector('.statusverwaltung'), updatedManagement = doc.querySelector('.statusverwaltung');
+            if (management && updatedManagement) {
+              management.replaceWith(updatedManagement);
+              const updatedForm = updatedManagement.querySelector('.status-form');
+              feedback(updatedForm, 'Status gespeichert.');
+              updatedForm.querySelector('button')?.focus({preventScroll:true});
+            }
             feedback(form, 'Status gespeichert.');
           } else {
             const panel = form.closest('#internal-notes');

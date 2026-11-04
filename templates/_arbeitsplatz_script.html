@@ -1,0 +1,93 @@
+(() => {
+  const preview = document.getElementById('ticket-vorschau');
+  const selectionKey = 'werkstattai:ticketauswahl:' + location.pathname + location.search;
+  let selected = null;
+  function auswaehlen(id) {
+    const row = document.getElementById(id);
+    const source = row?.querySelector('template[data-vorschau]');
+    if (!preview || !source) return false;
+    selected = id;
+    preview.dataset.auswahl = id;
+    try { sessionStorage.setItem(selectionKey,id); } catch (_) {}
+    preview.replaceChildren(source.content.cloneNode(true));
+    const actions = row.querySelector('.actions')?.cloneNode(true);
+    if (actions) {
+      actions.querySelectorAll('template').forEach(node => node.remove());
+      actions.querySelectorAll('form').forEach(form => form.dataset.previewTicket = id);
+      preview.append(actions);
+    }
+    document.querySelectorAll('[data-ticket-auswahl]').forEach(button => {
+      const active = button.dataset.ticketAuswahl === id;
+      button.setAttribute('aria-pressed', String(active));
+      button.closest('tr').classList.toggle('ausgewaehlt', active);
+    });
+    return true;
+  }
+  window.aktualisiereTicketVorschau = () => {
+    if (!auswaehlen(selected)) {
+      const first = document.querySelector('[data-ticket-auswahl]');
+      if (first) auswaehlen(first.dataset.ticketAuswahl);
+      else if (preview) preview.textContent = 'Kein Ticket in dieser Ansicht ausgewählt.';
+    }
+  };
+  if (preview) {
+    const hash = location.hash.slice(1);
+    let saved = null;
+    try { saved = sessionStorage.getItem(selectionKey); } catch (_) {}
+    if (!auswaehlen(hash) && !auswaehlen(saved)) window.aktualisiereTicketVorschau();
+    window.addEventListener('hashchange', () => auswaehlen(location.hash.slice(1)));
+    document.addEventListener('click', event => {
+      const button = event.target.closest('[data-ticket-auswahl]');
+      if (!button || !auswaehlen(button.dataset.ticketAuswahl)) return;
+      if (matchMedia('(max-width: 900px)').matches) {
+        preview.scrollIntoView({block:'start'}); preview.focus({preventScroll:true});
+      }
+    });
+  }
+  const tabs = [...document.querySelectorAll('[data-ticket-tab]')];
+  function tabAktivieren(id, focus=false) {
+    tabs.forEach(tab => {
+      const active = tab.dataset.ticketTab === id;
+      tab.setAttribute('aria-selected', String(active)); tab.tabIndex = active ? 0 : -1;
+      document.getElementById(tab.dataset.ticketTab).hidden = !active;
+      if (active && focus) tab.focus();
+    });
+  }
+  function hashAnzeigen() {
+    const target = document.getElementById(location.hash.slice(1));
+    const panel = target?.closest('[data-ticket-panel]');
+    tabAktivieren(panel?.id || 'gespraech-panel');
+    if (target) requestAnimationFrame(() => target.scrollIntoView({block:'center'}));
+  }
+  if (tabs.length) {
+    document.querySelector('.ticket-register').setAttribute('role','tablist');
+    tabs.forEach((tab, index) => {
+      tab.setAttribute('role','tab');
+      const panel = document.getElementById(tab.dataset.ticketTab);
+      panel.setAttribute('role','tabpanel'); panel.setAttribute('aria-labelledby',tab.id);
+      tab.addEventListener('click', () => tabAktivieren(tab.dataset.ticketTab));
+      tab.addEventListener('keydown', event => {
+        let next;
+        if (event.key === 'ArrowRight') next = (index+1)%tabs.length;
+        if (event.key === 'ArrowLeft') next = (index+tabs.length-1)%tabs.length;
+        if (event.key === 'Home') next=0;
+        if (event.key === 'End') next=tabs.length-1;
+        if (next !== undefined) {event.preventDefault();tabAktivieren(tabs[next].dataset.ticketTab,true);}
+      });
+    });
+    hashAnzeigen(); window.addEventListener('hashchange', hashAnzeigen);
+    const history = document.getElementById('communication-history');
+    if (history && !location.hash) history.scrollTop = history.scrollHeight;
+  }
+  document.addEventListener('click', event => {
+    const answer = event.target.closest('[data-frage-beantworten]');
+    if (!answer) return;
+    const form = document.querySelector('.customer-reply-form');
+    const purpose = form?.querySelector('[data-message-purpose]');
+    const target = form?.querySelector('[data-reply-target]');
+    if (!purpose || !target || ![...target.options].some(option => option.value === answer.dataset.frageBeantworten)) return;
+    purpose.value='workshop_answer'; purpose.dispatchEvent(new Event('change',{bubbles:true}));
+    target.value=answer.dataset.frageBeantworten; target.dispatchEvent(new Event('change',{bubbles:true}));
+    form.querySelector('textarea')?.focus();
+  });
+})();

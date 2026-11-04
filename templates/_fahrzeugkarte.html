@@ -1,0 +1,15 @@
+{% macro fahrzeugkarte(t, kompakt=false) %}
+<section class="fahrzeugkarte {% if kompakt %}kompakt{% endif %}" aria-label="Fahrzeugdaten">
+  <div class="fahrzeugkopf"><div class="eyebrow">Fahrzeug</div><h2>{{ t.fahrzeug or 'Fahrzeug nicht angegeben' }}</h2></div>
+  <div class="fahrzeugwerte">
+    <div class="fahrzeugwert"><img src="/static/arbeitsplatz/symbole/calendar-days.svg" alt="" width="18" height="18"><span>Baujahr</span><strong>{{ t.baujahr if t.baujahr is not none and t.baujahr != '' else 'Nicht angegeben' }}</strong></div>
+    <div class="fahrzeugwert"><img src="/static/arbeitsplatz/symbole/gauge.svg" alt="" width="18" height="18"><span>Kilometerstand</span><strong>{{ t.kilometerstand|kilometeranzeige }}</strong></div>
+  </div>
+  <figure class="fahrzeugbild"><img src="/static/arbeitsplatz/fahrzeug-symbolbild.png" alt="Neutrale Illustration eines Autos" width="600" height="400"><figcaption>Symbolbild</figcaption></figure>
+  <dl class="fahrzeugmerkmale">
+    {% for feld, name, symbol in [('fahrbereit','Fahrbereit','circle-check'),('abschleppdienst','Abschleppdienst','truck')] %}
+    <div><dt><img src="/static/arbeitsplatz/symbole/{{ symbol }}.svg" alt="" width="17" height="17">{{ name }}</dt><dd class="{% if t[feld] is sameas true %}ja{% elif t[feld] is sameas false %}nein{% else %}unbekannt{% endif %}">{% if t[feld] is sameas true %}Ja{% elif t[feld] is sameas false %}Nein{% else %}Unbekannt{% endif %}</dd></div>
+    {% endfor %}
+  </dl>
+</section>
+{% endmacro %}

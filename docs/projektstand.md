@@ -1,5 +1,30 @@
 # WerkstattAI – Projektstand und nächste Schritte
 
+## D1 – umgesetzter Dashboard-/Ticketschritt vom 4. November 2026
+
+Mikołaj hat den Figma-Entwurf einschließlich der klareren Fahrzeugdaten
+bestätigt und die Übernahme in die bestehende Anwendung beauftragt. Dashboard,
+Ticketkarten, Archivansicht und Ticketdetail verwenden nun das neue visuelle
+System. Navigation, Filter, Kennzahlen, Nachrichtenformulare und bestehende
+Schutzmechanismen bleiben erhalten. Fahrzeugdaten, chronologische Unterhaltung,
+interne Notizen und Falldaten sind übersichtlich getrennt.
+
+Abschließend 767 Python-Tests ohne Fehler, davon 90 PostgreSQL-Fälle mangels
+gesonderter Testdatenbank übersprungen; 62/62 JavaScript-Tests bestanden.
+Lokale Browserkontrolle auf erfundenen Daten einschließlich Antwort, Notiz,
+Status, Vorschau, Listenrückkehr sowie Desktop-/Mobilansicht durchgeführt.
+Keine echten Kundennachrichten versendet und keine Datenbankmigration.
+[Umfang, Nachweise und Veröffentlichungsweg](d1-arbeitsplatz-2026-11-04.md).
+
+Diese Angaben beschreiben den geprüften Code. Der tatsächlich aktive
+Railway-SHA und die angemeldete Produktionskontrolle werden getrennt im
+laufenden Veröffentlichungsnachweis und in Notion festgehalten. D1 bleibt als
+Gesamtpaket in Arbeit: Nach diesem Schritt folgen Login, eigenständige
+WhatsApp-Unterhaltungen und Kundenchat. S1/C1/R1 bleiben die anschließende
+beziehungsweise parallel vorbereitete Reihenfolge.
+
+Die folgenden Plan- und Prüfstände bleiben als datierte Vorgeschichte erhalten.
+
 ## Aktueller Schwerpunkt vom 3. November 2026: Produktauftritt für Werkstätten
 
 **Mikołaj hat die Priorität konkretisiert:** Chat und Gesprächsspeicherung

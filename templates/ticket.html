@@ -1,3 +1,4 @@
+{% from '_fahrzeugkarte.html' import fahrzeugkarte %}
 {% import '_communication.html' as communication %}
 <!doctype html>
 <html lang="de">
@@ -5,1847 +6,20 @@
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width,initial-scale=1" />
   <title>WerkstattAI – Ticket</title>
-  <style>
-    :root{
-      --bg:#09111f;
-      --bg-2:#0d1629;
-      --card:#0f1b33;
-      --card-2:#13213d;
-      --panel:#101a31;
-      --line:rgba(255,255,255,.08);
-      --line-2:rgba(255,255,255,.12);
-      --text:#e8eef8;
-      --muted:#97a3b6;
-      --soft:#c8d4e4;
-
-      --ok:#22c55e;
-      --warn:#f59e0b;
-      --info:#60a5fa;
-      --danger:#ef4444;
-
-      --shadow:0 10px 30px rgba(0,0,0,.32);
-      --shadow-2:0 20px 50px rgba(0,0,0,.42);
-      --r:20px;
-      --r-sm:14px;
-    }
-
-    *{box-sizing:border-box}
-
-    html{
-      scroll-behavior:smooth;
-    }
-
-    body{
-      margin:0;
-      font-family: system-ui, -apple-system, Segoe UI, Roboto, Arial, sans-serif;
-      color:var(--text);
-      background:
-        linear-gradient(90deg, rgba(255,255,255,.055) 1px, transparent 1px),
-        linear-gradient(180deg, rgba(255,255,255,.045) 1px, transparent 1px),
-        radial-gradient(900px 420px at 10% -8%, rgba(37,99,235,.48), transparent 64%),
-        radial-gradient(760px 360px at 86% 4%, rgba(245,158,11,.24), transparent 62%),
-        linear-gradient(135deg, #08111f 0%, #101b31 42%, #0a1020 100%);
-      background-size:44px 44px, 44px 44px, auto, auto, auto;
-      min-height:100vh;
-    }
-
-    .wrap{
-      max-width:1180px;
-      margin:0 auto;
-      padding:22px;
-    }
-
-    a{
-      color:var(--text);
-      text-decoration:none;
-      font-weight:800;
-    }
-
-    a:hover{
-      text-decoration:underline;
-    }
-
-    .muted{
-      color:#aebbd0;
-      font-size:12px;
-      line-height:1.5;
-    }
-
-    .card{
-      background:linear-gradient(180deg, rgba(255,255,255,.135), rgba(255,255,255,.055));
-      border:1px solid rgba(255,255,255,.18);
-      border-radius:22px;
-      box-shadow:0 22px 54px rgba(0,0,0,.36), inset 0 1px 0 rgba(255,255,255,.11);
-      padding:18px;
-    }
-
-    .topbar{
-      display:flex;
-      justify-content:space-between;
-      gap:16px;
-      flex-wrap:wrap;
-      align-items:flex-start;
-      margin-bottom:22px;
-      padding:24px;
-      border:1px solid rgba(255,255,255,.18);
-      border-radius:28px;
-      background:
-        linear-gradient(135deg, rgba(59,130,246,.38), rgba(255,255,255,.09) 45%, rgba(245,158,11,.16)),
-        rgba(8,15,28,.86);
-      box-shadow:0 30px 90px rgba(0,0,0,.48), inset 0 1px 0 rgba(255,255,255,.16);
-      backdrop-filter:blur(18px);
-    }
-
-    .topbar-left{
-      display:flex;
-      flex-direction:column;
-      gap:10px;
-    }
-
-    .back-link{
-      display:inline-flex;
-      align-items:center;
-      gap:8px;
-      width:max-content;
-      min-height:42px;
-      padding:10px 14px;
-      border-radius:14px;
-      border:1px solid rgba(255,255,255,.12);
-      background:rgba(255,255,255,.065);
-      transition:.18s ease;
-    }
-
-    .back-link:hover{
-      background:rgba(96,165,250,.14);
-      text-decoration:none;
-      transform:translateY(-1px);
-    }
-
-    .eyebrow{
-      display:inline-flex;
-      align-items:center;
-      gap:8px;
-      width:max-content;
-      padding:7px 11px;
-      border-radius:999px;
-      border:1px solid rgba(255,255,255,.22);
-      background:rgba(255,255,255,.13);
-      color:#eaf2ff;
-      font-size:12px;
-      font-weight:800;
-      letter-spacing:.04em;
-      text-transform:uppercase;
-    }
-
-    .title-row{
-      display:flex;
-      flex-wrap:wrap;
-      align-items:center;
-      gap:10px;
-    }
-
-    .title{
-      margin:0;
-      font-size:42px;
-      line-height:1.1;
-      letter-spacing:.2px;
-    }
-
-    .copy-wrap{
-      display:inline-flex;
-      align-items:center;
-      gap:8px;
-      flex-wrap:wrap;
-    }
-
-    .copy-btn{
-      min-height:36px;
-      padding:8px 10px;
-      border-radius:12px;
-      border:1px solid rgba(255,255,255,.12);
-      background:rgba(255,255,255,.065);
-      color:var(--text);
-      font-weight:900;
-      font-size:12px;
-      cursor:pointer;
-      transition:.18s ease;
-    }
-
-    .copy-btn:hover{
-      background:rgba(96,165,250,.14);
-      transform:translateY(-1px);
-    }
-
-    .copy-btn:disabled{
-      opacity:.5;
-      cursor:not-allowed;
-      transform:none;
-    }
-
-    .mini{
-      font-size:12px;
-      color:var(--muted);
-      font-weight:800;
-    }
-
-    .hero{
-      display:grid;
-      grid-template-columns: 1.25fr .95fr;
-      gap:16px;
-      margin-bottom:16px;
-    }
-
-    .hero-main{
-      position:relative;
-      overflow:hidden;
-      background:
-        radial-gradient(760px 280px at 0% 0%, rgba(96,165,250,.34), transparent 62%),
-        linear-gradient(135deg, rgba(255,255,255,.16), rgba(255,255,255,.055));
-      min-height:230px;
-    }
-
-    .hero-main::after{
-      content:"";
-      position:absolute;
-      right:-30px;
-      bottom:-30px;
-      width:220px;
-      height:220px;
-      border-radius:999px;
-      background:rgba(96,165,250,.12);
-      filter:blur(10px);
-    }
-
-    .hero-label{
-      color:var(--muted);
-      font-size:12px;
-      text-transform:uppercase;
-      letter-spacing:.08em;
-      font-weight:900;
-    }
-
-    .hero-problem{
-      font-size:40px;
-      line-height:1.2;
-      font-weight:900;
-      margin-top:10px;
-      max-width:760px;
-      position:relative;
-      z-index:1;
-    }
-
-    .hero-meta{
-      display:flex;
-      flex-wrap:wrap;
-      gap:8px;
-      margin-top:14px;
-      position:relative;
-      z-index:1;
-    }
-
-    .pill{
-      display:inline-flex;
-      align-items:center;
-      gap:8px;
-      padding:6px 11px;
-      border-radius:999px;
-      border:1px solid rgba(255,255,255,.12);
-      background:rgba(255,255,255,.065);
-      font-size:12px;
-      font-weight:800;
-      white-space:nowrap;
-    }
-
-    .status{
-      display:inline-flex;
-      align-items:center;
-      gap:8px;
-      padding:5px 11px;
-      border-radius:999px;
-      border:1px solid rgba(255,255,255,.12);
-      background:rgba(255,255,255,.065);
-      font-size:12px;
-      font-weight:900;
-      text-transform:capitalize;
-    }
-
-    .dot{
-      width:8px;
-      height:8px;
-      border-radius:999px;
-      flex:0 0 auto;
-    }
-
-    .s-offen .dot{background:var(--warn)}
-    .s-in_bearbeitung .dot{background:var(--info)}
-    .s-erledigt .dot{background:var(--ok)}
-    .s-archiviert .dot{background:#94a3b8}
-    .s-geschlossen .dot{background:var(--ok)}
-
-    .priority{
-      display:inline-flex;
-      align-items:center;
-      gap:6px;
-      padding:5px 11px;
-      border-radius:999px;
-      border:1px solid var(--line);
-      font-size:11px;
-      font-weight:900;
-      text-transform:uppercase;
-      letter-spacing:.06em;
-    }
-
-    .p-niedrig{
-      background:rgba(34,197,94,.12);
-      border-color:rgba(34,197,94,.24);
-      color:#bbf7d0;
-    }
-
-    .p-normal{
-      background:rgba(255,255,255,.04);
-      color:#dbe6f5;
-    }
-
-    .p-hoch{
-      background:rgba(239,68,68,.14);
-      border-color:rgba(239,68,68,.28);
-      color:#fecaca;
-    }
-
-    .request-type{
-      display:inline-flex;
-      align-items:center;
-      gap:6px;
-      padding:5px 11px;
-      border-radius:999px;
-      border:1px solid var(--line);
-      font-size:11px;
-      font-weight:900;
-      text-transform:uppercase;
-      letter-spacing:.05em;
-    }
-
-    .rt-service{
-      background:rgba(34,197,94,.10);
-      border-color:rgba(34,197,94,.22);
-      color:#bbf7d0;
-    }
-
-    .rt-diagnose{
-      background:rgba(96,165,250,.10);
-      border-color:rgba(96,165,250,.22);
-      color:#cfe3ff;
-    }
-
-    .rt-notfall{
-      background:rgba(245,158,11,.14);
-      border-color:rgba(245,158,11,.28);
-      color:#ffd39a;
-    }
-
-    .rt-kostenvoranschlag{
-      background:rgba(168,85,247,.14);
-      border-color:rgba(168,85,247,.30);
-      color:#e9d5ff;
-    }
-
-    .tiny-badge{
-      display:inline-flex;
-      align-items:center;
-      gap:6px;
-      padding:5px 10px;
-      border-radius:999px;
-      border:1px solid var(--line);
-      background:rgba(255,255,255,.04);
-      color:var(--soft);
-      font-size:11px;
-      font-weight:800;
-    }
-
-    .tiny-badge.warn{
-      background:rgba(245,158,11,.12);
-      border-color:rgba(245,158,11,.24);
-      color:#ffd39a;
-    }
-
-    .tiny-badge.danger{
-      background:rgba(239,68,68,.12);
-      border-color:rgba(239,68,68,.24);
-      color:#fecaca;
-    }
-
-    .hero-side{
-      display:flex;
-      flex-direction:column;
-      gap:12px;
-    }
-
-    .status-card{
-      min-height:100%;
-    }
-
-    .status-card.row-high{
-      box-shadow:inset 4px 0 0 rgba(239,68,68,.95), 0 16px 38px rgba(0,0,0,.28);
-      border-color:rgba(239,68,68,.26);
-    }
-
-    .status-card.row-notfall{
-      box-shadow:inset 4px 0 0 rgba(245,158,11,.95), 0 16px 38px rgba(0,0,0,.28);
-      border-color:rgba(245,158,11,.26);
-    }
-
-    .status-head{
-      display:flex;
-      justify-content:space-between;
-      gap:12px;
-      align-items:flex-start;
-      flex-wrap:wrap;
-    }
-
-    .status-value{
-      margin-top:8px;
-    }
-
-    .status-sub{
-      margin-top:10px;
-      color:#aebbd0;
-      font-size:13px;
-      line-height:1.5;
-    }
-
-    .conversation-state{
-      display:inline-flex;
-      align-items:center;
-      gap:6px;
-      padding:6px 10px;
-      border-radius:999px;
-      border:1px solid rgba(255,255,255,.14);
-      font-size:11px;
-      font-weight:900;
-      letter-spacing:.04em;
-      text-transform:uppercase;
-      white-space:nowrap;
-    }
-
-    .conversation-state.open{
-      border-color:rgba(239,68,68,.32);
-      background:rgba(239,68,68,.14);
-      color:#fecaca;
-    }
-
-    .conversation-state.answered{
-      border-color:rgba(34,197,94,.34);
-      background:rgba(34,197,94,.14);
-      color:#bbf7d0;
-    }
-
-    .grid{
-      display:grid;
-      grid-template-columns:repeat(3, minmax(220px, 1fr));
-      gap:16px;
-      margin-bottom:16px;
-    }
-
-    .section{
-      display:grid;
-      gap:16px;
-    }
-
-    .section-title{
-      margin:0 0 10px 0;
-      font-size:12px;
-      font-weight:900;
-      color:#c7d2fe;
-      letter-spacing:.08em;
-      text-transform:uppercase;
-    }
-
-    .value-lg{
-      font-size:22px;
-      font-weight:900;
-      line-height:1.25;
-      margin-top:6px;
-    }
-
-    .kv{
-      display:grid;
-      grid-template-columns:160px 1fr;
-      gap:10px 14px;
-      margin-top:10px;
-    }
-
-    .kv b{
-      color:#d7dfeb;
-      font-size:13px;
-      font-weight:850;
-    }
-
-    .divider{
-      height:1px;
-      background:var(--line);
-      margin:14px 0;
-    }
-
-    .problem-box{
-      font-size:20px;
-      font-weight:900;
-      line-height:1.35;
-      margin-top:6px;
-    }
-
-    .action-card{
-      background:
-        radial-gradient(620px 240px at 100% 0%, rgba(96,165,250,.26), transparent 60%),
-        linear-gradient(180deg, rgba(255,255,255,.13), rgba(255,255,255,.055));
-    }
-
-    .actions{
-      display:flex;
-      gap:12px;
-      flex-wrap:wrap;
-      align-items:flex-end;
-    }
-
-    .status-form{
-      display:flex;
-      gap:10px;
-      flex-wrap:wrap;
-      align-items:flex-end;
-      flex:1;
-    }
-
-    .field{
-      min-width:260px;
-      flex:1;
-    }
-
-    input, select, button, textarea{
-      min-height:44px;
-      padding:10px 12px;
-      border-radius:14px;
-      border:1px solid rgba(255,255,255,.12);
-      background:rgba(7,14,27,.78);
-      color:var(--text);
-      outline:none;
-      transition:.18s ease;
-    }
-
-    input:focus, select:focus, button:focus, textarea:focus{
-      border-color:rgba(96,165,250,.35);
-      box-shadow:0 0 0 3px rgba(96,165,250,.10);
-    }
-
-    button{
-      cursor:pointer;
-      font-weight:900;
-      background:linear-gradient(180deg, rgba(96,165,250,.28), rgba(96,165,250,.13));
-    }
-
-    button:hover{
-      transform:translateY(-1px);
-      background:linear-gradient(180deg, rgba(96,165,250,.28), rgba(96,165,250,.14));
-    }
-
-    .archive-btn{
-      background:rgba(239,68,68,.14);
-      border:1px solid rgba(239,68,68,.28);
-      color:#fecaca;
-    }
-
-    .archive-btn:hover{
-      background:rgba(239,68,68,.22);
-    }
-
-    .debug-grid{
-      display:grid;
-      grid-template-columns:repeat(2, minmax(240px, 1fr));
-      gap:12px;
-      margin-top:12px;
-    }
-
-    .debug-item{
-      padding:10px;
-      border-radius:14px;
-      border:1px solid rgba(255,255,255,.055);
-      background:rgba(7,14,27,.34);
-    }
-
-    .debug-label{
-      font-size:11px;
-      text-transform:uppercase;
-      letter-spacing:.08em;
-      color:#8ea1ba;
-      margin-bottom:6px;
-      font-weight:900;
-    }
-
-    .debug-value{
-      color:#dce7f5;
-      font-size:13px;
-      line-height:1.5;
-      word-break:break-word;
-    }
-
-    .debug-list{
-      margin:0;
-      padding-left:18px;
-      color:#dbe6f5;
-      line-height:1.5;
-      font-size:13px;
-    }
-
-    .debug-list li + li{
-      margin-top:4px;
-    }
-
-    .note-form{
-      margin-bottom:16px;
-    }
-
-    .note-form-row{
-      display:flex;
-      gap:10px;
-      flex-wrap:wrap;
-    }
-
-    .note-form textarea{
-      flex:1;
-      min-height:82px;
-      resize:vertical;
-      line-height:1.5;
-    }
-
-    .note-submit{
-      display:flex;
-      align-items:flex-end;
-    }
-
-    .note-stack{
-      display:flex;
-      flex-direction:column;
-      gap:10px;
-    }
-
-    .note-card{
-      padding:14px 16px;
-      border-radius:18px;
-      border:1px solid rgba(255,255,255,.16);
-      background:rgba(255,255,255,.08);
-      box-shadow:0 14px 30px rgba(0,0,0,.22);
-    }
-
-    .note-card.customer-question{
-      border-color:rgba(96,165,250,.48);
-      background:linear-gradient(180deg, rgba(96,165,250,.28), rgba(96,165,250,.10));
-    }
-
-    .note-card.customer-reply{
-      border-color:rgba(34,197,94,.42);
-      background:linear-gradient(180deg, rgba(34,197,94,.20), rgba(34,197,94,.075));
-    }
-
-    .note-card.internal-note{
-      border-color:rgba(255,255,255,.14);
-      background:rgba(255,255,255,.07);
-    }
-
-    .communication-grid{
-      display:grid;
-      grid-template-columns:1fr 1fr;
-      gap:16px;
-    }
-
-    .communication-panel{
-      min-width:0;
-    }
-
-    .communication-panel.full{
-      grid-column:1 / -1;
-    }
-
-    .note-label{
-      margin-bottom:7px;
-      font-size:11px;
-      color:#bfdbfe;
-      font-weight:900;
-      letter-spacing:.06em;
-      text-transform:uppercase;
-    }
-
-    .channel-badge{
-      display:inline-flex;
-      align-items:center;
-      gap:6px;
-      padding:5px 10px;
-      border-radius:999px;
-      border:1px solid rgba(255,255,255,.14);
-      background:rgba(255,255,255,.06);
-      color:#dbe6f5;
-      font-size:11px;
-      font-weight:850;
-      letter-spacing:.03em;
-      text-transform:uppercase;
-    }
-
-    .channel-icon{
-      width:16px;
-      height:16px;
-      border-radius:999px;
-      display:inline-flex;
-      align-items:center;
-      justify-content:center;
-      font-size:10px;
-      line-height:1;
-      font-weight:900;
-      background:rgba(255,255,255,.14);
-      color:#f8fbff;
-      flex:0 0 auto;
-    }
-
-    .channel-badge.web_chat{
-      border-color:rgba(96,165,250,.35);
-      background:rgba(96,165,250,.14);
-      color:#dbeafe;
-    }
-
-    .channel-badge.whatsapp{
-      border-color:rgba(34,197,94,.40);
-      background:rgba(34,197,94,.16);
-      color:#bbf7d0;
-    }
-
-    .channel-badge.direktannahme{
-      border-color:rgba(245,158,11,.42);
-      background:rgba(245,158,11,.18);
-      color:#fde68a;
-    }
-
-    .note-text{
-      color:#eef5ff;
-      font-size:13px;
-      line-height:1.55;
-      white-space:pre-wrap;
-      word-break:break-word;
-    }
-
-    .note-date{
-      margin-top:8px;
-      color:#9fb0c6;
-      font-size:11px;
-      font-weight:800;
-    }
-
-    details{
-      border:1px solid rgba(255,255,255,.10);
-      border-radius:14px;
-      background:rgba(7,14,27,.54);
-      overflow:hidden;
-      margin-top:14px;
-    }
-
-    summary{
-      cursor:pointer;
-      padding:12px 14px;
-      font-weight:900;
-      list-style:none;
-      color:#f1f5f9;
-      background:rgba(255,255,255,.045);
-      user-select:none;
-    }
-
-    summary::-webkit-details-marker{
-      display:none;
-    }
-
-    .raw{
-      padding:12px;
-      border-top:1px solid rgba(255,255,255,.08);
-      background:rgba(7,14,27,.58);
-    }
-
-    pre{
-      white-space:pre-wrap;
-      word-break:break-word;
-      overflow:auto;
-      max-height:360px;
-      background:rgba(0,0,0,.24);
-      border:1px solid rgba(255,255,255,.10);
-      border-radius:14px;
-      padding:12px;
-      margin:0;
-      color:#dbe6f5;
-      line-height:1.5;
-      font-size:13px;
-    }
-
-    .toast{
-      position:fixed;
-      right:18px;
-      bottom:18px;
-      padding:10px 12px;
-      border-radius:14px;
-      border:1px solid var(--line);
-      background:rgba(0,0,0,.55);
-      color:var(--text);
-      box-shadow:var(--shadow);
-      font-weight:900;
-      font-size:12px;
-      opacity:0;
-      transform:translateY(10px);
-      transition:opacity .18s ease, transform .18s ease;
-      pointer-events:none;
-      z-index:60;
-    }
-
-    .toast.show{
-      opacity:1;
-      transform:translateY(0);
-    }
-
-    .reply-alert{
-      margin-bottom:14px;
-      padding:12px 14px;
-      border:1px solid rgba(34,197,94,.42);
-      border-radius:10px;
-      background:rgba(34,197,94,.14);
-      color:#bbf7d0;
-      font-size:13px;
-      font-weight:800;
-    }
-
-    .reply-alert.failed{
-      border-color:rgba(239,68,68,.46);
-      background:rgba(239,68,68,.14);
-      color:#fecaca;
-    }
-
-    @media (max-width: 980px){
-      .hero{
-        grid-template-columns:1fr;
-      }
-
-      .grid{
-        grid-template-columns:1fr;
-      }
-
-      .debug-grid{
-        grid-template-columns:1fr;
-      }
-
-      .communication-grid{
-        grid-template-columns:1fr;
-      }
-
-      .kv{
-        grid-template-columns:1fr;
-      }
-    }
-
-    @media (max-width: 680px){
-      .wrap{
-        padding:14px;
-      }
-
-      .title{
-        font-size:24px;
-      }
-
-      .hero-problem{
-        font-size:22px;
-      }
-    }
-
-    /* Premium readability pass */
-    body{
-      background:
-        linear-gradient(90deg, rgba(255,255,255,.035) 1px, transparent 1px),
-        linear-gradient(180deg, rgba(255,255,255,.03) 1px, transparent 1px),
-        radial-gradient(900px 420px at 8% -10%, rgba(37,99,235,.32), transparent 64%),
-        radial-gradient(760px 360px at 92% -2%, rgba(245,158,11,.16), transparent 62%),
-        linear-gradient(135deg, #08111f 0%, #0d182b 50%, #090f1c 100%);
-      letter-spacing:0;
-    }
-
-    .wrap{
-      max-width:1220px;
-      padding:26px;
-    }
-
-    .topbar{
-      border-radius:20px;
-      padding:20px;
-      margin-bottom:16px;
-      background:linear-gradient(135deg, rgba(18,31,55,.94), rgba(11,20,36,.92));
-      box-shadow:0 18px 50px rgba(0,0,0,.34), inset 0 1px 0 rgba(255,255,255,.10);
-    }
-
-    .topbar-left{
-      gap:8px;
-    }
-
-    .back-link,
-    .eyebrow,
-    .pill,
-    .status,
-    .priority,
-    .request-type,
-    .tiny-badge,
-    button,
-    input,
-    select,
-    textarea{
-      border-radius:10px;
-    }
-
-    .back-link{
-      min-height:38px;
-      padding:8px 12px;
-      background:rgba(255,255,255,.055);
-    }
-
-    .eyebrow{
-      background:rgba(255,255,255,.075);
-      letter-spacing:.03em;
-    }
-
-    .title{
-      font-size:32px;
-      font-weight:850;
-    }
-
-    .muted{
-      color:#b4c0d0;
-      font-size:12px;
-    }
-
-    .card{
-      border-radius:16px;
-      border-color:rgba(255,255,255,.13);
-      background:rgba(15,27,51,.84);
-      box-shadow:0 14px 34px rgba(0,0,0,.28), inset 0 1px 0 rgba(255,255,255,.08);
-    }
-
-    .hero{
-      grid-template-columns:minmax(0, 1.35fr) minmax(280px, .65fr);
-      gap:12px;
-      margin-bottom:12px;
-    }
-
-    .hero-main{
-      min-height:174px;
-      background:linear-gradient(135deg, rgba(20,38,70,.95), rgba(15,27,51,.86));
-    }
-
-    .hero-main::after{
-      display:none;
-    }
-
-    .hero-problem{
-      margin-top:8px;
-      font-size:28px;
-      font-weight:850;
-      line-height:1.25;
-      max-width:820px;
-    }
-
-    .hero-meta{
-      margin-top:12px;
-    }
-
-    .grid{
-      grid-template-columns:1fr 1fr 1fr;
-      gap:12px;
-      margin-bottom:12px;
-    }
-
-    .section{
-      gap:12px;
-    }
-
-    .section-title{
-      margin-bottom:8px;
-      color:#ccd8ff;
-      font-size:11px;
-      letter-spacing:.06em;
-    }
-
-    .value-lg{
-      font-size:20px;
-      font-weight:800;
-    }
-
-    .kv{
-      grid-template-columns:135px 1fr;
-      gap:8px 12px;
-    }
-
-    .kv b{
-      color:#dbe5f2;
-      font-weight:750;
-    }
-
-    .action-card{
-      background:rgba(15,27,51,.86);
-    }
-
-    .divider{
-      margin:16px 0;
-      background:rgba(255,255,255,.10);
-    }
-
-    .communication-grid{
-      grid-template-columns:1fr 1fr;
-      gap:14px;
-      align-items:start;
-    }
-
-    .communication-panel{
-      padding:14px;
-      border-radius:14px;
-      border:1px solid rgba(255,255,255,.10);
-      background:rgba(5,10,20,.22);
-    }
-
-    .communication-panel.full{
-      padding:14px;
-    }
-
-    .note-form{
-      margin-bottom:12px;
-    }
-
-    .note-form-row{
-      gap:8px;
-    }
-
-    .note-form textarea{
-      min-height:96px;
-      background:rgba(7,14,27,.72);
-      font-size:14px;
-    }
-
-    .note-card{
-      border-radius:14px;
-      padding:14px;
-      box-shadow:none;
-      background:rgba(255,255,255,.055);
-    }
-
-    .note-card.customer-question{
-      border-color:rgba(96,165,250,.42);
-      background:rgba(37,99,235,.14);
-    }
-
-    .note-card.customer-reply{
-      border-color:rgba(34,197,94,.36);
-      background:rgba(22,101,52,.16);
-    }
-
-    .note-card.internal-note{
-      background:rgba(255,255,255,.05);
-    }
-
-    .note-label{
-      margin-bottom:8px;
-      color:#c7d2fe;
-      font-size:10px;
-      letter-spacing:.06em;
-    }
-
-    .note-text{
-      color:#f2f7ff;
-      font-size:14px;
-      line-height:1.6;
-    }
-
-    .note-date{
-      color:#9fb0c6;
-      font-size:11px;
-    }
-
-    .debug-grid{
-      grid-template-columns:repeat(4, minmax(150px, 1fr));
-      gap:8px;
-    }
-
-    .debug-item{
-      border-radius:12px;
-      padding:9px 10px;
-      background:rgba(255,255,255,.04);
-    }
-
-    .debug-label{
-      font-size:10px;
-      color:#9daec3;
-    }
-
-    .debug-value,
-    .debug-list,
-    pre{
-      font-size:12px;
-    }
-
-    details{
-      border-radius:12px;
-      opacity:.88;
-    }
-
-    summary{
-      padding:10px 12px;
-      font-size:12px;
-    }
-
-    @media (max-width: 980px){
-      .hero,
-      .grid,
-      .communication-grid,
-      .debug-grid{
-        grid-template-columns:1fr;
-      }
-
-      .kv{
-        grid-template-columns:1fr;
-      }
-    }
-
-    /* Calm workshop workspace theme */
-    :root{
-      --bg:#f3f6f5;
-      --bg-2:#eaf0ee;
-      --card:#ffffff;
-      --card-2:#f8faf9;
-      --panel:#ffffff;
-      --line:#dfe6e3;
-      --line-2:#cfdad6;
-      --text:#182522;
-      --muted:#65736f;
-      --soft:#45544f;
-      --petrol:#0f6f66;
-      --petrol-dark:#17413c;
-      --graphite:#172723;
-      --ok:#23815d;
-      --warn:#c47a16;
-      --info:#2d6f96;
-      --danger:#c44743;
-      --shadow:0 8px 24px rgba(28,52,45,.08);
-      --shadow-2:0 18px 42px rgba(28,52,45,.12);
-    }
-
-    body{
-      color:var(--text);
-      background:
-        radial-gradient(900px 440px at 72% -10%, rgba(15,111,102,.11), transparent 64%),
-        linear-gradient(180deg, #edf3f1 0, #f7f9f8 420px, #f3f6f5 100%);
-      font-family:"Segoe UI Variable", "Segoe UI", Inter, system-ui, -apple-system, sans-serif;
-    }
-
-    .wrap{
-      width:min(1280px, 100%);
-      max-width:1280px;
-      margin:0 auto;
-      padding:24px clamp(16px, 3vw, 38px) 44px;
-    }
-
-    a{
-      color:var(--petrol);
-    }
-
-    a:focus-visible,
-    button:focus-visible,
-    input:focus-visible,
-    select:focus-visible,
-    textarea:focus-visible,
-    summary:focus-visible{
-      outline:3px solid rgba(15,111,102,.20);
-      outline-offset:2px;
-    }
-
-    input,
-    select,
-    button,
-    textarea{
-      min-height:44px;
-      border:1px solid #d5dfdc;
-      border-radius:9px;
-      background:#ffffff;
-      color:var(--text);
-      font:inherit;
-      box-shadow:none;
-    }
-
-    input:focus,
-    select:focus,
-    button:focus,
-    textarea:focus{
-      border-color:#5b9e94;
-      box-shadow:0 0 0 3px rgba(15,111,102,.11);
-    }
-
-    button{
-      border-color:#0c625a;
-      background:var(--petrol);
-      color:#ffffff;
-      font-weight:700;
-    }
-
-    button:hover{
-      transform:translateY(-1px);
-      background:#0c625a;
-    }
-
-    .topbar{
-      display:block;
-      margin:0 0 18px;
-      padding:21px 24px 23px;
-      border:0;
-      border-radius:15px;
-      color:#f5fbf9;
-      background:
-        radial-gradient(520px 230px at 4% -20%, rgba(45,150,136,.25), transparent 68%),
-        linear-gradient(135deg, #172a26 0%, #13231f 100%);
-      box-shadow:0 13px 30px rgba(22,42,36,.14);
-      backdrop-filter:none;
-    }
-
-    .topbar-left{
-      width:100%;
-      gap:18px;
-    }
-
-    .ticket-nav{
-      display:flex;
-      align-items:center;
-      gap:7px;
-      flex-wrap:wrap;
-    }
-
-    .ticket-nav form{
-      margin:0 0 0 auto !important;
-    }
-
-    .topbar .back-link{
-      width:auto;
-      min-height:38px;
-      padding:8px 11px;
-      border:1px solid rgba(255,255,255,.08);
-      border-radius:9px;
-      background:rgba(255,255,255,.055);
-      color:#dce9e5;
-      font-size:12px;
-      font-weight:650;
-      box-shadow:none;
-    }
-
-    .topbar .back-link:hover{
-      transform:none;
-      border-color:rgba(121,205,191,.20);
-      background:rgba(255,255,255,.10);
-      color:#ffffff;
-      text-decoration:none;
-    }
-
-    .topbar .back-link.active{
-      border-color:rgba(86,194,177,.18);
-      background:rgba(64,166,151,.18);
-      color:#ffffff;
-      box-shadow:inset 3px 0 0 #58b8a9;
-    }
-
-    .topbar .eyebrow{
-      padding:0;
-      border:0;
-      background:transparent;
-      color:#78c9bd;
-      font-size:11px;
-      font-weight:750;
-      letter-spacing:.09em;
-    }
-
-    .topbar .title-row{
-      margin-top:6px;
-    }
-
-    .topbar .title{
-      color:#ffffff;
-      font-size:30px;
-      line-height:1.18;
-      font-weight:720;
-      letter-spacing:-.025em;
-    }
-
-    .topbar .muted{
-      margin-top:7px;
-      color:#afc0ba;
-      font-size:13px;
-    }
-
-    .topbar .copy-btn{
-      min-height:32px;
-      padding:6px 9px;
-      border-color:rgba(255,255,255,.11);
-      background:rgba(255,255,255,.07);
-      color:#e7f2ef;
-      font-size:11px;
-    }
-
-    .topbar .copy-btn:hover{
-      background:rgba(255,255,255,.12);
-    }
-
-    .topbar .mini{
-      color:#91a69f;
-      font-weight:650;
-    }
-
-    .card{
-      padding:18px;
-      border:1px solid var(--line);
-      border-radius:12px;
-      background:#ffffff;
-      box-shadow:var(--shadow);
-    }
-
-    .hero{
-      grid-template-columns:minmax(0, 1.45fr) minmax(290px, .55fr);
-      gap:12px;
-      margin-bottom:12px;
-    }
-
-    .hero-main{
-      min-height:178px;
-      border-left:4px solid var(--petrol);
-      background:
-        linear-gradient(110deg, rgba(15,111,102,.075), transparent 48%),
-        #ffffff;
-    }
-
-    .hero-main::after{
-      display:none;
-    }
-
-    .hero-label,
-    .section-title{
-      color:#39736c;
-      font-size:11px;
-      font-weight:750;
-      letter-spacing:.07em;
-    }
-
-    .hero-problem{
-      margin-top:9px;
-      max-width:850px;
-      color:#1b2925;
-      font-size:28px;
-      line-height:1.3;
-      font-weight:720;
-      letter-spacing:-.018em;
-    }
-
-    .hero-meta{
-      margin-top:14px;
-    }
-
-    .pill,
-    .tiny-badge,
-    .status,
-    .priority,
-    .request-type,
-    .conversation-state,
-    .channel-badge{
-      border-color:#d8e1de;
-      background:#f2f6f4;
-      color:#465650;
-      font-weight:650;
-      box-shadow:none;
-    }
-
-    .status-card{
-      min-height:100%;
-      background:#ffffff;
-    }
-
-    .status-card.row-high{
-      border-color:#edcfcd;
-      box-shadow:inset 4px 0 0 #c44743, var(--shadow);
-    }
-
-    .status-card.row-notfall{
-      border-color:#eadbbd;
-      box-shadow:inset 4px 0 0 #d08a2d, var(--shadow);
-    }
-
-    .status-sub{
-      color:#66746f;
-      font-size:12px;
-      line-height:1.65;
-    }
-
-    .s-offen{border-color:#ead2a4;background:#fff6e5;color:#8a5b14}
-    .s-in_bearbeitung{border-color:#bfd7e6;background:#edf7fc;color:#285f7d}
-    .s-erledigt,
-    .s-geschlossen{border-color:#bcdccb;background:#edf8f2;color:#267153}
-    .s-archiviert{border-color:#d6dcda;background:#f1f3f2;color:#5f6b67}
-    .p-niedrig,
-    .rt-service{border-color:#bfdfd0;background:#edf8f2;color:#267153}
-    .p-normal{border-color:#d6dedb;background:#f2f5f4;color:#53615c}
-    .p-hoch{border-color:#efc5c3;background:#fff0ef;color:#a2322e}
-    .rt-diagnose{border-color:#c6dce8;background:#eff7fb;color:#2b6481}
-    .rt-notfall,
-    .tiny-badge.warn{border-color:#ead1a0;background:#fff5df;color:#8a5911}
-    .rt-kostenvoranschlag{border-color:#d9cfeb;background:#f7f3fc;color:#665181}
-    .tiny-badge.danger{border-color:#edc4c2;background:#fff0ef;color:#a3312e}
-    .conversation-state.open{border-color:#efc5c3;background:#fff0ef;color:#a2322e}
-    .conversation-state.answered{border-color:#bcdccb;background:#edf8f2;color:#267153}
-
-    .grid{
-      grid-template-columns:repeat(3, minmax(0, 1fr));
-      gap:12px;
-      margin-bottom:12px;
-    }
-
-    .grid > .card{
-      min-height:156px;
-    }
-
-    .section{
-      gap:12px;
-    }
-
-    .section-title{
-      margin-bottom:9px;
-    }
-
-    .value-lg{
-      color:#1c2925;
-      font-size:20px;
-      font-weight:720;
-    }
-
-    .muted{
-      color:var(--muted);
-    }
-
-    .kv{
-      grid-template-columns:138px minmax(0, 1fr);
-      gap:9px 14px;
-    }
-
-    .kv b{
-      color:#34433e;
-      font-size:12px;
-      font-weight:700;
-    }
-
-    .action-card{
-      padding:20px;
-      background:#ffffff;
-    }
-
-    .divider{
-      margin:19px 0;
-      background:var(--line);
-    }
-
-    .field .muted{
-      margin-bottom:5px;
-      color:#43534e;
-      font-size:12px;
-      font-weight:650;
-    }
-
-    .archive-btn{
-      border-color:#e7bebb;
-      background:#fff0ef;
-      color:#a3312e;
-    }
-
-    .archive-btn:hover{
-      background:#fce3e1;
-    }
-
-    .copy-btn{
-      min-height:34px;
-      padding:7px 9px;
-      border-color:#d5dfdc;
-      background:#f4f7f6;
-      color:#41504b;
-      font-size:11px;
-    }
-
-    .copy-btn:hover{
-      transform:none;
-      background:#e9f0ee;
-    }
-
-    .communication-grid{
-      grid-template-columns:1fr 1fr;
-      gap:12px;
-    }
-
-    .communication-panel{
-      padding:16px;
-      border:1px solid var(--line);
-      border-radius:11px;
-      background:#f8faf9;
-    }
-
-    .communication-panel.full{
-      padding:16px;
-    }
-
-    .note-form textarea{
-      min-height:102px;
-      background:#ffffff;
-      color:var(--text);
-      font-size:14px;
-      line-height:1.55;
-    }
-
-    textarea::placeholder,
-    input::placeholder{
-      color:#8a9893;
-      opacity:1;
-    }
-
-    .note-card{
-      padding:13px 14px;
-      border:1px solid #dfe6e3;
-      border-radius:10px;
-      background:#ffffff;
-      box-shadow:none;
-    }
-
-    .note-card.customer-question{
-      border-color:#c4dce8;
-      background:#f0f8fb;
-    }
-
-    .note-card.customer-reply{
-      border-color:#bfded0;
-      background:#eef8f3;
-    }
-
-    .note-card.internal-note{
-      border-color:#dfe6e3;
-      background:#ffffff;
-    }
-
-    .note-label{
-      color:#39736c;
-      font-size:11px;
-      font-weight:750;
-    }
-
-    .note-text{
-      color:#2d3d38;
-      font-size:14px;
-      line-height:1.6;
-    }
-
-    .note-date{
-      color:#74827e;
-      font-size:11px;
-      font-weight:600;
-    }
-
-    .channel-icon{
-      background:rgba(15,111,102,.12);
-      color:var(--petrol);
-    }
-
-    .channel-badge.web_chat{border-color:#c7dce8;background:#eff7fb;color:#285f7c}
-    .channel-badge.whatsapp{border-color:#bfe1d3;background:#ecf8f2;color:#267454}
-    .channel-badge.direktannahme{border-color:#ead4a6;background:#fff6e4;color:#8a5b18}
-
-    .debug-grid{
-      grid-template-columns:repeat(4, minmax(150px, 1fr));
-      gap:8px;
-    }
-
-    .debug-item{
-      padding:10px 11px;
-      border:1px solid #e0e7e4;
-      border-radius:9px;
-      background:#f7f9f8;
-    }
-
-    .debug-label{
-      margin-bottom:5px;
-      color:#74827e;
-      font-size:11px;
-      font-weight:700;
-    }
-
-    .debug-value,
-    .debug-list{
-      color:#3f4e49;
-      font-size:12px;
-    }
-
-    details{
-      margin-top:16px;
-      border:1px solid #dce4e1;
-      border-radius:10px;
-      background:#ffffff;
-      opacity:1;
-    }
-
-    summary{
-      padding:11px 13px;
-      background:#ffffff;
-      color:#34433e;
-      font-size:12px;
-      font-weight:700;
-    }
-
-    .raw{
-      border-top-color:#dce4e1;
-      background:#f7f9f8;
-    }
-
-    pre{
-      border-color:#d8e1de;
-      background:#eef3f1;
-      color:#33423d;
-      font-size:12px;
-    }
-
-    .reply-alert{
-      margin-bottom:14px;
-      border-color:#b9dcc9;
-      background:#edf8f2;
-      color:#24694e;
-    }
-
-    .reply-alert.failed{
-      border-color:#ebc0bd;
-      background:#fff0ef;
-      color:#a3312e;
-    }
-
-    .delivery-info{
-      display:flex;
-      align-items:flex-start;
-      gap:9px;
-      margin:0 0 12px;
-      padding:10px 11px;
-      border:1px solid #c7ddd7;
-      border-radius:9px;
-      background:#f0f7f5;
-      color:#3e5f57;
-      font-size:12px;
-      line-height:1.45;
-    }
-
-    .delivery-info.warning{border-color:#e7d5ae;background:#fff9ed;color:#795c24}
-    .delivery-dot{flex:0 0 auto;width:8px;height:8px;margin-top:5px;border-radius:50%;background:#2e8a69}
-    .delivery-info.warning .delivery-dot{background:#c9892e}
-    .delivery-info a{color:inherit;font-weight:750}
-    .note-submit button:disabled{border-color:#d6dfdc;background:#e8eeec;color:#83908c;cursor:not-allowed}
-    .conversation-control-bar,
-    .template-start-card{
-      display:flex;
-      align-items:center;
-      justify-content:space-between;
-      gap:12px;
-      margin:0 0 12px;
-      padding:10px 11px;
-      border:1px solid #cbded8;
-      border-radius:9px;
-      background:#f3f8f6;
-      color:#426159;
-      font-size:12px;
-      line-height:1.45;
-    }
-    .conversation-control-bar strong,.template-start-card strong{display:block;color:#284d44}
-    .conversation-control-bar form,.template-start-card form{flex:0 0 auto}
-    .conversation-mode-button,.template-start-button{min-height:38px;padding:8px 12px;border-radius:8px;font-weight:750;white-space:nowrap}
-    .conversation-mode-button{border-color:#acd0c5;background:#e8f5f1;color:#176657}
-    .conversation-mode-button.assistant{border-color:#dccb9b;background:#fff7e5;color:#765616}
-    .template-start-card{border-color:#e3d2aa;background:#fff9eb;color:#74591f}
-    .template-start-card strong{color:#604614}
-    .template-start-button{border-color:#ceb66e;background:#fff2ca;color:#6d4e0e}
-    .template-start-button:disabled{border-color:#d8d6cf;background:#eceeeb;color:#858b87;cursor:not-allowed}
-
-    .toast{
-      border-color:#31534a;
-      background:#18332c;
-      color:#ffffff;
-      box-shadow:var(--shadow-2);
-    }
-
-    @media (max-width: 980px){
-      .wrap{
-        padding:18px 18px 34px;
-      }
-
-      .hero,
-      .grid,
-      .communication-grid,
-      .debug-grid{
-        grid-template-columns:1fr;
-      }
-
-      .grid > .card{
-        min-height:0;
-      }
-
-      .kv{
-        grid-template-columns:125px minmax(0, 1fr);
-      }
-    }
-
-    @media (max-width: 680px){
-      .wrap{
-        padding:0 0 28px;
-      }
-
-      .topbar{
-        margin:0 0 14px;
-        padding:17px 15px 19px;
-        border-radius:0;
-      }
-
-      .ticket-nav{
-        display:grid;
-        grid-template-columns:1fr 1fr;
-      }
-
-      .ticket-nav form{
-        width:100%;
-        margin:0 !important;
-      }
-
-      .topbar .back-link{
-        width:100%;
-        justify-content:center;
-        text-align:center;
-      }
-
-      .ticket-nav > a:first-child{
-        grid-column:1 / -1;
-      }
-
-      .topbar .title{
-        font-size:25px;
-      }
-
-      .reply-alert,
-      .hero,
-      .grid,
-      .section{
-        margin-left:14px;
-        margin-right:14px;
-      }
-
-      .hero-problem{
-        font-size:23px;
-      }
-
-      .card,
-      .action-card{
-        padding:16px;
-      }
-
-      .kv{
-        grid-template-columns:1fr;
-        gap:5px;
-      }
-
-      .kv b:not(:first-child){
-        margin-top:7px;
-      }
-
-      .status-form,
-      .field,
-      .note-form-row,
-      .note-form textarea,
-      .note-submit,
-      .note-submit button{
-        width:100%;
-        min-width:0;
-      }
-
-      .actions > form,
-      .actions > form button{
-        width:100%;
-      }
-      .conversation-control-bar,.template-start-card{align-items:stretch;flex-direction:column}
-      .conversation-control-bar form,.template-start-card form,
-      .conversation-mode-button,.template-start-button{width:100%}
-    }
-    {{ communication.styles() }}
-  </style>
+  <style>{{ communication.styles() }}</style>
+<link rel="stylesheet" href="/static/arbeitsplatz/arbeitsplatz.css?v=20261104">
 </head>
-<body>
-  <div class="wrap">
-    <div class="topbar">
-      <div class="topbar-left">
-        <div class="ticket-nav">
-          <a class="back-link active" href="{{ list_url }}" data-list-return aria-current="location">← Zurück zur Liste</a>
-          <a class="back-link" href="/dashboard/whatsapp?workshop_id={{ workshop_id }}">WhatsApp</a>
-          <a class="back-link" href="/dashboard/intake?workshop_id={{ workshop_id }}">+ Direktannahme</a>
-          <a class="back-link" href="/dashboard/archive?workshop_id={{ workshop_id }}">Archiv</a>
-          <a class="back-link" href="/dashboard/settings?workshop_id={{ workshop_id }}">Einstellungen</a>
-          <a class="back-link" href="/dashboard/billing?workshop_id={{ workshop_id }}">Abo</a>
-          {% if current_user and current_user.role == "admin" %}
-            <a class="back-link" href="/dashboard/admin/workshops">Admin</a>
-          {% endif %}
-          <form method="post" action="/logout" style="margin:0;">
-            <button class="back-link" type="submit">Abmelden</button>
-          </form>
-        </div>
-
-        <div class="ticket-heading">
-          <div class="eyebrow">{{ workshop.name or "WerkstattAI" }} • Ticketansicht</div>
-          <div class="title-row">
-            <h1 class="title">Ticket <span id="ticketIdText">{{ ticket.ticket_view_id or "-" }}</span></h1>
-
-            <div class="copy-wrap">
-              <button class="copy-btn" type="button" data-copy="#ticketIdText">Kopieren</button>
-              <span class="mini">ID</span>
-            </div>
-          </div>
-
-          <div class="muted">Anliegen, Aufgaben und Kommunikation mit dem Kunden.</div>
-        </div>
-      </div>
-    </div>
-
-    {% if reply_detail %}
+<body class="arbeitsplatz ticketseite">
+<a class="skip-link" href="#main-content">Direkt zum Ticket</a>
+{% include '_arbeitsplatz_kopf.html' %}
+<main class="ticket-hauptbereich" id="main-content">
+  <a class="back-link" href="{{ list_url }}" data-list-return>← Zurück zur Liste</a>
+  {% if reply_detail %}
       <div class="reply-alert {% if reply_status in ['failed', 'unknown'] %}failed{% endif %}" role="{% if reply_status in ['failed', 'unknown'] %}alert{% else %}status{% endif %}">
         <strong>{% if reply_status == 'failed' %}Nachricht nicht gesendet: {% elif reply_status == 'unknown' %}Versandstatus unklar: {% elif reply_status == 'template_sent' %}Startvorlage an Meta übergeben: {% elif reply_status == 'sent' %}An Meta übergeben: {% elif reply_status == 'saved' %}Gespeichert: {% endif %}</strong>{{ reply_detail }}
       </div>
     {% endif %}
-
-    <div class="hero">
-      <div class="card hero-main">
-        <div class="hero-label">Gemeldetes Problem</div>
-        <div class="hero-problem">{{ ticket.problem or "-" }}</div>
-
-        <div class="hero-meta">
-          <span class="pill">Fahrzeug: {{ ticket.fahrzeug or "-" }}</span>
-          <span class="pill">Baujahr: {{ ticket.baujahr or "-" }}</span>
-
-          {% if ticket.kilometerstand %}
-            <span class="pill">Kilometerstand: {{ ticket.kilometerstand }}</span>
-          {% endif %}
-
-          {% if ticket.fahrbereit is not none %}
-            <span class="tiny-badge {% if not ticket.fahrbereit %}warn{% endif %}">
-              Fahrbereit:
-              {% if ticket.fahrbereit %}Ja{% else %}Nein{% endif %}
-            </span>
-          {% endif %}
-
-          {% if ticket.abschleppdienst %}
-            <span class="tiny-badge danger">Abschleppdienst</span>
-          {% endif %}
-        </div>
-      </div>
-
-      <div class="hero-side">
-        <div id="ticket-status" class="card status-card {% if ticket.priority == 'hoch' %}row-high{% endif %} {% if ticket.request_type == 'notfall' %}row-notfall{% endif %}">
+  <header class="ticket-kopf"><div><div class="ticket-kennung"><span class="eyebrow">Ticket <span id="ticketIdText">{{ ticket.ticket_view_id }}</span></span><button class="copy-btn" type="button" data-copy="#ticketIdText">ID kopieren</button></div><h1>{{ ticket.problem or 'Anliegen nicht angegeben' }}</h1><p class="muted">{{ ticket.kunde_name or ticket.name or 'Kunde nicht angegeben' }} · {{ ticket.source_label }}</p></div><div id="ticket-status" class="card status-card {% if ticket.priority == 'hoch' %}row-high{% endif %} {% if ticket.request_type == 'notfall' %}row-notfall{% endif %}">
           <div class="status-head">
             <div>
               <div class="muted">Aktueller Status</div>
@@ -1881,148 +55,55 @@
             {% endif %}
             Bearbeitungsstatus: {{ ticket.status_label or "-" }}
           </div>
-        </div>
-      </div>
+        </div></header>
+  {% include '_dashboard_events.html' %}
+  <div class="ticket-raster"><section class="ticket-inhalt" aria-label="Ticket bearbeiten">
+    <div class="ticket-register" aria-label="Ticketbereiche">
+      <button type="button" id="tab-gespraech" data-ticket-tab="gespraech-panel" aria-controls="gespraech-panel">Gespräch</button>
+      <button type="button" id="tab-notizen" data-ticket-tab="notizen-panel" aria-controls="notizen-panel">Interne Notizen</button>
+      <button type="button" id="tab-falldaten" data-ticket-tab="falldaten-panel" aria-controls="falldaten-panel">Falldaten</button>
     </div>
-
-    <div class="grid">
-      <div class="card">
-        <h3 class="section-title">Fahrzeug</h3>
-        <div class="value-lg">{{ ticket.fahrzeug or "-" }}</div>
-        <div class="kv">
-          <b>Baujahr</b><div class="muted">{{ ticket.baujahr or "-" }}</div>
-          <b>Kilometerstand</b><div class="muted">{{ ticket.kilometerstand or "-" }}</div>
-        </div>
-      </div>
-
-      <div class="card">
-        <h3 class="section-title">Kontakt</h3>
-        <div class="kv">
-          <b>Kunde</b>
-          <div class="muted">{{ ticket.kunde_name or ticket.name or "-" }}</div>
-
-          <b>Telefon</b>
-          <div style="display:flex; gap:10px; align-items:center; flex-wrap:wrap;">
-            {% if ticket.telefon %}
-              <a href="tel:{{ ticket.telefon }}" id="phoneText">{{ ticket.telefon }}</a>
-              <button class="copy-btn" type="button" data-copy="#phoneText">Kopieren</button>
-            {% else %}
-              <span class="muted" id="phoneText">-</span>
-              <button class="copy-btn" type="button" data-copy="#phoneText" disabled>Kopieren</button>
-            {% endif %}
-          </div>
-
-        </div>
-      </div>
-
-      <div class="card">
-        <h3 class="section-title">Zeit</h3>
-        <div class="kv">
-          <b>Erstellt</b><div class="muted">{{ ticket.created_at_display or "-" }}</div>
-          <b>Aktualisiert</b><div class="muted">{{ ticket.updated_at_display or "-" }}</div>
-        </div>
-      </div>
-    </div>
-
-    <div class="section">
-      <div class="card action-card">
-        <h3 class="section-title">Statusverwaltung</h3>
-
-        <div class="actions">
-          <form method="post" action="/dashboard/ticket/{{ ticket.ticket_view_id }}/status" class="status-form">
-            <input type="hidden" name="workshop_id" value="{{ workshop_id }}" />
-              <input type="hidden" name="return_to" value="{{ list_url }}" />
-            <div class="field">
-              <div class="muted">Status ändern</div>
-              <select name="status" style="margin-top:6px; width:100%;">
-                <option value="offen" {% if ticket.status_ui=="offen" %}selected{% endif %}>Offen</option>
-                <option value="in_bearbeitung" {% if ticket.status_ui=="in_bearbeitung" %}selected{% endif %}>In Bearbeitung</option>
-                <option value="erledigt" {% if ticket.status_ui=="erledigt" %}selected{% endif %}>Erledigt</option>
-              </select>
+    <div id="gespraech-panel" data-ticket-panel><div class="communication-panel full" id="communication-history">
+            <h3 class="section-title">Gesprächsverlauf</h3>
+            <div style="margin-bottom:10px;">
+              <span class="channel-badge {{ ticket.source or 'web_chat' }}">
+                {% if ticket.source == "whatsapp" %}
+                  <span class="wa-mark"><img src="/static/arbeitsplatz/whatsapp.svg" width="20" height="20" alt=""></span>
+                {% elif ticket.source == "web_chat" %}
+                  <span class="channel-icon">C</span>
+                {% else %}
+                  <span class="channel-icon">D</span>
+                {% endif %}
+                Kanal: {{ ticket.source_label or "-" }}
+              </span>
             </div>
 
-            <div>
-              <button type="submit">Status speichern</button>
-            </div>
-          </form>
-
-          {% if ticket.status_ui == "erledigt" %}
-          <form
-            method="post"
-            action="/dashboard/ticket/{{ ticket.ticket_view_id }}/archive"
-            data-confirm="Dieses Ticket wirklich archivieren?"
-          >
-            <input type="hidden" name="workshop_id" value="{{ workshop_id }}" />
-              <input type="hidden" name="return_to" value="{{ list_url }}" />
-            <button class="archive-btn" type="submit">Archivieren</button>
-          </form>
-          {% endif %}
-        </div>
-
-        <div class="divider"></div>
-
-        <h3 class="section-title">Falldaten</h3>
-        <div class="kv">
-          <b>Kunde</b><div class="muted">{{ ticket.kunde_name or ticket.name or "-" }}</div>
-          <b>Fahrzeug</b><div class="muted">{{ ticket.fahrzeug or "-" }}</div>
-          <b>Baujahr</b><div class="muted">{{ ticket.baujahr or "-" }}</div>
-          <b>Kilometerstand</b><div class="muted">{{ ticket.kilometerstand or "-" }}</div>
-          <b>Telefon</b><div class="muted">{{ ticket.telefon or "-" }}</div>
-          <b>Priorität</b><div class="muted">{{ ticket.priority_label or "-" }}</div>
-          <b>Typ</b><div class="muted">{{ ticket.request_type_label or "-" }}</div>
-          <b>Quelle</b><div class="muted">{{ ticket.source_label or "-" }}</div>
-          <b>Fahrbereit</b>
-          <div class="muted">
-            {% if ticket.fahrbereit is sameas true %}Ja
-            {% elif ticket.fahrbereit is sameas false %}Nein
-            {% else %}-{% endif %}
-          </div>
-          <b>Abschleppdienst</b>
-          <div class="muted">
-            {% if ticket.abschleppdienst %}Ja{% else %}Nein{% endif %}
-          </div>
-        </div>
-
-        <div class="divider"></div>
-
-        {% include "_dashboard_events.html" %}
-        <div class="communication-grid">
-          <div class="communication-panel" id="internal-notes">
-            <h3 class="section-title">Interne Notiz</h3>
-
-            <form class="note-form" method="post" action="/dashboard/ticket/{{ ticket.ticket_view_id }}/notes">
-              <input type="hidden" name="workshop_id" value="{{ workshop_id }}" />
-              <input type="hidden" name="return_to" value="{{ list_url }}" />
-              <input type="hidden" name="note_type" value="internal_note">
-              <div class="note-form-row">
-                <textarea
-                  name="note_text"
-                  placeholder="Interne Notiz hinzufügen..."
-                  required
-                ></textarea>
-
-                <div class="note-submit">
-                  <button type="submit">Speichern</button>
-                </div>
-              </div>
-            </form>
-
-            {% if ticket.internal_notes %}
+            {% if ticket.communication_messages %}
+              {% include '_whatsapp_bild_stil.html' %}
               <div class="note-stack">
-                {% for note in ticket.internal_notes | reverse %}
-                  <div class="note-card internal-note">
-                    <div class="note-label">Interne Notiz</div>
+                {% for note in ticket.communication_messages %}
+                  <div id="communication-{{ note.message_id }}" class="note-card {% if note.sender_role == 'customer' %}customer-question{% else %}customer-reply{% endif %}">
+                    {{ communication.message_heading(note) }}
                     <div class="note-text">{{ note.text }}</div>
-                    <div class="note-date">{{ note.created_at_display }}</div>
+                    {% with nachricht=note %}{% include '_whatsapp_bild.html' %}{% endwith %}
+                    {% if note.sender_role == 'customer' and note.purpose == 'customer_information' and note.requires_human_action and not note.resolved_at %}
+                    <form method="post" action="/dashboard/ticket/{{ ticket.ticket_view_id }}/information-resolve">
+                      <input type="hidden" name="workshop_id" value="{{ workshop_id }}" />
+              <input type="hidden" name="return_to" value="{{ list_url }}" />
+                      <input type="hidden" name="message_id" value="{{ note.message_id }}" />
+                      <button type="submit">Als bearbeitet markieren</button>
+                    </form>
+                    {% endif %}
+                    {% if note.reply_to_message_id %}<a class="communication-message-link" href="#communication-{{ note.reply_to_message_id }}">Bezug anzeigen</a>{% endif %}
+                    {% if note.sender_role == 'customer' and note.purpose == 'customer_question' and note.requires_human_action and not note.resolved_at and not note.legacy_closed %}<button class="frage-beantworten" type="button" data-frage-beantworten="{{ note.message_id }}">Antworten</button>{% endif %}
+                    <div class="note-date">{{ note.created_at_display }}{% if note.versandanzeige %} · {{ note.versandanzeige }}{% elif note.delivery_status == 'sent' and ticket.source == 'web_chat' and not ticket.has_whatsapp_conversation %} · Im Webchat gespeichert{% endif %}</div>
                   </div>
                 {% endfor %}
               </div>
             {% else %}
-              <div class="muted" data-empty-notes>Noch keine internen Notizen vorhanden.</div>
+              <div class="muted">Noch keine Kundennachrichten oder Werkstattnachrichten vorhanden.</div>
             {% endif %}
-          </div>
-
-          <div class="communication-panel" id="communication-controls">
+          </div> <div class="communication-panel" id="communication-controls">
             <h3 class="section-title">
               {% if ticket.has_whatsapp_conversation or ticket.source == "whatsapp" %}
                 Über WhatsApp schreiben
@@ -2033,7 +114,7 @@
             <div style="margin-bottom:10px;">
               <span class="channel-badge {{ ticket.source or 'web_chat' }}">
                 {% if ticket.source == "whatsapp" %}
-                  <span class="channel-icon">W</span>
+                  <span class="wa-mark"><img src="/static/arbeitsplatz/whatsapp.svg" width="20" height="20" alt=""></span>
                 {% elif ticket.source == "web_chat" %}
                   <span class="channel-icon">C</span>
                 {% else %}
@@ -2110,6 +191,7 @@
               <input type="hidden" name="note_type" value="customer_reply">
               {{ communication.purpose_controls('ticketMessage', ticket.open_customer_questions|default([]), ticket.has_whatsapp_conversation or ticket.source == 'whatsapp') }}
               <div class="note-form-row">
+                <label for="ticketCustomerReplyText">Nachricht an den Kunden</label>
                 <textarea
                   id="ticketCustomerReplyText"
                   name="note_text"
@@ -2161,104 +243,69 @@
               </div>
             {% endif %}
 
-          </div>
+          </div></div>
+    <div id="notizen-panel" data-ticket-panel><div class="communication-panel" id="internal-notes">
+            <h3 class="section-title">Interne Notiz</h3>
 
-          <div class="communication-panel full" id="communication-history">
-            <h3 class="section-title">Gesprächsverlauf</h3>
-            <div style="margin-bottom:10px;">
-              <span class="channel-badge {{ ticket.source or 'web_chat' }}">
-                {% if ticket.source == "whatsapp" %}
-                  <span class="channel-icon">W</span>
-                {% elif ticket.source == "web_chat" %}
-                  <span class="channel-icon">C</span>
-                {% else %}
-                  <span class="channel-icon">D</span>
-                {% endif %}
-                Kanal: {{ ticket.source_label or "-" }}
-              </span>
-            </div>
-
-            {% if ticket.communication_messages %}
-              {% include '_whatsapp_bild_stil.html' %}
-              <div class="note-stack">
-                {% for note in ticket.communication_messages | reverse %}
-                  <div id="communication-{{ note.message_id }}" class="note-card {% if note.sender_role == 'customer' %}customer-question{% else %}customer-reply{% endif %}">
-                    {{ communication.message_heading(note) }}
-                    <div class="note-text">{{ note.text }}</div>
-                    {% with nachricht=note %}{% include '_whatsapp_bild.html' %}{% endwith %}
-                    {% if note.sender_role == 'customer' and note.purpose == 'customer_information' and note.requires_human_action and not note.resolved_at %}
-                    <form method="post" action="/dashboard/ticket/{{ ticket.ticket_view_id }}/information-resolve">
-                      <input type="hidden" name="workshop_id" value="{{ workshop_id }}" />
+            <form class="note-form" method="post" action="/dashboard/ticket/{{ ticket.ticket_view_id }}/notes">
+              <input type="hidden" name="workshop_id" value="{{ workshop_id }}" />
               <input type="hidden" name="return_to" value="{{ list_url }}" />
-                      <input type="hidden" name="message_id" value="{{ note.message_id }}" />
-                      <button type="submit">Als bearbeitet markieren</button>
-                    </form>
-                    {% endif %}
-                    {% if note.reply_to_message_id %}<a class="communication-message-link" href="#communication-{{ note.reply_to_message_id }}">Bezug anzeigen</a>{% endif %}
+              <input type="hidden" name="note_type" value="internal_note">
+              <div class="note-form-row">
+                <label for="ticketInternalNoteText">Nur für das Werkstatt-Team</label>
+                <textarea
+                  id="ticketInternalNoteText"
+                  name="note_text"
+                  placeholder="Interne Notiz hinzufügen..."
+                  required
+                ></textarea>
+
+                <div class="note-submit">
+                  <button type="submit">Speichern</button>
+                </div>
+              </div>
+            </form>
+
+            {% if ticket.internal_notes %}
+              <div class="note-stack">
+                {% for note in ticket.internal_notes | reverse %}
+                  <div class="note-card internal-note">
+                    <div class="note-label">Interne Notiz</div>
+                    <div class="note-text">{{ note.text }}</div>
                     <div class="note-date">{{ note.created_at_display }}</div>
                   </div>
                 {% endfor %}
               </div>
             {% else %}
-              <div class="muted">Noch keine Kundennachrichten oder Werkstattnachrichten vorhanden.</div>
+              <div class="muted" data-empty-notes>Noch keine internen Notizen vorhanden.</div>
             {% endif %}
+          </div></div>
+    <div id="falldaten-panel" data-ticket-panel class="falldaten"><h2>Falldaten</h2><h3>Gemeldetes Problem</h3><p class="volltext">{{ ticket.problem or '-' }}</p><div class="kv">
+          <b>Kunde</b><div class="muted">{{ ticket.kunde_name or ticket.name or "-" }}</div>
+          <b>Fahrzeug</b><div class="muted">{{ ticket.fahrzeug or "-" }}</div>
+          <b>Baujahr</b><div class="muted">{{ ticket.baujahr or "-" }}</div>
+          <b>Kilometerstand</b><div class="muted">{{ ticket.kilometerstand or "-" }}</div>
+          <b>Telefon</b><div class="muted">{{ ticket.telefon or "-" }}</div>
+          <b>Priorität</b><div class="muted">{{ ticket.priority_label or "-" }}</div>
+          <b>Typ</b><div class="muted">{{ ticket.request_type_label or "-" }}</div>
+          <b>Quelle</b><div class="muted">{{ ticket.source_label or "-" }}</div>
+          <b>Fahrbereit</b>
+          <div class="muted">
+            {% if ticket.fahrbereit is sameas true %}Ja
+            {% elif ticket.fahrbereit is sameas false %}Nein
+            {% else %}-{% endif %}
           </div>
+          <b>Abschleppdienst</b>
+          <div class="muted">
+            {% if ticket.abschleppdienst %}Ja{% else %}Nein{% endif %}
+          </div>
+        </div> <div class="card">
+        <h3 class="section-title">Zeit</h3>
+        <div class="kv">
+          <b>Erstellt</b><div class="muted">{{ ticket.created_at_display or "-" }}</div>
+          <b>Aktualisiert</b><div class="muted">{{ ticket.updated_at_display or "-" }}</div>
         </div>
-
-        <div hidden>
-        <h3 class="section-title">Interne Notizen</h3>
-
-        <form class="note-form" method="post" action="/dashboard/ticket/{{ ticket.ticket_view_id }}/notes">
-          <input type="hidden" name="workshop_id" value="{{ workshop_id }}" />
-              <input type="hidden" name="return_to" value="{{ list_url }}" />
-          <div class="note-form-row">
-            <textarea
-              name="note_text"
-              placeholder="Neue Notiz hinzufügen..."
-              required
-            ></textarea>
-
-            <div class="note-submit">
-              <button type="submit">Speichern</button>
-            </div>
-          </div>
-        </form>
-
-        {% if ticket.notes %}
-          <div class="note-stack">
-            {% for note in ticket.notes | reverse %}
-              <div class="note-card"
-                style="
-                  padding:10px 12px;
-                  border-radius:14px;
-                  border:1px solid {% if note.text.startswith("Kundenfrage über den Chat:") %}rgba(96,165,250,.30){% else %}var(--line){% endif %};
-                  background:{% if note.text.startswith("Kundenfrage über den Chat:") %}rgba(96,165,250,.12){% else %}rgba(255,255,255,.04){% endif %};
-                "
-              >
-                {% if note.text.startswith("Kundenfrage über den Chat:") %}
-                  <div class="note-label">
-                    Kundenfrage aus dem Chat
-                  </div>
-                {% endif %}
-
-                <div class="note-text">
-                  {{ note.text }}
-                </div>
-
-                <div class="note-date">
-                  {{ note.created_at_display }}
-                </div>
-              </div>
-            {% endfor %}
-          </div>
-        {% else %}
-          <div class="muted">Noch keine Notizen vorhanden.</div>
-        {% endif %}
-        </div>
-
-        <div class="divider"></div>
-
-        <details><summary>Technische Details</summary>
+      </div> <details><summary>Technische Details</summary>
         <div class="debug-grid">
           <div class="debug-item">
             <div class="debug-label">Bearbeitungsstatus</div>
@@ -2340,11 +387,60 @@
             <pre>{{ ticket.raw_json or "{}" }}</pre>
           </div>
         </details>
-      </details>
-      </div>
-    </div>
-  </div>
+      </details></div>
+  </section><aside class="ticket-seitenleiste" aria-label="Fahrzeug, Kontakt und Status">
+    {{ fahrzeugkarte(ticket, true) }}
+    <div class="card">
+        <h3 class="section-title">Kontakt</h3>
+        <div class="kv">
+          <b>Kunde</b>
+          <div class="muted">{{ ticket.kunde_name or ticket.name or "-" }}</div>
 
+          <b>Telefon</b>
+          <div style="display:flex; gap:10px; align-items:center; flex-wrap:wrap;">
+            {% if ticket.telefon %}
+              <a href="tel:{{ ticket.telefon }}" id="phoneText">{{ ticket.telefon }}</a>
+              <button class="copy-btn" type="button" data-copy="#phoneText">Kopieren</button>
+            {% else %}
+              <span class="muted" id="phoneText">-</span>
+              <button class="copy-btn" type="button" data-copy="#phoneText" disabled>Kopieren</button>
+            {% endif %}
+          </div>
+
+        </div>
+      </div>
+    <section class="card statusverwaltung"><h3>Statusverwaltung</h3><div class="actions">
+          <form method="post" action="/dashboard/ticket/{{ ticket.ticket_view_id }}/status" class="status-form">
+            <input type="hidden" name="workshop_id" value="{{ workshop_id }}" />
+              <input type="hidden" name="return_to" value="{{ list_url }}" />
+            <div class="field">
+              <div class="muted">Status ändern</div>
+              <select name="status" style="margin-top:6px; width:100%;">
+                <option value="offen" {% if ticket.status_ui=="offen" %}selected{% endif %}>Offen</option>
+                <option value="in_bearbeitung" {% if ticket.status_ui=="in_bearbeitung" %}selected{% endif %}>In Bearbeitung</option>
+                <option value="erledigt" {% if ticket.status_ui=="erledigt" %}selected{% endif %}>Erledigt</option>
+              </select>
+            </div>
+
+            <div>
+              <button type="submit">Status speichern</button>
+            </div>
+          </form>
+
+          {% if ticket.status_ui == "erledigt" %}
+          <form
+            method="post"
+            action="/dashboard/ticket/{{ ticket.ticket_view_id }}/archive"
+            data-confirm="Dieses Ticket wirklich archivieren?"
+          >
+            <input type="hidden" name="workshop_id" value="{{ workshop_id }}" />
+              <input type="hidden" name="return_to" value="{{ list_url }}" />
+            <button class="archive-btn" type="submit">Archivieren</button>
+          </form>
+          {% endif %}
+        </div></section>
+  </aside></div>
+</main>
   <div id="toast" class="toast">✅ Kopiert!</div>
 
   <script nonce="{{ request.state.csp_nonce }}">
@@ -2352,11 +448,10 @@
     {% include '_dashboard_live_script.html' %}
     installDashboardLive({initialCursor: {{ event_cursor|tojson }}, workshopId: {{ workshop_id|tojson }}, scope: {{ event_scope|tojson }}, list: false});
     installDispatchRecovery(document);
-    document.querySelectorAll('form[data-confirm]').forEach(form => {
-      form.addEventListener('submit', event => {
-        if (!confirm(form.dataset.confirm)) event.preventDefault();
-      });
-    });
+    document.addEventListener('submit', event => {
+      const form = event.target;
+      if (form.matches('form[data-confirm]') && !confirm(form.dataset.confirm)) event.preventDefault();
+    }, true);
     const ticketCustomerReplyText = document.getElementById("ticketCustomerReplyText");
     const ticketHasWhatsappRecipient = {{ (ticket.whatsapp_phone | length > 0) | tojson }};
     const ticketReplyUsesWhatsapp = {{ (ticket.has_whatsapp_conversation or ticket.source == "whatsapp") | tojson }};
@@ -2450,6 +545,7 @@
       const ok = await copyText(text);
       showToast(ok ? "✅ Kopiert!" : "❌ Kopieren fehlgeschlagen");
     });
-  </script>
+  {% include '_arbeitsplatz_script.html' %}
+</script>
 </body>
 </html>

@@ -1,0 +1,4 @@
+<div class="vorschau-kopf"><div><div class="eyebrow">Ticket {{ t.ticket_view_id }}</div><h3>{{ t.kunde_name or t.name or 'Kunde nicht angegeben' }}</h3></div><span class="status s-{{ t.status_ui }}">{{ t.status_label }}</span></div>
+{{ fahrzeugkarte(t) }}
+<div class="vorschau-anliegen"><div class="eyebrow">Gemeldetes Problem</div><p>{{ t.problem or 'Nicht angegeben' }}</p><div class="meta-row"><span class="priority p-{{ t.priority or 'normal' }}">{{ t.priority_label }}</span><span class="request-type">{{ t.request_type_label }}</span><span class="channel-badge">{% if t.source == 'whatsapp' %}<span class="wa-mark"><img src="/static/arbeitsplatz/whatsapp.svg" width="20" height="20" alt=""></span>{% endif %}{{ t.source_label }}</span></div></div>
+<div class="vorschau-kontakt"><span>{{ t.created_at_display }}</span>{% if t.telefon %}<a href="tel:{{ t.telefon }}">{{ t.telefon }}</a>{% else %}<span>Telefon nicht angegeben</span>{% endif %}</div>
