@@ -36,6 +36,7 @@ from app.db import (
     set_whatsapp_conversation_control,
 )
 from app.models import IntakeState
+from app.oberflaeche import kilometeranzeige
 from app.subscriptions import get_subscription
 from app.tickets import (
     add_ticket_note,
@@ -63,6 +64,7 @@ from app.whatsapp_verbindungen import VerbindungsFehler, verbindungsstatus, zuga
 
 router = APIRouter()
 templates = Jinja2Templates(directory="templates")
+templates.env.filters["kilometeranzeige"] = kilometeranzeige
 logger = logging.getLogger(__name__)
 
 
@@ -2232,6 +2234,10 @@ def ticket_detail(
     bilder = _decorate_whatsapp_messages(list_whatsapp_messages(workshop_id=wid, ticket_id=ticket_id, limit=500))
     vorhandene = {nachricht["message_id"]: nachricht for nachricht in t["communication_messages"]}
     for bild in bilder:
+        if bild.get("direction") == "outbound":
+            bild["versandanzeige"] = bild["status_label"]
+            if bild["message_id"] in vorhandene:
+                vorhandene[bild["message_id"]]["versandanzeige"] = bild["status_label"]
         if not bild.get("bild_url"):
             continue
         if bild["message_id"] in vorhandene:

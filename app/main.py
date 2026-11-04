@@ -1,11 +1,13 @@
 from __future__ import annotations
 
 import logging
+from pathlib import Path
 from typing import Annotated
 
 from fastapi import BackgroundTasks, FastAPI, HTTPException, Query, Request, Response
 from fastapi.exceptions import RequestValidationError
 from fastapi.responses import JSONResponse, PlainTextResponse, RedirectResponse
+from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel, Field, ValidationError
 
 from app.ai_service import polish_reply_de
@@ -69,6 +71,12 @@ app = FastAPI(
     docs_url=None if is_production(settings) else "/docs",
     redoc_url=None if is_production(settings) else "/redoc",
     openapi_url=None if is_production(settings) else "/openapi.json",
+)
+
+app.mount(
+    "/static/arbeitsplatz",
+    StaticFiles(directory=Path(__file__).resolve().parents[1] / "static" / "arbeitsplatz"),
+    name="arbeitsplatz",
 )
 
 # ✅ NOWE — inicjalizacja bazy SQLite
