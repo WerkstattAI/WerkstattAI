@@ -100,7 +100,7 @@ class ArbeitsplatzTests(unittest.TestCase):
 
     def test_statische_bilder_sind_verfuegbar_ohne_private_dateien_freizugeben(self):
         self.client.headers.pop('cookie',None)
-        for name in ['arbeitsplatz.css','grundlagen.css','anmeldung.css','kundenchat.css','whatsapp.css','InterVariable.woff2','fahrzeug-symbolbild.png','whatsapp.svg','symbole/gauge.svg']:
+        for name in ['arbeitsplatz.css','grundlagen.css','anmeldung.css','kundenchat.css','whatsapp.css','InterVariable.woff2','fahrzeug-symbolbild.png','fahrzeuge/markenbilder-v1.png','whatsapp.svg','symbole/gauge.svg']:
             response = self.client.get('/static/arbeitsplatz/'+name)
             self.assertEqual(response.status_code,200,name)
             self.assertIn("default-src 'self'",response.headers['content-security-policy'])

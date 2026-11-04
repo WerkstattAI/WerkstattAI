@@ -1,5 +1,25 @@
 # WerkstattAI – Projektstand und nächste Schritte
 
+## D1 – Markenbezogene Fahrzeugbilder vom 4. November 2026
+
+Die freigegebenen realistischen Illustrationen ersetzen die zuvor vorgesehenen
+Karosseriesymbole. 18 ausdrücklich genannte Marken erhalten jeweils ein festes
+Bild, unabhängig vom Modell. VW/Volkswagen, Mercedes-Benz/Benz, Groß-/Kleinschreibung
+und Akzente werden vereinheitlicht. Unbekannte, fehlende oder mehrere verschiedene
+Marken erhalten das neutrale Bild; aus Modellnamen allein wird keine Marke geraten.
+Die ursprünglichen Fahrzeugdaten bleiben unverändert. Dashboardvorschau und Ticket
+verwenden dieselbe Vorlage und lokal gespeicherte Bildtafel ohne Beschriftungen.
+Die Herkunft und Einordnung als Symbolbilder stehen in `static/arbeitsplatz/QUELLEN.md`.
+
+Prüfung: 16 gezielte Python-Tests bestanden; darunter alle Marken, Aliasnamen,
+Mehrdeutigkeiten, 19 verschiedene Bildausschnitte und bestehende Oberflächenverträge.
+Der erweiterte Test für die lokale Bildauslieferung wurde anschließend erneut
+erfolgreich ausgeführt. Lokale Browserkontrolle der Dashboardvorschau sowie der
+Ticketkarte bei 390 px Breite mit erfundenen Daten bestanden.
+Veröffentlichung weiterhin separat: PR #4 ist noch nicht zusammengeführt.
+Die zuvor angeforderte ausdrückliche Freigabe für Merge/Produktionsveröffentlichung
+steht wegen der automatischen Freigabeprüfung weiterhin aus.
+
 ## D1 – Feinschliff der fünf Rückmeldungen vom 4. November 2026
 
 Restliche Menüseiten übernehmen den gemeinsamen Stil. Ticketkarten öffnen über

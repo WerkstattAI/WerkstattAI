@@ -10,7 +10,8 @@
 .kpi-hot .kennzahl-icon {background:#fbefd9}
 [data-ticket-karte] {cursor:pointer}
 [data-ticket-karte]:hover {border-color:#94b8aa!important}
-.fahrzeugbild>img {object-fit:contain}
+.fahrzeuggrafik {display:block;width:100%;height:auto;overflow:hidden;mix-blend-mode:multiply}
+.fahrzeugbild.markenbild figcaption {margin:0 5px 10px;text-align:center}
 .nachrichtenoptionen {width:100%;border:1px solid #dce6e0;border-radius:12px;padding:10px 14px;background:#fbfcfb}
 .nachrichtenoptionen summary {cursor:pointer;font-size:12px;font-weight:550;color:#567267}
 .nachrichtenoptionen[open] summary {margin-bottom:12px}

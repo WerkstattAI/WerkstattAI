@@ -9,8 +9,17 @@
 - `whatsapp.svg`: WhatsApp-Signet aus dem bereits freigegebenen Entwurf,
   ursprünglich Simple Icons 11.15.0. Farbe über den umgebenden Markenbereich.
 - `fahrzeug-symbolbild.png`: für diesen Produktentwurf erstellte Illustration.
-  Sie wird ausdrücklich als **Symbolbild** angezeigt, ohne eine automatische
-  Zuordnung zu Marke, Modell oder Generation zu behaupten.
+  Frühere Golf-Vorschau; im aktuellen Fahrzeugbereich durch Markenbilder ersetzt.
+- `fahrzeuge/markenbilder-v1.png`: freigegebene, mit dem integrierten ImageGen
+  erstellte Bildtafel vom 4. November 2026: 18 Marken und ein neutrales Fahrzeug.
+  Letzte Bearbeitung: sämtliche Beschriftungen entfernen und Herstellerembleme
+  durch neutrale Details ersetzen; Perspektive, Farbe und Fahrzeugformen erhalten.
+  Die Vorlage zeigt jeweils einen unveränderten Ausschnitt der Tafel. Eine lokale
+  Bilddatei wird für alle Ausschnitte gemeinsam geladen und zwischengespeichert.
+  Die Auswahl erfolgt ausschließlich nach ausdrücklich genannter Marke, nicht
+  nach Modell oder Karosserie. Die Abbildung ist ein **Symbolbild**, kein Foto
+  des Kundenfahrzeugs und keine Aussage zu dessen Generation oder Ausstattung.
+  Die visuelle Freigabe ist keine rechtliche Rechteprüfung.
 
 Schrift, Symbole und Bild werden lokal ausgeliefert. Die Anwendung lädt für
 diese Ansichten keine Schrift- oder Bildressourcen von externen Hosts.

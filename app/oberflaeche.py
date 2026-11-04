@@ -1,25 +1,40 @@
 """Reine Anzeigehilfen für den Werkstattbereich."""
 
 import re
+import unicodedata
+
+
+# Nur ausdrücklich genannte Marken; Modellnamen allein werden nicht geraten.
+_FAHRZEUGMARKEN = {
+    'volkswagen': r'volkswagen|vw|v\W+w\.?',
+    'bmw': r'bmw|b\W+m\W+w\.?',
+    'mercedes': r'mercedes(?:\W*benz)?|benz',
+    'audi': r'audi',
+    'skoda': r'skoda',
+    'opel': r'opel',
+    'ford': r'ford',
+    'toyota': r'toyota',
+    'renault': r'renault',
+    'peugeot': r'peugeot',
+    'citroen': r'citroen',
+    'seat': r'seat',
+    'hyundai': r'hyundai',
+    'kia': r'kia',
+    'volvo': r'volvo',
+    'nissan': r'nissan',
+    'mazda': r'mazda',
+    'dacia': r'dacia',
+}
 
 
 def fahrzeugsymbol(wert):
-    """Grobe Modellfamilie, niemals eine behauptete exakte Modellabbildung."""
-    text = re.sub(r"[^a-z0-9äöüß]+", " ", str(wert or '').lower()).strip()
-    if not text:
-        return 'neutral'
-    # Explizite Karosserieangaben haben Vorrang vor der Modellfamilie.
-    for muster, symbol in [
-        (r'\b(kombi|variant|touring|avant|sports tourer|t modell|estate)\b', 'kombi'),
-        (r'\b(coupe|coupé|cabrio|cabriolet|roadster)\b', 'coupe'),
-        (r'\b(transporter|sprinter|crafter|transit|vito|multivan|v klasse)\b', 'transporter'),
-        (r'\b(suv|tiguan|touareg|kodiaq|karoq|q[3-8]|x[1-7]|gl[abcse])\b', 'suv'),
-        (r'\b(golf|polo|up|fabia|clio|corsa|fiesta|yaris|aygo|mini)\b', 'kompakt'),
-        (r'\b(limousine|sedan|c\s?(180|200|220|250|300)|[35][12][0689][di]?)\b', 'limousine'),
-    ]:
-        if re.search(muster, text):
-            return symbol
-    return 'neutral'
+    """Ein Symbolbild pro Marke, unabhängig von Modell und Karosserie."""
+    text = ''.join(zeichen for zeichen in unicodedata.normalize('NFKD', str(wert or '').casefold())
+                   if not unicodedata.combining(zeichen))
+    marken = {marke for marke, muster in _FAHRZEUGMARKEN.items()
+              if re.search(r'(?<!\w)(?:' + muster + r')(?![^\W\d_])', text)}
+    # Mehrere unterschiedliche Marken sind ohne weitere Daten nicht eindeutig.
+    return next(iter(marken)) if len(marken) == 1 else 'neutral'
 
 
 def kilometeranzeige(wert):
