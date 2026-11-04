@@ -8,6 +8,7 @@
   <link rel="stylesheet" href="/static/arbeitsplatz/grundlagen.css" />
   <link rel="stylesheet" href="/static/arbeitsplatz/whatsapp.css" />
   <style nonce="{{ request.state.csp_nonce }}">{{ communication.styles() }}</style>
+<link rel="stylesheet" href="/static/arbeitsplatz/feinschliff.css">
 </head>
 <body class="produkt whatsapp-seite">
   <a class="skip-link" href="#main-content">Zu den Unterhaltungen springen</a>
@@ -138,6 +139,7 @@
                 {% if m.echo_zuordnung_offen %}<div role="status">Die Echo-Zuordnung ist offen. Automatische Antworten bleiben gesperrt. Bitte einen laufenden Versand zuerst klären; andernfalls den Verlauf prüfen und den Assistenten bewusst fortsetzen.</div>{% endif %}
                 {% with nachricht=m %}{% include '_whatsapp_bild.html' %}{% endwith %}
                 {% if m.reply_to_message_id %}<a class="communication-message-link" href="#communication-{{ m.reply_to_message_id }}">Bezug anzeigen</a>{% endif %}
+                {% if m.sender_role == 'customer' and m.purpose == 'customer_question' and m.requires_human_action and not m.resolved_at and not m.legacy_closed %}<button class="frage-beantworten" type="button" data-frage-beantworten="{{ m.message_id }}">Antworten</button>{% endif %}
                 {% if m.message_error %}
                   <div class="message-error">{{ m.message_error }}</div>
                 {% endif %}
@@ -189,7 +191,7 @@
                 {% if selected_conversation and selected_conversation.active_ticket_id %}
                   <input type="hidden" name="ticket_id" value="{{ selected_conversation.active_ticket_id }}" />
                 {% endif %}
-                {{ communication.purpose_controls('inboxMessage', selected_conversation.open_customer_questions|default([]) if selected_conversation else []) }}
+                {{ communication.purpose_controls('inboxMessage', selected_conversation.open_customer_questions|default([]) if selected_conversation else [], einfach=true) }}
                 <label class="field-label" for="replyText">Nachricht an {{ selected_phone }}</label>
                 <textarea
                   class="reply-input"
@@ -462,5 +464,7 @@
     {% include '_dashboard_live_script.html' %}
     installDashboardLive({initialCursor: {{ event_cursor|tojson }}, workshopId: {{ workshop_id|tojson }}, scope: {{ event_scope|tojson }}, list: false});
   </script>
+<script nonce="{{ request.state.csp_nonce }}" src="/static/arbeitsplatz/bildbetrachter.js" defer></script>
+<script nonce="{{ request.state.csp_nonce }}" src="/static/arbeitsplatz/nachrichtenkomfort.js" defer></script>
 </body>
 </html>

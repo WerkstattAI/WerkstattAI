@@ -1,0 +1,34 @@
+@import url('grundlagen.css');
+
+/* Gleicher Arbeitsbereich für alle Verwaltungsseiten; Formularverträge bleiben erhalten. */
+body.verwaltung {background:var(--wa-hintergrund);color:var(--wa-text);font-family:Inter,Arial,sans-serif}
+.verwaltung .app-shell {display:block;min-height:0}
+.verwaltung .workspace,.verwaltung .wrap {display:block;width:100%;max-width:1344px;margin:0 auto;padding:32px;min-height:0}
+.verwaltung .topbar,.verwaltung .page-header {position:static;display:block;height:auto;min-height:0;overflow:visible;margin:0 0 28px;padding:0;border:0;border-radius:0;background:transparent;box-shadow:none;color:var(--wa-text)}
+.verwaltung .topbar>div:first-child {padding:0}
+.verwaltung :is(h1,.topbar h1) {color:var(--wa-text);font-size:30px;line-height:1.2;font-weight:650;letter-spacing:-1px;margin:6px 0 12px}
+.verwaltung :is(.sub,.topbar .sub,.page-header p) {color:var(--wa-sekundaer);font-size:14px;max-width:780px;line-height:1.65}
+.verwaltung :is(.overline,.eyebrow) {color:var(--wa-gruen);font-size:11px;font-weight:650;letter-spacing:1.5px;text-transform:uppercase}
+.verwaltung :is(.card,.panel,.summary-card) {background:#fff;border:1px solid var(--wa-linie);border-radius:20px;box-shadow:0 4px 18px #183c3204;overflow:hidden}
+.verwaltung :is(.panel-head,.card-head) {background:#fff;border-bottom:1px solid var(--wa-linie);padding:24px}
+.verwaltung :is(.panel-title,.card-title) {color:var(--wa-text);font-weight:650;font-size:19px}
+.verwaltung :is(.panel-sub,.card-sub,.hint) {color:var(--wa-sekundaer);line-height:1.6}
+.verwaltung .wrap>.grid {padding:0;gap:24px}
+.verwaltung :is(.form,.panel-body) {padding:24px}
+.verwaltung :is(input:not([type=checkbox]):not([type=radio]):not([type=hidden]),textarea,select) {border:1px solid #cedcd5;border-radius:10px;background:#fbfcfb;color:var(--wa-text);box-shadow:none;font-family:inherit;min-height:44px;padding:11px 12px}
+.verwaltung :is(input,textarea,select):focus {border-color:var(--wa-gruen);outline:3px solid #16766320;outline-offset:1px;background:white}
+.verwaltung :is(input,textarea,select) {font-weight:400;align-self:start}
+.verwaltung :is(.button,.btn,button):not(.nav-btn) {border-radius:10px;font-family:inherit;box-shadow:none;min-height:42px}
+.verwaltung :is(.primary,.button.primary,.btn.primary) {background:var(--wa-gruen);border-color:var(--wa-gruen);color:white}
+.verwaltung .hauptnavigation .nav-btn {width:auto;box-shadow:none;font-family:inherit;flex-shrink:0}
+.verwaltung .hauptnavigation form {width:auto;margin:0 0 0 auto}
+.verwaltung .wortmarke {color:white}
+.verwaltung>main {width:calc(100% - 48px);max-width:960px;margin:32px auto;background:white;border:1px solid var(--wa-linie);border-radius:20px;padding:28px}
+.verwaltung .table-wrap {max-width:100%;overflow:auto}
+@media(max-width:700px) {
+  .verwaltung .workspace,.verwaltung .wrap {padding:24px 16px}
+  .verwaltung :is(.content-grid,.grid,.row,.field-row,.form-grid,.vehicle-grid) {grid-template-columns:minmax(0,1fr)}
+  .verwaltung :is(.card-head,.panel-head,.panel-body,.form) {padding:18px}
+  .verwaltung h1 {font-size:26px}
+  .verwaltung>main {width:calc(100% - 32px);padding:20px}
+}

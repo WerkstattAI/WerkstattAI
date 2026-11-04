@@ -36,7 +36,7 @@ from app.db import (
     set_whatsapp_conversation_control,
 )
 from app.models import IntakeState
-from app.oberflaeche import kilometeranzeige
+from app.oberflaeche import kilometeranzeige, fahrzeugsymbol
 from app.subscriptions import get_subscription
 from app.tickets import (
     add_ticket_note,
@@ -65,6 +65,7 @@ from app.whatsapp_verbindungen import VerbindungsFehler, verbindungsstatus, zuga
 router = APIRouter()
 templates = Jinja2Templates(directory="templates")
 templates.env.filters["kilometeranzeige"] = kilometeranzeige
+templates.env.filters["fahrzeugsymbol"] = fahrzeugsymbol
 logger = logging.getLogger(__name__)
 
 
@@ -135,6 +136,9 @@ def _format_datetime_for_display(value: Any) -> str:
         return text
 
     return parsed.strftime("%d.%m.%Y · %H:%M")
+
+
+templates.env.filters["datumanzeige"] = _format_datetime_for_display
 
 
 def _ticket_id(t: dict) -> str:

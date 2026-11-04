@@ -24,6 +24,29 @@ class ArbeitsplatzTests(unittest.TestCase):
     setUp = formularfixture.ManualCommunicationFormTests.setUp
     tearDown = formularfixture.ManualCommunicationFormTests.tearDown
 
+    def test_neue_skripte_behalten_csp_nonce_und_nachrichtenstandard(self):
+        for path in ['/dashboard', '/dashboard/whatsapp', f'/dashboard/ticket/{self.web_ticket}']:
+            page = self.client.get(path,params={'workshop_id':self.wid,'phone':self.phone})
+            elements = Elemente(page.text).elemente
+            scripts = [a for tag,a in elements if tag == 'script' and a.get('src','').startswith('/static/arbeitsplatz/')]
+            self.assertEqual(len(scripts),2)
+            for script in scripts:
+                self.assertTrue(script.get('nonce'))
+                self.assertIn("'nonce-"+script['nonce']+"'",page.headers['content-security-policy'])
+            purpose = next(a for tag,a in elements if a.get('data-standard'))
+            self.assertEqual(purpose['data-standard'],'workshop_notification')
+
+    def test_verwaltungsnavigation_und_bestehende_formulare(self):
+        for route, action in [('/dashboard/intake','/dashboard/intake'),('/dashboard/settings','/dashboard/settings'),('/dashboard/billing',None),('/dashboard/whatsapp/verbinden',None)]:
+            page = self.client.get(route,params={'workshop_id':self.wid})
+            self.assertEqual(page.status_code,200)
+            elements = Elemente(page.text).elemente
+            self.assertNotIn('class="sidebar"',page.text)
+            self.assertIn('verwaltung.css',page.text)
+            if action:
+                self.assertTrue(any(tag=='form' and a.get('action')==action and a.get('method')=='post' for tag,a in elements))
+            self.assertNotIn('/dashboard/admin/workshops',page.text)
+
     def test_vorschau_und_ticket_behalten_formularziele_und_listenkontext(self):
         context = '/dashboard?workshop_id=' + self.wid + '&q=Test&source=web_chat&sort=priority&page=2&limit=20'
         from urllib.parse import quote

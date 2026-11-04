@@ -44,6 +44,13 @@
       }
     });
   }
+  // Freie Kartenfläche öffnet das Ticket; Formularaktionen und Textauswahl bleiben eigenständig.
+  document.addEventListener('click', event => {
+    const row = event.target.closest('[data-ticket-karte]');
+    if (!row || event.defaultPrevented || event.button !== 0 || event.ctrlKey || event.metaKey || event.shiftKey || event.altKey) return;
+    if (event.target.closest('a,button,input,select,textarea,label,summary,details,form') || window.getSelection()?.toString()) return;
+    window.location.assign(row.dataset.ticketUrl);
+  });
   const tabs = [...document.querySelectorAll('[data-ticket-tab]')];
   function tabAktivieren(id, focus=false) {
     tabs.forEach(tab => {
@@ -79,15 +86,4 @@
     const history = document.getElementById('communication-history');
     if (history && !location.hash) history.scrollTop = history.scrollHeight;
   }
-  document.addEventListener('click', event => {
-    const answer = event.target.closest('[data-frage-beantworten]');
-    if (!answer) return;
-    const form = document.querySelector('.customer-reply-form');
-    const purpose = form?.querySelector('[data-message-purpose]');
-    const target = form?.querySelector('[data-reply-target]');
-    if (!purpose || !target || ![...target.options].some(option => option.value === answer.dataset.frageBeantworten)) return;
-    purpose.value='workshop_answer'; purpose.dispatchEvent(new Event('change',{bubbles:true}));
-    target.value=answer.dataset.frageBeantworten; target.dispatchEvent(new Event('change',{bubbles:true}));
-    form.querySelector('textarea')?.focus();
-  });
 })();

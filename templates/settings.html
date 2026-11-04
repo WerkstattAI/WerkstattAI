@@ -519,38 +519,12 @@
       .sidebar-foot .side-link,.session-status{width:100%}
     }
   </style>
+<link rel="stylesheet" href="/static/arbeitsplatz/verwaltung.css">
 </head>
-<body>
+<body class="produkt verwaltung">
+{% set aktive_navigation = '/dashboard/settings' %}{% include '_arbeitsplatz_kopf.html' %}
   <div class="app-shell">
-    <aside class="sidebar">
-      <div class="brand">
-        <div class="brand-kicker">WerkstattAI</div>
-        <div class="brand-name">{{ workshop.name or "Werkstattbereich" }}</div>
-        <div class="brand-subtitle">Digitaler Werkstattbereich</div>
-      </div>
 
-      <nav class="side-nav" aria-label="Hauptnavigation">
-        <div class="nav-label">Anfragen</div>
-        <a class="side-link" href="/dashboard?workshop_id={{ workshop_id }}">Aktive Tickets</a>
-        <a class="side-link" href="/dashboard/whatsapp?workshop_id={{ workshop_id }}">WhatsApp</a>
-        <a class="side-link intake-link" href="/dashboard/intake?workshop_id={{ workshop_id }}">+ Direktannahme</a>
-
-        <div class="nav-label">Verwaltung</div>
-        <a class="side-link" href="/dashboard/archive?workshop_id={{ workshop_id }}">Archiv</a>
-        <a class="side-link active" aria-current="page" href="/dashboard/settings?workshop_id={{ workshop_id }}">Einstellungen</a>
-        <a class="side-link" href="/dashboard/billing?workshop_id={{ workshop_id }}">Abo</a>
-        {% if current_user and current_user.role == "admin" %}
-          <a class="side-link" href="/dashboard/admin/workshops">Admin</a>
-        {% endif %}
-      </nav>
-
-      <div class="sidebar-foot">
-        <form method="post" action="/logout">
-          <button class="side-link" type="submit">Abmelden</button>
-        </form>
-        <div class="session-status"><span class="session-dot"></span>Sicher angemeldet</div>
-      </div>
-    </aside>
 
     <main class="workspace">
       <header class="page-header">

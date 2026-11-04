@@ -1,0 +1,51 @@
+/* Kleine, konsistente Details für Übersicht und Kommunikation. */
+.arbeitsplatz-kopf .wortmarke {color:white}
+.cards-primary .kpi {position:relative;min-height:155px;border:1px solid #dce6e0;border-radius:19px;padding:21px 23px;background:linear-gradient(130deg,#fff 65%,#f3f8f5);box-shadow:0 3px 12px #183c3203;transition:box-shadow .18s,border-color .18s}
+.cards-primary .kpi:hover {border-color:#86b4a4;box-shadow:0 7px 22px #183c320c}
+.cards-primary .kpi .label {display:flex;align-items:center;justify-content:space-between;gap:12px;font-size:13px;font-weight:550;color:#50685e}
+.kennzahl-icon {display:grid;place-items:center;width:38px;height:38px;border-radius:12px;background:#eaf3ed;flex-shrink:0}
+.cards-primary .kpi .value {font-size:35px;font-weight:650;letter-spacing:-1.5px;line-height:1.1;margin:3px 0 12px;font-variant-numeric:tabular-nums}
+.cards-primary .kpi .hint {font-size:12px;line-height:1.5;color:#6a7e74;max-width:30ch}
+.cards-primary .kpi-hot {background:linear-gradient(130deg,#fff 65%,#fff8ee)}
+.kpi-hot .kennzahl-icon {background:#fbefd9}
+[data-ticket-karte] {cursor:pointer}
+[data-ticket-karte]:hover {border-color:#94b8aa!important}
+.fahrzeugbild>img {object-fit:contain}
+.nachrichtenoptionen {width:100%;border:1px solid #dce6e0;border-radius:12px;padding:10px 14px;background:#fbfcfb}
+.nachrichtenoptionen summary {cursor:pointer;font-size:12px;font-weight:550;color:#567267}
+.nachrichtenoptionen[open] summary {margin-bottom:12px}
+.gespraechdetails {margin-bottom:16px;font-size:12px}
+.gespraechdetails summary {cursor:pointer;color:#567267;padding:8px 0}
+.gespraechdetails[open] summary {margin-bottom:10px}
+.frage-beantworten {border:1px solid #cbded2;border-radius:8px;background:#f4f8f4;color:#17685d;font:500 12px Inter,Arial,sans-serif;padding:7px 11px;cursor:pointer}
+.nachrichtenoptionen .communication-field+.communication-field {margin-top:12px}
+.ticket-inhalt .communication-controls {display:block}
+.ticket-inhalt .communication-controls .communication-help {margin:8px 0 0;font-size:11px;line-height:1.6}
+.ticket-inhalt #communication-history {background:#f2f3ee;border:1px solid #e3e8e1;border-radius:18px 18px 0 0;padding:24px;max-height:580px;min-height:240px}
+.ticket-inhalt #communication-history .note-stack {display:flex;flex-direction:column;gap:14px}
+.ticket-inhalt #communication-history .note-card {width:fit-content;max-width:85%;border:1px solid #e5eae4;border-radius:3px 16px 16px 16px;box-shadow:0 2px 4px #20352f04;padding:13px 16px;background:#fff}
+.ticket-inhalt #communication-history .customer-reply {align-self:flex-end;background:#e0f0e4;border-color:#d3e7d8;border-radius:16px 3px 16px 16px}
+.ticket-inhalt .note-text {font-size:14px;line-height:1.65}
+.ticket-inhalt .note-date {font-size:10px;opacity:.8;text-align:right;margin-top:9px}
+.ticket-inhalt #communication-controls {border-radius:0 0 18px 18px;border:1px solid #dce6e0;border-top:0;background:#fff;padding:22px}
+.ticket-inhalt .note-form-row textarea {border-radius:14px;background:#f7f9f7;border-color:#dce6e0;min-height:92px;resize:vertical;font:14px/1.6 Inter,Arial,sans-serif;padding:14px}
+.ticket-inhalt .note-submit button {border-radius:12px;padding:12px 20px}
+.communication-message-heading>span:not(.communication-question-status) {font-size:10px;color:#7a8b82}
+.kundenfoto img {cursor:zoom-in}
+.bild-fehler {padding:20px;background:#f4f5f1;border:1px dashed #c6d3c9;border-radius:12px;font-size:12px;line-height:1.6;color:#627268}
+.bildbetrachter {width:min(1000px,94vw);max-height:94vh;border:1px solid #dce6e0;border-radius:18px;padding:20px;background:#fff;color:#20352f;font:14px/1.6 Inter,Arial,sans-serif}
+.bildbetrachter::backdrop {background:#10271fba;backdrop-filter:blur(4px)}
+.bildbetrachter header {display:flex;align-items:center;justify-content:space-between;gap:16px;margin-bottom:16px}
+.bildbetrachter h2 {margin:0;font-size:18px}
+.bildbetrachter button,.bildbetrachter a {border:1px solid #dce6e0;border-radius:9px;padding:8px 12px;background:#f0f5f1;color:#17685d;font:inherit}
+.bildbetrachter img {display:block;max-width:100%;max-height:70vh;width:auto;height:auto;margin:auto;object-fit:contain}
+.bildbetrachter [hidden] {display:none!important}
+@media(max-width:640px) {
+ .cards-primary .kpi {padding:15px;min-height:148px}
+ .cards-primary .kpi .label {font-size:12px;align-items:flex-start}
+ .kennzahl-icon {width:28px;height:28px;border-radius:9px}
+ .kennzahl-icon img {width:17px;height:17px}
+ .ticket-inhalt #communication-history,.ticket-inhalt #communication-controls {padding:14px}
+ .ticket-inhalt #communication-history .note-card {max-width:94%}
+}
+@media(prefers-reduced-motion:reduce) {.cards-primary .kpi {transition:none}}

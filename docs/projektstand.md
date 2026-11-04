@@ -1,5 +1,19 @@
 # WerkstattAI – Projektstand und nächste Schritte
 
+## D1 – Feinschliff der fünf Rückmeldungen vom 4. November 2026
+
+Restliche Menüseiten übernehmen den gemeinsamen Stil. Ticketkarten öffnen über
+ihre freie Fläche; Hauptkennzahlen sind überarbeitet. Fahrzeugbilder werden als
+grobe lokale Karosseriesymbole statt als gemeinsames Golf-Bild dargestellt.
+Normale Nachrichten benötigen keine Zweckauswahl; gezielte Antworten bleiben
+explizit. Empfangene Bilder erhalten einen Dialog und einen Fehlerzustand.
+[Umfang, Grenzen und Prüfung](d1-feinschliff-2026-11-04.md): 54 gezielte Python-
+und 64 JavaScript-Tests bestanden, lokale Desktop-/Mobilkontrolle erfolgt.
+Aktuelle Veröffentlichung wird separat im PR und Notion nachgewiesen.
+Nächster Schritt: konkreten Bildfehler in der angemeldeten Produktion prüfen;
+Anmeldung war beim letzten Versuch erforderlich. Anschließend visuelle Abnahme.
+Die folgenden Einträge bleiben als Verlauf erhalten.
+
 ## D1 – Anmeldung und Chatansichten vom 4. November 2026
 
 Mikołaj hat die Fortsetzung hier im bestehenden Repository gewählt. Anmeldung,
