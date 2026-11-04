@@ -77,7 +77,7 @@ class ArbeitsplatzTests(unittest.TestCase):
 
     def test_statische_bilder_sind_verfuegbar_ohne_private_dateien_freizugeben(self):
         self.client.headers.pop('cookie',None)
-        for name in ['arbeitsplatz.css','InterVariable.woff2','fahrzeug-symbolbild.png','whatsapp.svg','symbole/gauge.svg']:
+        for name in ['arbeitsplatz.css','grundlagen.css','anmeldung.css','kundenchat.css','whatsapp.css','InterVariable.woff2','fahrzeug-symbolbild.png','whatsapp.svg','symbole/gauge.svg']:
             response = self.client.get('/static/arbeitsplatz/'+name)
             self.assertEqual(response.status_code,200,name)
             self.assertIn("default-src 'self'",response.headers['content-security-policy'])
@@ -97,6 +97,61 @@ class ArbeitsplatzTests(unittest.TestCase):
         text = self.client.get(f'/dashboard/ticket/{self.web_ticket}?workshop_id={self.wid}').text
         self.assertIn('Im Webchat gespeichert',text)
         self.assertNotIn(' · An Meta übergeben',text)
+
+    def test_whatsapp_navigation_formulare_und_fragebezug_bleiben_erreichbar(self):
+        response = self.client.get('/dashboard/whatsapp',params={'workshop_id':self.wid,'phone':self.phone})
+        self.assertEqual(response.status_code,200)
+        elements = Elemente(response.text).elemente
+        ids = [a['id'] for _,a in elements if 'id' in a]
+        self.assertEqual(len(ids),len(set(ids)))
+        self.assertTrue({'messageThread','replyText','inboxMessagePurpose','inboxMessageReplyTarget','testPhone','webhookUrl'} <= set(ids))
+        navigation = [a['href'] for tag,a in elements if tag=='a' and a.get('aria-current')=='page']
+        self.assertEqual(navigation,['/dashboard/whatsapp?workshop_id='+self.wid])
+        actions = [a.get('action') for tag,a in elements if tag=='form']
+        self.assertTrue({'/logout','/dashboard/whatsapp/control','/dashboard/whatsapp/reply','/dashboard/whatsapp/test'} <= set(actions))
+        self.assertNotIn('/dashboard/admin/workshops',response.text)
+        self.assertIn(self.questions[self.wa_ticket],response.text)
+        self.assertIn('conversation-control-bar',response.text)
+        self.assertIn('formaction="/dashboard/whatsapp/open-manual"',response.text)
+        self.assertLess(response.text.index('id="messageThread"'),response.text.index('<details class="verbindungsdetails"'))
+        # Die gemeinsame Navigation darf ihre bisherigen Seiten nicht verlieren.
+        for path in ['/dashboard','/dashboard/archive']:
+            page = self.client.get(path,params={'workshop_id':self.wid})
+            current = [a['href'] for tag,a in Elemente(page.text).elemente if tag=='a' and a.get('aria-current')=='page']
+            self.assertEqual(current,[path+'?workshop_id='+self.wid])
+
+    def test_kundenchat_bleibt_oeffentlich_mit_sitzung_und_aufnahmefunktionen(self):
+        self.client.headers.pop('cookie',None)
+        response = self.client.get('/assistant',params={'workshop_id':self.wid})
+        self.assertEqual(response.status_code,200)
+        elements = Elemente(response.text).elemente
+        ids = [a['id'] for _,a in elements if 'id' in a]
+        self.assertEqual(len(ids),len(set(ids)))
+        self.assertTrue({'chatForm','messageInput','messages','sendBtn','resetBtn','typing','doneBox','charCount','sessionIdBox','conversationStatus'} <= set(ids))
+        field = next(a for tag,a in elements if a.get('id')=='messageInput')
+        self.assertEqual(field['maxlength'],'4096')
+        self.assertIn('required',field)
+        self.assertIn('werkstattai_session_id:',response.text)
+        self.assertIn('/chat/messages',response.text)
+        self.assertIn('Kostenvoranschlag anfragen',response.text)
+        self.assertIn('/datenschutz?workshop_id='+self.wid,response.text)
+        self.assertLess(response.text.index('id="chatForm"'),response.text.index('<aside'))
+
+    def test_anmeldung_behaelt_rueckkehrziel_und_barrierefreie_felder(self):
+        self.client.headers.pop('cookie',None)
+        target = '/dashboard/whatsapp?workshop_id='+self.wid
+        response = self.client.get('/login',params={'next':target})
+        self.assertEqual(response.status_code,200)
+        elements = Elemente(response.text).elemente
+        fields = {a['name']:a for tag,a in elements if tag=='input' and 'name' in a}
+        self.assertEqual(fields['next']['value'],target)
+        self.assertEqual(fields['email']['autocomplete'],'username')
+        self.assertEqual(fields['password']['autocomplete'],'current-password')
+        self.assertEqual(fields['password']['type'],'password')
+        self.assertIn('required',fields['email'])
+        self.assertIn('required',fields['password'])
+        self.assertIn(('form',{'method':'post','action':'/login'}),elements)
+        self.assertIn('/datenschutz/rechte',response.text)
 
 
 class KilometeranzeigeTests(unittest.TestCase):

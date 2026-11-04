@@ -1,10 +1,4 @@
-@font-face {
-  font-family:Inter;
-  src:url('InterVariable.woff2') format('woff2');
-  font-style:normal;
-  font-weight:100 900;
-  font-display:swap;
-}
+@import url("grundlagen.css");
 
 .arbeitsplatz .fahrzeugkarte.kompakt .fahrzeugwerte {
   min-width:0;
@@ -433,89 +427,6 @@ body.arbeitsplatz {
 
 .arbeitsplatz .wrap:before {
   display:none;
-}
-
-.arbeitsplatz-kopf {
-  background:white;
-  border-bottom:1px solid #dce6e0;
-}
-
-.markenzeile {
-  height:68px;
-  background:#183c32;
-  color:#fff;
-  padding:0 max(32px,calc((100vw - 1280px)/2));
-  display:flex;
-  justify-content:space-between;
-  align-items:center;
-  gap:20px;
-}
-
-.arbeitsplatz .wortmarke {
-  display:flex;
-  align-items:center;
-  gap:11px;
-  color:white;
-  text-decoration:none;
-  font-weight:700;
-  font-size:23px;
-  letter-spacing:-.7px;
-}
-
-.wortmarke img {
-  filter:brightness(0) invert(1);
-}
-
-.werkstattname {
-  font-size:12px;
-  text-align:right;
-}
-
-.werkstattname span {
-  display:block;
-  font-size:10px;
-  opacity:.65;
-}
-
-.hauptnavigation {
-  display:flex;
-  align-items:center;
-  gap:5px;
-  max-width:1344px;
-  margin:auto;
-  padding:10px 32px;
-  overflow-x:auto;
-}
-
-.hauptnavigation .nav-btn {
-  display:flex;
-  align-items:center;
-  gap:8px;
-  white-space:nowrap;
-  font-size:12px;
-  font-weight:500;
-  min-height:39px;
-  padding:9px 12px;
-  border:0;
-  background:transparent;
-  color:#61746c;
-  border-radius:7px;
-  text-decoration:none;
-}
-
-.hauptnavigation .nav-btn.active {
-  background:#e8f1eb;
-  color:#167663;
-}
-
-.hauptnavigation img {
-  opacity:.75;
-}
-
-.hauptnavigation form {
-  margin:0;
-  margin-left:auto;
-  flex-shrink:0;
 }
 
 .arbeitsplatz .grid#main-content,.ticket-hauptbereich {

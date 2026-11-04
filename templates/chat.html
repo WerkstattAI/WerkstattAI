@@ -5,527 +5,18 @@
   <meta name="viewport" content="width=device-width,initial-scale=1" />
   <meta name="description" content="Digitale Fahrzeugannahme mit WerkstattAI – Anliegen schnell und vollständig an die Werkstatt übermitteln." />
   <title>WerkstattAI – Digitale Fahrzeugannahme</title>
-  <style>
-    :root{
-      --bg:#edf2f0;
-      --bg-soft:#f3f6f5;
-      --panel:#ffffff;
-      --panel-2:#f8faf9;
-      --line:#dfe7e4;
-      --line-strong:#cbd8d4;
-      --text:#182522;
-      --text-soft:#43534e;
-      --muted:#687772;
-      --accent:#0f6f66;
-      --accent-dark:#0c625a;
-      --accent-soft:#e4f2ef;
-      --user:#0f6f66;
-      --bot:#ffffff;
-      --graphite:#172a26;
-      --success:#23815d;
-      --shadow:0 8px 24px rgba(25,47,41,.08);
-      --shadow-raised:0 22px 58px rgba(22,43,37,.13);
-      --r:20px;
-    }
-
-    *{box-sizing:border-box}
-
-    body{
-      margin:0;
-      font-family:"Segoe UI Variable","Segoe UI",Inter,system-ui,-apple-system,sans-serif;
-      background:
-        radial-gradient(900px 460px at 12% -8%, rgba(15,111,102,.13), transparent 66%),
-        radial-gradient(760px 420px at 96% 4%, rgba(35,129,93,.09), transparent 64%),
-        var(--bg);
-      color:var(--text);
-      min-height:100vh;
-    }
-
-    .skip-link{
-      position:fixed;
-      top:12px;
-      left:12px;
-      z-index:100;
-      padding:10px 14px;
-      border-radius:10px;
-      background:var(--graphite);
-      color:#fff;
-      font-weight:850;
-      text-decoration:none;
-      transform:translateY(-160%);
-      transition:transform .16s ease;
-    }
-
-    .skip-link:focus{transform:translateY(0)}
-
-    .wrap{
-      max-width:1180px;
-      margin:0 auto;
-      padding:24px;
-    }
-
-    .top{
-      display:flex;
-      justify-content:space-between;
-      align-items:center;
-      gap:14px;
-      flex-wrap:wrap;
-      margin-bottom:18px;
-    }
-
-    .brand h1{
-      margin:0;
-      font-size:24px;
-      letter-spacing:.2px;
-    }
-
-    .brand .sub{
-      margin-top:6px;
-      color:var(--muted);
-      font-size:13px;
-    }
-
-    .brand-kicker{
-      margin-bottom:4px;
-      color:var(--accent);
-      font-size:11px;
-      font-weight:900;
-      letter-spacing:.09em;
-      text-transform:uppercase;
-    }
-
-    .top-actions{
-      display:flex;
-      gap:10px;
-      flex-wrap:wrap;
-      align-items:center;
-    }
-
-    .link-btn{
-      display:inline-flex;
-      align-items:center;
-      gap:8px;
-      padding:10px 12px;
-      border-radius:14px;
-      border:1px solid var(--line);
-      background:var(--panel);
-      color:var(--text);
-      text-decoration:none;
-      font-weight:800;
-      transition:background .16s ease,border-color .16s ease,transform .16s ease;
-    }
-
-    .link-btn:hover{background:var(--panel-2);border-color:var(--line-strong);transform:translateY(-1px)}
-
-    .shell{
-      display:grid;
-      grid-template-columns:300px minmax(0,1fr);
-      gap:18px;
-      align-items:start;
-    }
-
-    .card{
-      background:var(--panel);
-      border:1px solid var(--line);
-      border-radius:var(--r);
-      box-shadow:var(--shadow);
-    }
-
-    .side{
-      padding:18px;
-      position:sticky;
-      top:20px;
-    }
-
-    .side h2{
-      margin:0 0 12px 0;
-      font-size:16px;
-      color:var(--text);
-    }
-
-    .hint-box{
-      padding:14px;
-      border-radius:16px;
-      background:var(--panel-2);
-      border:1px solid var(--line);
-      margin-bottom:12px;
-    }
-
-    .hint-title{
-      font-size:12px;
-      font-weight:900;
-      text-transform:uppercase;
-      letter-spacing:.08em;
-      color:var(--accent);
-      margin-bottom:8px;
-    }
-
-    .hint-text{
-      font-size:13px;
-      color:var(--text-soft);
-      line-height:1.5;
-    }
-
-    .hint-list{
-      margin:0;
-      padding-left:18px;
-      display:grid;
-      gap:6px;
-    }
-
-    .example-list{
-      margin:0;
-      padding:0;
-      list-style:none;
-      display:grid;
-      gap:7px;
-    }
-
-    .example-list li::before{content:"› ";color:var(--accent);font-weight:900}
-
-    .session-box{
-      display:none;
-      margin-top:14px;
-      padding:12px;
-      border-radius:16px;
-      background:var(--panel-2);
-      border:1px solid var(--line);
-    }
-
-    .session-label{
-      font-size:12px;
-      color:var(--muted);
-      font-weight:800;
-      text-transform:uppercase;
-      letter-spacing:.08em;
-      margin-bottom:8px;
-    }
-
-    .session-id{
-      font-family:ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
-      font-size:12px;
-      line-height:1.5;
-      word-break:break-word;
-      color:var(--text-soft);
-    }
-
-    .chat-card{
-      min-height:clamp(620px,calc(100vh - 112px),760px);
-      display:flex;
-      flex-direction:column;
-      overflow:hidden;
-    }
-
-    .chat-header{
-      display:flex;
-      justify-content:space-between;
-      align-items:center;
-      gap:12px;
-      padding:16px 18px;
-      border-bottom:1px solid var(--line);
-      background:var(--panel);
-    }
-
-    .chat-header h2{
-      margin:0;
-      font-size:17px;
-    }
-
-    .chat-header .muted{
-      color:var(--muted);
-      font-size:12px;
-    }
-
-    .chat-status{
-      display:inline-flex;
-      align-items:center;
-      gap:8px;
-      padding:8px 12px;
-      border-radius:999px;
-      border:1px solid var(--line);
-      background:#eef8f3;
-      font-size:12px;
-      font-weight:800;
-      color:#246047;
-    }
-
-    .chat-status .dot{
-      width:8px;
-      height:8px;
-      border-radius:999px;
-      background:var(--success);
-      box-shadow:0 0 0 4px rgba(35,129,93,.12);
-    }
-
-    .messages{
-      flex:1;
-      padding:18px;
-      overflow:auto;
-      display:flex;
-      flex-direction:column;
-      gap:12px;
-      background:
-        radial-gradient(circle at 18px 18px,rgba(15,111,102,.035) 1.5px,transparent 1.5px),
-        var(--bg-soft);
-      background-size:28px 28px;
-    }
-
-    .message-row{
-      display:flex;
-      width:100%;
-    }
-
-    .message-row.bot{
-      justify-content:flex-start;
-    }
-
-    .message-row.user{
-      justify-content:flex-end;
-    }
-
-    .bubble{
-      max-width:min(78%, 720px);
-      padding:12px 14px;
-      border-radius:18px;
-      line-height:1.55;
-      font-size:14px;
-      white-space:pre-wrap;
-      word-break:break-word;
-      box-shadow:0 5px 16px rgba(25,47,41,.08);
-      border:1px solid var(--line);
-    }
-
-    .message-row.bot .bubble{
-      background:var(--bot);
-      color:var(--text);
-      border-top-left-radius:8px;
-    }
-
-    .message-row.user .bubble{
-      background:linear-gradient(180deg,var(--accent),var(--accent-dark));
-      color:white;
-      border-color:var(--accent);
-      border-top-right-radius:8px;
-    }
-
-    .meta{
-      margin-top:6px;
-      font-size:11px;
-      color:var(--muted);
-    }
-
-    .quick-actions{
-      display:flex;
-      flex-wrap:wrap;
-      gap:10px;
-      margin-top:10px;
-      max-width:min(78%, 720px);
-    }
-
-    .quick-btn{
-      padding:10px 14px;
-      border-radius:14px;
-      border:1px solid #bcd8d1;
-      background:var(--panel);
-      color:var(--accent-dark);
-      cursor:pointer;
-      font-weight:800;
-      font-size:13px;
-      transition:all .15s ease;
-    }
-
-    .quick-btn:hover{
-      background:var(--accent-soft);
-      border-color:#86b9ad;
-      transform:translateY(-1px);
-    }
-
-    .composer{
-      border-top:1px solid var(--line);
-      background:var(--panel);
-      padding:16px;
-    }
-
-    .composer-form{
-      display:flex;
-      gap:10px;
-      align-items:flex-end;
-    }
-
-    .input-wrap{
-      flex:1;
-      display:flex;
-      flex-direction:column;
-      gap:8px;
-    }
-
-    textarea{
-      width:100%;
-      min-height:58px;
-      max-height:180px;
-      resize:vertical;
-      padding:14px 14px;
-      border-radius:16px;
-      border:1px solid var(--line);
-      background:var(--panel-2);
-      color:var(--text);
-      font:inherit;
-      outline:none;
-    }
-
-    textarea::placeholder{
-      color:#82908c;
-    }
-
-    .helper{
-      display:flex;
-      justify-content:space-between;
-      gap:10px;
-      flex-wrap:wrap;
-      font-size:12px;
-      color:var(--muted);
-    }
-
-    .send-btn, .ghost-btn{
-      padding:12px 16px;
-      border-radius:16px;
-      border:1px solid var(--line);
-      font-weight:800;
-      cursor:pointer;
-      color:var(--text);
-      transition:background .16s ease,border-color .16s ease,transform .16s ease,box-shadow .16s ease;
-    }
-
-    .send-btn{
-      border-color:var(--accent);
-      background:linear-gradient(180deg,var(--accent),var(--accent-dark));
-      color:#fff;
-      min-width:110px;
-    }
-
-    .ghost-btn{
-      background:var(--panel-2);
-    }
-
-    .send-btn:hover:not(:disabled){transform:translateY(-1px);box-shadow:0 8px 18px rgba(15,111,102,.20)}
-    .ghost-btn:hover:not(:disabled){background:#edf2f0;border-color:var(--line-strong)}
-    button:disabled,textarea:disabled{cursor:not-allowed;opacity:.62}
-
-    .link-btn:focus-visible,
-    .quick-btn:focus-visible,
-    .send-btn:focus-visible,
-    .ghost-btn:focus-visible,
-    textarea:focus-visible{
-      outline:3px solid #0f6f66;
-      outline-offset:3px;
-    }
-
-    .done-box{
-      margin-top:10px;
-      padding:12px 14px;
-      border-radius:16px;
-      border:1px solid #b9dfcb;
-      background:#eef8f3;
-      color:#205d43;
-      font-size:13px;
-      line-height:1.6;
-      display:none;
-      white-space:pre-wrap;
-    }
-
-    .typing{
-      display:none;
-      align-items:center;
-      gap:10px;
-      color:var(--muted);
-      font-size:12px;
-      padding:0 18px 10px 18px;
-      background:var(--bg-soft);
-    }
-
-    .typing-dots{
-      display:inline-flex;
-      gap:5px;
-    }
-
-    .typing-dots span{
-      width:7px;
-      height:7px;
-      border-radius:999px;
-      background:var(--accent);
-      opacity:.55;
-      animation:blink 1.2s infinite ease-in-out;
-    }
-
-    .typing-dots span:nth-child(2){animation-delay:.15s}
-    .typing-dots span:nth-child(3){animation-delay:.30s}
-
-    @keyframes blink{
-      0%, 80%, 100%{transform:scale(.7); opacity:.4}
-      40%{transform:scale(1); opacity:1}
-    }
-
-    @media (max-width: 920px){
-      .shell{
-        grid-template-columns:1fr;
-      }
-
-      .chat-card{
-        min-height:680px;
-      }
-
-      .side{position:static}
-    }
-
-    @media (max-width: 640px){
-      .wrap{
-        padding:14px;
-      }
-
-      .messages{
-        padding:14px;
-      }
-
-      .bubble{
-        max-width:88%;
-      }
-
-      .quick-actions{
-        max-width:88%;
-      }
-
-      .composer-form{
-        flex-direction:column;
-        align-items:stretch;
-      }
-
-      .send-btn, .ghost-btn{
-        width:100%;
-      }
-    }
-
-    @media (max-width:420px){
-      .wrap{padding:10px}
-      .top{padding:6px 4px}
-      .card{border-radius:16px}
-      .chat-header{align-items:flex-start}
-      .chat-status{padding:7px 10px}
-      .messages{min-height:360px}
-    }
-
-    @media (prefers-reduced-motion:reduce){
-      *,*::before,*::after{animation-duration:.01ms!important;animation-iteration-count:1!important;transition:none!important}
-    }
-  </style>
+  <link rel="stylesheet" href="/static/arbeitsplatz/grundlagen.css" />
+  <link rel="stylesheet" href="/static/arbeitsplatz/kundenchat.css" />
 </head>
-<body>
+<body class="produkt kundenchat">
   <a class="skip-link" href="#main-content">Zum Kundenchat springen</a>
+  <header class="markenzeile"><a class="wortmarke" href="/"><img src="/static/arbeitsplatz/symbole/wrench.svg" width="24" height="24" alt="" />WerkstattAI</a><span class="werkstattname">Kundenservice<span>Digitale Fahrzeugannahme</span></span></header>
   <div class="wrap">
     <header class="top">
       <div class="brand">
         <div class="sub" id="workshop-name">Anfrage an {{ workshop.name }}</div>
         <div class="brand-kicker">Digitale Fahrzeugannahme</div>
-        <h1>WerkstattAI Kundenservice</h1>
+        <h1>Wie können wir Ihnen helfen?</h1>
         <div class="sub">{% if workshop.is_demo %}Demo mit Beispieldaten – es wird kein echter Werkstattauftrag erstellt.{% else %}Ihr Anliegen kommt vollständig und übersichtlich bei der Werkstatt an.{% endif %}</div>
       </div>
 
@@ -536,8 +27,57 @@
     </header>
 
     <main class="shell" id="main-content">
+
+
+      <section class="card chat-card" aria-labelledby="customer-chat-title">
+        <div class="chat-header">
+          <div class="chat-kontakt"><span class="chat-avatar" aria-hidden="true"><img class="symbol-hell" src="/static/arbeitsplatz/symbole/messages-square.svg" width="23" height="23" alt="" /></span><div>
+            <h2 id="customer-chat-title">Kundenchat</h2>
+            <div class="muted">WerkstattAI nimmt Ihre Anfrage auf und erstellt daraus ein übersichtliches Ticket.</div>
+          </div>
+
+          </div>
+          <div class="chat-status" role="status" aria-live="polite">
+            <span class="dot"></span>
+            <span id="conversationStatus">Gespräch wird geladen …</span>
+          </div>
+        </div>
+
+        <div class="messages" id="messages" role="log" aria-live="polite" aria-relevant="additions text"></div>
+
+        <div class="typing" id="typing" role="status" aria-live="polite">
+          <span>WerkstattAI schreibt</span>
+          <span class="typing-dots" aria-hidden="true">
+            <span></span><span></span><span></span>
+          </span>
+        </div>
+
+        <div class="composer">
+          <form class="composer-form" id="chatForm">
+            <div class="input-wrap">
+              <textarea
+                id="messageInput"
+                maxlength="4096"
+                aria-label="Nachricht an die Werkstatt"
+                placeholder="Beschreiben Sie kurz Ihr Anliegen …"
+                required
+              ></textarea>
+
+              <div class="helper">
+                <span>Enter sendet · Shift + Enter fügt eine neue Zeile ein</span>
+                <span id="charCount">0 Zeichen</span>
+              </div>
+            </div>
+
+            <button class="ghost-btn" type="button" id="resetBtn">Neu starten</button>
+            <button class="send-btn" type="submit" id="sendBtn">Senden</button>
+          </form>
+
+          <div class="done-box" id="doneBox" role="status" aria-live="polite"></div>
+        </div>
+      </section>
       <aside class="card side" aria-labelledby="chat-help-title">
-        <h2 id="chat-help-title">So funktioniert die Anfrage</h2>
+        <h2 id="chat-help-title">Ihre Anfrage, Schritt für Schritt</h2>
 
         {% if workshop.is_demo %}
         <div class="hint-box" id="demo-notice">
@@ -582,53 +122,6 @@
         </div>
         <div class="hint-box"><div class="hint-title">Ihre Daten</div><div class="hint-text">Informationen zu Speicherung und Ihren Rechten: <a href="/datenschutz?workshop_id={{ workshop.id|urlencode }}">Datenschutz</a> · <a href="/datenschutz/rechte">Auskunft &amp; Löschung</a> · <a href="/impressum">Impressum</a></div></div>
       </aside>
-
-      <section class="card chat-card" aria-labelledby="customer-chat-title">
-        <div class="chat-header">
-          <div>
-            <h2 id="customer-chat-title">Kundenchat</h2>
-            <div class="muted">WerkstattAI nimmt Ihre Anfrage auf und erstellt daraus ein übersichtliches Ticket.</div>
-          </div>
-
-          <div class="chat-status" role="status" aria-live="polite">
-            <span class="dot"></span>
-            <span id="conversationStatus">Gespräch wird geladen …</span>
-          </div>
-        </div>
-
-        <div class="messages" id="messages" role="log" aria-live="polite" aria-relevant="additions text"></div>
-
-        <div class="typing" id="typing" role="status" aria-live="polite">
-          <span>WerkstattAI schreibt</span>
-          <span class="typing-dots" aria-hidden="true">
-            <span></span><span></span><span></span>
-          </span>
-        </div>
-
-        <div class="composer">
-          <form class="composer-form" id="chatForm">
-            <div class="input-wrap">
-              <textarea
-                id="messageInput"
-                maxlength="4096"
-                aria-label="Nachricht an die Werkstatt"
-                placeholder="Beschreiben Sie kurz Ihr Anliegen …"
-                required
-              ></textarea>
-
-              <div class="helper">
-                <span>Enter sendet · Shift + Enter fügt eine neue Zeile ein</span>
-                <span id="charCount">0 Zeichen</span>
-              </div>
-            </div>
-
-            <button class="ghost-btn" type="button" id="resetBtn">Neu starten</button>
-            <button class="send-btn" type="submit" id="sendBtn">Senden</button>
-          </form>
-
-          <div class="done-box" id="doneBox" role="status" aria-live="polite"></div>
-        </div>
-      </section>
     </main>
   </div>
 
