@@ -1,0 +1,228 @@
+@font-face {
+  font-family:Inter;
+  src:url('InterVariable.woff2') format('woff2');
+  font-style:normal;
+  font-weight:100 900;
+  font-display:swap;
+}
+
+/* Gemeinsame Gestaltung für Werkstattbereich, Anmeldung und Kundenchat. */ :root {
+  --wa-hintergrund:#f2f5f4;
+  --wa-flaeche:#fff;
+  --wa-mint:#edf4ef;
+  --wa-text:#20352f;
+  --wa-sekundaer:#61746c;
+  --wa-linie:#dce6e0;
+  --wa-gruen:#167663;
+  --wa-dunkel:#183c32;
+  --wa-chat:#f0eee7;
+  --wa-ausgehend:#e1f1e6;
+}
+
+.produkt {
+  box-sizing:border-box;
+  margin:0;
+  color:var(--wa-text);
+  background:var(--wa-hintergrund);
+  font:14px/1.5 Inter,Arial,sans-serif;
+  -webkit-font-smoothing:antialiased;
+}
+
+.produkt * {
+  box-sizing:border-box;
+}
+
+.produkt [hidden] {
+  display:none!important;
+}
+
+.produkt :is(button,input,textarea,select) {
+  font:inherit;
+}
+
+.produkt :is(input,textarea,select) {
+  max-width:100%;
+  min-width:0;
+}
+
+.produkt button {
+  cursor:pointer;
+}
+
+.produkt button:disabled {
+  cursor:not-allowed;
+  opacity:.55;
+}
+
+.produkt a {
+  color:var(--wa-gruen);
+}
+
+.produkt :focus-visible {
+  outline:3px solid var(--wa-gruen);
+  outline-offset:3px;
+}
+
+.produkt .wortmarke {
+  color:white;
+}
+
+.produkt h1 {
+  font-size:28px;
+  line-height:1.25;
+  letter-spacing:-.8px;
+}
+
+.produkt :is(h1,h2,h3,p) {
+  margin-top:0;
+}
+
+.produkt .hauptnavigation .nav-btn {
+  color:var(--wa-sekundaer);
+}
+
+.produkt .hauptnavigation .nav-btn.active {
+  color:var(--wa-gruen);
+}
+
+.produkt .hauptnavigation .nav-btn:hover {
+  background:var(--wa-mint);
+}
+
+.produkt .skip-link {
+  position:fixed;
+  top:8px;
+  left:8px;
+  z-index:100;
+  padding:12px;
+  background:white;
+  transform:translateY(-160%);
+}
+
+.produkt .skip-link:focus {
+  transform:translateY(0);
+}
+
+.produkt .markenzeile a:focus-visible {
+  outline-color:#b6e4cc;
+}
+
+.produkt .symbol {
+  width:20px;
+  height:20px;
+  flex-shrink:0;
+}
+
+.produkt .symbol-hell {
+  filter:brightness(0) invert(1);
+}
+
+.arbeitsplatz-kopf {
+  background:white;
+  border-bottom:1px solid #dce6e0;
+}
+
+.markenzeile {
+  height:68px;
+  background:#183c32;
+  color:#fff;
+  padding:0 max(32px,calc((100vw - 1280px)/2));
+  display:flex;
+  justify-content:space-between;
+  align-items:center;
+  gap:20px;
+}
+
+.wortmarke {
+  display:flex;
+  align-items:center;
+  gap:11px;
+  color:white;
+  text-decoration:none;
+  font-weight:700;
+  font-size:23px;
+  letter-spacing:-.7px;
+}
+
+.wortmarke img {
+  filter:brightness(0) invert(1);
+}
+
+.werkstattname {
+  font-size:12px;
+  text-align:right;
+}
+
+.werkstattname span {
+  display:block;
+  font-size:10px;
+  opacity:.65;
+}
+
+.hauptnavigation {
+  display:flex;
+  align-items:center;
+  gap:5px;
+  max-width:1344px;
+  margin:auto;
+  padding:10px 32px;
+  overflow-x:auto;
+}
+
+.hauptnavigation .nav-btn {
+  display:flex;
+  align-items:center;
+  gap:8px;
+  white-space:nowrap;
+  font-size:12px;
+  font-weight:500;
+  min-height:39px;
+  padding:9px 12px;
+  border:0;
+  background:transparent;
+  color:#61746c;
+  border-radius:7px;
+  text-decoration:none;
+}
+
+.hauptnavigation .nav-btn.active {
+  background:#e8f1eb;
+  color:#167663;
+}
+
+.hauptnavigation img {
+  opacity:.75;
+}
+
+.hauptnavigation form {
+  margin:0;
+  margin-left:auto;
+  flex-shrink:0;
+}
+
+@media (max-width:640px) {
+  .produkt .markenzeile {
+    height:auto;
+    min-height:64px;
+    padding:14px 16px;
+    gap:14px;
+  }
+  .produkt .wortmarke {
+    font-size:20px;
+  }
+  .produkt .werkstattname {
+    max-width:50%;
+    overflow-wrap:anywhere;
+  }
+  .produkt .hauptnavigation {
+    padding:8px 12px;
+  }
+}
+
+@media (prefers-reduced-motion:reduce) {
+  .produkt *, .produkt *::before, .produkt *::after {
+    scroll-behavior:auto!important;
+    animation:none!important;
+    transition:none!important;
+  }
+}

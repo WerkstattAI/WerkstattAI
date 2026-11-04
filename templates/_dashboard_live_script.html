@@ -209,6 +209,17 @@ function installDashboardLive({workshopId, scope, list, initialCursor = 0}) {
           } else if (form.action.endsWith('/conversation-control') || form.action.endsWith('/whatsapp/control')) {
             const bar = form.closest('.conversation-control-bar'), next = doc.querySelector('.conversation-control-bar');
             if (next) { bar.replaceWith(next); next.querySelector('button')?.focus({preventScroll:true}); }
+            // Auch die ausgewählte Unterhaltung zeigt den neuen Übernahmestatus.
+            if (form.action.endsWith('/whatsapp/control')) {
+              const conversations = document.querySelector('.conversation-list');
+              const updatedConversations = doc.querySelector('.conversation-list');
+              if (conversations && updatedConversations) {
+                const top = conversations.scrollTop, left = conversations.scrollLeft;
+                conversations.replaceWith(updatedConversations);
+                updatedConversations.scrollTop = top;
+                updatedConversations.scrollLeft = left;
+              }
+            }
           } else if (form.action.endsWith('/status')) {
             const next = doc.querySelector('.status-value');
             if (next) document.querySelector('.status-value').replaceWith(next);

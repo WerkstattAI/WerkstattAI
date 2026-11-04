@@ -1,5 +1,20 @@
 # WerkstattAI – Projektstand und nächste Schritte
 
+## D1 – Anmeldung und Chatansichten vom 4. November 2026
+
+Mikołaj hat die Fortsetzung hier im bestehenden Repository gewählt. Anmeldung,
+eigenständige WhatsApp-Ansicht und Kundenchat übernehmen nun den freigegebenen
+Dashboard-/Ticketstil. Bestehende Formulare, Sitzungen, Nachrichtenzwecke,
+Versandsperren und Medien bleiben erhalten. Die Übernahmeanzeige aktualisiert
+sich im WhatsApp-Gespräch und in der Kontaktliste gleichzeitig, ohne den Entwurf
+zu verlieren. [Umfang und Prüfbericht](d1-anmeldung-und-chats-2026-11-04.md).
+
+Die aktive Veröffentlichung wird separat im zugehörigen PR und in Notion
+nachgewiesen. Nächster Schritt: gemeinsamer visueller Abgleich dieser Ansichten
+und Entscheidung über die verbleibenden Verwaltungsseiten in D1. Anschließend
+bleibt die vereinbarte Reihenfolge S1/C1/R1 bestehen. Ältere Einträge folgen als
+Historie und sind nicht die aktuelle nächste Aufgabe.
+
 ## D1 – umgesetzter Dashboard-/Ticketschritt vom 4. November 2026
 
 Mikołaj hat den Figma-Entwurf einschließlich der klareren Fahrzeugdaten
