@@ -1,5 +1,18 @@
 # WerkstattAI – Projektstand und nächste Schritte
 
+## D1 – Kartenklick zeigt Vorschau, 5. November 2026
+
+Auf ausdrücklichen Wunsch zeigt ein Klick auf die freie Ticketkartenfläche jetzt
+die Vorschau rechts, statt sofort zur Ticketseite zu wechseln. Der bestehende
+Vorschauschalter übernimmt Auswahl, Markierung und mobile Scrollführung.
+Links, Formulare, Aktionen und Textauswahl bleiben eigenständig; „Ticket öffnen“
+öffnet weiterhin die vollständige Ticketseite.
+
+Der vorherige PR #4 wurde inzwischen mit Zustimmung zusammengeführt und als
+`cd3487b10605f71a020ff5ca5931edf846a8c972` erfolgreich auf Railway veröffentlicht
+(Deployment `30fab2d0-b26f-4ab0-b3e6-e4174d46f516`). Die älteren Hinweise auf
+ausstehende Freigabe sind damit historisch überholt.
+
 ## D1 – Markenbezogene Fahrzeugbilder vom 4. November 2026
 
 Die freigegebenen realistischen Illustrationen ersetzen die zuvor vorgesehenen
