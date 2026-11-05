@@ -44,12 +44,12 @@
       }
     });
   }
-  // Freie Kartenfläche öffnet das Ticket; Formularaktionen und Textauswahl bleiben eigenständig.
+  // Freie Kartenfläche zeigt die Vorschau; Formularaktionen und Textauswahl bleiben eigenständig.
   document.addEventListener('click', event => {
     const row = event.target.closest('[data-ticket-karte]');
     if (!row || event.defaultPrevented || event.button !== 0 || event.ctrlKey || event.metaKey || event.shiftKey || event.altKey) return;
     if (event.target.closest('a,button,input,select,textarea,label,summary,details,form') || window.getSelection()?.toString()) return;
-    window.location.assign(row.dataset.ticketUrl);
+    row.querySelector('[data-ticket-auswahl]')?.click();
   });
   const tabs = [...document.querySelectorAll('[data-ticket-tab]')];
   function tabAktivieren(id, focus=false) {

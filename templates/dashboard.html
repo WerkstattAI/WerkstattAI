@@ -248,7 +248,6 @@
               <tr
                 id="ticket-{{ t.ticket_view_id }}"
                 data-ticket-karte
-                data-ticket-url="/dashboard/ticket/{{ t.ticket_view_id }}?workshop_id={{ workshop_id }}&amp;return_to={{ list_url|urlencode }}"
                 class="
                   {% if t.priority == 'hoch' %}row-high{% endif %}
                   {% if t.request_type == 'notfall' %}row-notfall{% endif %}
