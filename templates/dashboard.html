@@ -274,6 +274,7 @@
                   {% endif %}
 
                   <div class="muted id">ID: {{ t.ticket_view_id }}</div>
+                  <span class="kartenauswahl" aria-hidden="true">✓ Ausgewählt</span>
                   <div class="muted">Quelle: {{ t.source_label or "-" }}</div>
                   <div>{{ communication.state_badge(t.conversation_state) }}</div>
                 </td>
@@ -303,6 +304,13 @@
                 <td class="problem">
                   <span class="cell-label">Anliegen</span>
                   <button type="button" class="ticket-auswahl" data-ticket-auswahl="ticket-{{ t.ticket_view_id }}" aria-pressed="false" aria-controls="ticket-vorschau">{{ t.problem or "Anliegen nicht angegeben" }}</button>
+                  {% if t.nachrichtenvorschau %}
+                  <div class="karten-nachricht">
+                    <div class="karten-nachricht-kopf"><span>{{ t.nachrichtenvorschau.sender }} · Letzte Nachricht</span><time datetime="{{ t.nachrichtenvorschau.created_at or '' }}">{{ t.nachrichtenvorschau.zeit }}</time></div>
+                    <div class="karten-nachricht-text">{{ t.nachrichtenvorschau.text }}</div>
+                    {% if t.nachrichtenvorschau.versandhinweis %}<span class="karten-versandhinweis">{{ t.nachrichtenvorschau.versandhinweis }}</span>{% endif %}
+                  </div>
+                  {% endif %}
 
                   <div class="meta-row">
                     {% if t.fahrbereit is not none %}

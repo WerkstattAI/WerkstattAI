@@ -37,6 +37,7 @@ from app.db import (
 )
 from app.models import IntakeState
 from app.oberflaeche import kilometeranzeige, fahrzeugsymbol
+from app.nachrichtenvorschau import letzte_whatsapp_nachrichten, letzte_nachricht
 from app.subscriptions import get_subscription
 from app.tickets import (
     add_ticket_note,
@@ -761,6 +762,7 @@ def _prepare_tickets(limit: int, workshop_id: str | None = None, *, raw=None, li
     wid = _normalize_workshop_id(workshop_id)
     raw = list_latest_tickets(limit=limit, workshop_id=wid) if raw is None else raw
     tickets = [_as_dict(t) for t in raw]
+    letzte_wa = {} if lightweight else letzte_whatsapp_nachrichten(wid, [_ticket_id(t) for t in tickets])
 
     for t in tickets:
         t["ticket_view_id"] = _ticket_id(t)
@@ -804,6 +806,9 @@ def _prepare_tickets(limit: int, workshop_id: str | None = None, *, raw=None, li
             t["whatsapp_mode"] = "assistant"
 
         notes = t.get("notes") if isinstance(t.get("notes"), list) else []
+        t['nachrichtenvorschau'] = letzte_nachricht(notes, letzte_wa.get(t['ticket_view_id']))
+        if t['nachrichtenvorschau']:
+            t['nachrichtenvorschau']['zeit'] = _format_datetime_for_display(t['nachrichtenvorschau']['created_at'])
         last_note = notes[-1] if notes else {}
         customer_question_notes = [
             note

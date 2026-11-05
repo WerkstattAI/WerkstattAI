@@ -1,5 +1,19 @@
 # WerkstattAI – Projektstand und nächste Schritte
 
+## D1 – Elegante Karten und letzte Nachricht, 5. November 2026
+
+Freigegebener Figma-Entwurf A: ruhigere Karten, grüner Auswahlstreifen und sichtbare
+Auswahlmarkierung. Jede Karte zeigt die letzte öffentliche Gesprächsnachricht mit
+Absender und Datum/Uhrzeit. Interne Notizen werden ausgeschlossen. WhatsApp wird
+für die sichtbaren Tickets gemeinsam und mandantenbezogen gelesen; Fotos ohne Text
+erhalten „Foto“. Ungeklärte Echo-/Historienzuordnungen werden nicht angezeigt.
+Fehlgeschlagener bzw. unklarer Versand wird gekennzeichnet. Es entsteht kein neuer
+Lesestatus, und die Vorschau löst keine offene Kundenfrage auf.
+
+Prüfung: 26 gezielte Python-Tests bestanden (Vorschau, Oberflächenverträge und
+Dashboardabläufe); lokale Desktop- und Mobilkontrolle bei 390 px bestanden.
+Keine Migration und keine echten Nachrichten. Veröffentlichung separat bestätigen.
+
 ## D1 – Kartenklick zeigt Vorschau, 5. November 2026
 
 Auf ausdrücklichen Wunsch zeigt ein Klick auf die freie Ticketkartenfläche jetzt

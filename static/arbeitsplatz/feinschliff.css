@@ -1,4 +1,19 @@
 /* Kleine, konsistente Details für Übersicht und Kommunikation. */
+.arbeitsplatz .ticket-table tr {border-radius:18px;padding:20px;gap:8px;box-shadow:0 3px 10px #183c3205}
+.arbeitsplatz .ticket-table tr.ausgewaehlt {border:1px solid #70aa8a;padding:20px;background:#eff7f1;box-shadow:inset 4px 0 #227655,0 4px 14px #183c3208}
+.arbeitsplatz .ticket-table tr.ausgewaehlt:hover {background:#eff7f1}
+.ticket-table .vehicle .title {font-size:20px;font-weight:650;letter-spacing:-.3px}
+.ticket-table .vehicle .muted {font-size:12px}
+.ticket-table .kartenauswahl {display:none;color:#216e55;font-size:11px;white-space:nowrap}
+.ticket-table .ausgewaehlt .kartenauswahl {display:inline}
+.ticket-table .ticket-auswahl:after {display:none}
+.ticket-table .ticket-auswahl {font-size:13px;margin-bottom:4px}
+.karten-nachricht {margin-top:10px;padding:12px 13px;border-radius:12px;background:#f3f6f2;color:#2d493a}
+.ausgewaehlt .karten-nachricht {background:#fff}
+.karten-nachricht-kopf {display:flex;flex-wrap:wrap;justify-content:space-between;gap:3px 8px;color:#647b6b;font-size:11px;line-height:1.5;margin-bottom:6px}
+.karten-nachricht-kopf time {font-variant-numeric:tabular-nums}
+.karten-nachricht-text {font-size:13px;line-height:1.6;overflow-wrap:anywhere;display:-webkit-box;-webkit-box-orient:vertical;-webkit-line-clamp:2;overflow:hidden}
+.karten-versandhinweis {display:block;color:#9b541b;font-size:11px;margin-top:5px}
 .arbeitsplatz-kopf .wortmarke {color:white}
 .cards-primary .kpi {position:relative;min-height:155px;border:1px solid #dce6e0;border-radius:19px;padding:21px 23px;background:linear-gradient(130deg,#fff 65%,#f3f8f5);box-shadow:0 3px 12px #183c3203;transition:box-shadow .18s,border-color .18s}
 .cards-primary .kpi:hover {border-color:#86b4a4;box-shadow:0 7px 22px #183c320c}
