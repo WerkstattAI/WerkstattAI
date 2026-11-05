@@ -24,6 +24,25 @@ class ArbeitsplatzTests(unittest.TestCase):
     setUp = formularfixture.ManualCommunicationFormTests.setUp
     tearDown = formularfixture.ManualCommunicationFormTests.tearDown
 
+    def test_kartenvorschau_verknuepft_nachrichten_nur_mit_ihrem_ticket(self):
+        from app.nachrichtenvorschau import letzte_whatsapp_nachrichten
+        save_whatsapp_message(workshop_id=self.wid, customer_phone=self.phone, direction='inbound',
+                              ticket_id=self.wa_ticket, text='Letzter Kartentext', message_id='karten-neu')
+        bilder = letzte_whatsapp_nachrichten(self.wid, [self.wa_ticket, self.web_ticket])
+        self.assertEqual(bilder[self.wa_ticket]['text'],'Letzter Kartentext')
+        self.assertNotIn(self.web_ticket, bilder)
+        self.assertEqual(letzte_whatsapp_nachrichten('fremde-werkstatt', [self.wa_ticket]), {})
+        add_ticket_note(self.web_ticket, '<b>Kundenantwort</b>', workshop_id=self.wid,
+                        purpose='workshop_notification', message_id='karten-web')
+        add_ticket_note(self.web_ticket, 'Interne Geheimnotiz', workshop_id=self.wid, message_id='karten-intern')
+        page = self.client.get('/dashboard',params={'workshop_id':self.wid})
+        self.assertEqual(page.status_code,200)
+        self.assertIn('Letzter Kartentext',page.text)
+        self.assertIn('&lt;b&gt;Kundenantwort&lt;/b&gt;',page.text)
+        import re
+        vorschauen = re.findall(r'<div class="karten-nachricht-text">(.*?)</div>',page.text)
+        self.assertNotIn('Interne Geheimnotiz', ''.join(vorschauen))
+
     def test_neue_skripte_behalten_csp_nonce_und_nachrichtenstandard(self):
         for path in ['/dashboard', '/dashboard/whatsapp', f'/dashboard/ticket/{self.web_ticket}']:
             page = self.client.get(path,params={'workshop_id':self.wid,'phone':self.phone})
