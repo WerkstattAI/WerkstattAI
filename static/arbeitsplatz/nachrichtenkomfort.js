@@ -13,3 +13,30 @@ document.addEventListener('click', event => {
   if (options) options.open = true;
   form.querySelector('textarea')?.focus();
 });
+
+// Nachladende Bilder halten das Ende nur fest, solange dort gelesen wird.
+const verlauf = document.getElementById('messageThread');
+const verlaufNavigation = document.querySelector('.verlauf-navigation');
+const neuesteNachricht = document.querySelector('.neueste-nachricht');
+if (verlauf && verlaufNavigation && neuesteNachricht) {
+  let amEnde = true;
+  const aktualisieren = () => {
+    amEnde = verlauf.scrollHeight - verlauf.clientHeight - verlauf.scrollTop < 60;
+    verlaufNavigation.hidden = amEnde;
+  };
+  const zumEnde = () => {
+    verlauf.scrollTop = verlauf.scrollHeight;
+    aktualisieren();
+  };
+  verlauf.addEventListener('scroll', aktualisieren, {passive:true});
+  neuesteNachricht.addEventListener('click', () => {
+    zumEnde();
+    verlauf.focus({preventScroll:true});
+  });
+  verlauf.querySelectorAll('img').forEach(bild => {
+    const nachgeladen = () => { if (amEnde) zumEnde(); else aktualisieren(); };
+    bild.addEventListener('load', nachgeladen);
+    bild.addEventListener('error', nachgeladen);
+  });
+  zumEnde();
+}

@@ -76,7 +76,9 @@
               <div class="avatar" aria-hidden="true"><img class="symbol-hell" src="/static/arbeitsplatz/whatsapp.svg" width="23" height="23" alt="" /></div>
               <div class="contact-main">
                 <div class="contact-title">
-                  {% if selected_phone %}{{ selected_phone }}{% else %}Keine Konversation ausgewählt{% endif %}
+                  {% if selected_phone %}
+                    {% if selected_conversation and selected_conversation.customer_name %}<span class="contact-name">{{ selected_conversation.customer_name }}</span><span aria-hidden="true"> · </span>{% endif %}{{ selected_phone }}
+                  {% else %}Keine Konversation ausgewählt{% endif %}
                 </div>
                 <div class="contact-meta">
                   {% if selected_conversation %}
@@ -124,7 +126,7 @@
           </div>
 
           {% include '_whatsapp_bild_stil.html' %}
-          <div class="thread" id="messageThread">
+          <div class="thread" id="messageThread" tabindex="0" role="region" aria-label="Nachrichtenverlauf">
             {% for m in messages %}
               <div id="communication-{{ m.message_id }}" class="bubble {{ m.direction }}">
                 <div class="bubble-meta">
@@ -162,6 +164,9 @@
             {% endif %}
           </div>
 
+          <div class="verlauf-navigation" hidden>
+            <button type="button" class="neueste-nachricht" aria-controls="messageThread">↓ Zur neuesten Nachricht</button>
+          </div>
           <div class="composer">
             {% if reply_detail %}
               <div
@@ -198,9 +203,12 @@
                   id="replyText"
                   name="reply_text"
                   maxlength="4096"
+                  rows="3"
+                  aria-describedby="antwortHinweis"
                   placeholder="Nachricht an den Kunden schreiben …"
                   required
                 ></textarea>
+                <div class="antwort-hinweis" id="antwortHinweis">Enter für einen Zeilenumbruch. Senden über „Nachricht senden“.</div>
                 <div class="composer-actions">
                   <div class="composer-note {% if not readiness.can_send or not selected_conversation or not selected_conversation.service_window_open %}warning{% endif %}">
                     {% if not readiness.can_send %}
@@ -373,9 +381,6 @@
   <script nonce="{{ request.state.csp_nonce }}">
     {% include '_communication_script.html' %}
     installDispatchRecovery(document);
-
-    const messageThread = document.getElementById("messageThread");
-    if (messageThread) messageThread.scrollTop = messageThread.scrollHeight;
 
     const whatsappReplyForm = document.querySelector(".reply-form");
     if (whatsappReplyForm) {

@@ -1,5 +1,26 @@
 # WerkstattAI – Projektstand und nächste Schritte
 
+## D2 – WhatsApp-Ansicht, 8. November 2026
+
+Ergänzung nach Sichtprüfung: Der Chatkopf zeigt den Kundennamen aus dem
+zugeordneten aktiven Ticket neben der Telefonnummer. Ohne hinterlegten Namen
+bleibt die Telefonnummer allein sichtbar. Die Zuordnung bleibt werkstattbezogen.
+
+Lokaler Entwurf auf `codex/d2-whatsapp-2026-11-08`: größere Nachrichtenschrift,
+lesbarere Absender und Zeitangaben, kompakterer Verlauf, geordnete Bildvorschau
+und ein größeres Antwortfeld mit Zeilenumbruchhinweis. Ein Schalter führt zur
+neuesten Nachricht zurück. Nachladende Bilder halten das Ende nur fest, wenn
+nicht gerade ältere Nachrichten gelesen werden. Der Verlauf ist per Tastatur
+erreichbar. Auf schmalen Bildschirmen bleiben die Antwortaktionen im sichtbaren
+Bereich; ein bestehender Überlauf durch Flex-Wrapping wurde korrigiert.
+
+Prüfung: 27 JavaScript-Tests und 12 bestehende Python-Oberflächentests bestanden.
+Lokale Desktop- und Mobilkontrolle bei 390 px mit erfundenen Daten: Bilddialog,
+Rücksprung zum Ende und Antwortaktionen geprüft. Keine echten Nachrichten
+versendet. Darstellung einschließlich Kundenname vom Nutzer abgenommen;
+Veröffentlichung am 8. November ausdrücklich freigegeben. Deployment-Nachweis
+wird nach erfolgreicher Aktivierung im D2-Projektplan ergänzt.
+
 ## D1 – Elegante Karten und letzte Nachricht, 5. November 2026
 
 Freigegebener Figma-Entwurf A: ruhigere Karten, grüner Auswahlstreifen und sichtbare
