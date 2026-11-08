@@ -1,6 +1,6 @@
 # C1 – Kostenmodell und Angebotsentwurf
 
-Stand: 8. November 2026. Entscheidungsgrundlage, noch nicht vom Nutzer freigegeben. Keine Preisänderung auf der Website, kein aktiviertes Abrechnungssystem. Die ältere Empfehlung vom 12. September (99 €/Monat, 199 € Einrichtung) bleibt als Historie erhalten.
+Stand: 8. November 2026. Die Preise wurden vom Nutzer freigegeben: 149 €/Monat, 299 € Einrichtung, erste drei Pilotbetriebe für drei bezahlte Monate zu 99 €/Monat; Meta separat. Die weiteren Detailbedingungen dieses Entwurfs bleiben abzustimmen. Keine Preisänderung auf der Website, kein aktiviertes Abrechnungssystem. Die ältere Empfehlung vom 12. September (99 €/Monat, 199 € Einrichtung) bleibt als Historie erhalten.
 
 ## Empfehlung zur Entscheidung
 

@@ -1,13 +1,27 @@
 # WerkstattAI – Projektstand und nächste Schritte
 
+## S1 – Startseite und freigegebene Preise, 8. November 2026
+
+Der Nutzer hat 149 €/Monat, 299 € Einrichtung und für die ersten drei
+Pilotbetriebe 99 €/Monat während der ersten drei bezahlten Monate freigegeben.
+Meta wird separat abgerechnet. Detailbedingungen und Steuerkennzeichnung
+bleiben abzustimmen. Entwicklung wird aus dem verbleibenden Beitrag finanziert.
+
+Aktuell S1: heller, professioneller Auftritt mit grünen Akzenten, echtem
+Produktausschnitt mit ausschließlich erfundenen Daten, interaktiven Beispielanfragen,
+transparenten Preisen und Kontakt. Die bestehende Marke WerkstattAI bleibt für
+den Entwurf bestehen; endgültige Marke/Domäne gehört weiterhin zu N1.
+Lokaler Entwurf auf `codex/s1-startseite-2026-11-08`, nicht veröffentlicht.
+Details und Prüfnachweise: [S1-Bericht](s1-startseite-2026-11-08.md).
+
 ## C1 – Kosten und Preise, 8. November 2026
 
 Aktuelle Nutzerpriorität: Kosten und Angebot festlegen, danach Website und
 Präsentation; Anschluss einer echten Werkstatt erst mit dem ersten Kunden.
 Der [C1-Entwurf](c1-kosten-und-angebot-2026-11-08.md) enthält Kosten für
 1/5/10 Betriebe, aktuelle Meta-Tarife, Preisvorschlag und Pilotbedingungen.
-149 €/Monat, 299 € Einrichtung und 99 € für drei Pilotmonate sind Vorschläge,
-noch nicht freigegeben. Meta separat. Keine Website- oder Zahlungsänderung.
+149 €/Monat, 299 € Einrichtung und 99 € für drei Pilotmonate wurden anschließend
+freigegeben; siehe S1-Eintrag oben. Meta separat. Keine Zahlungsänderung.
 `subscription_ends_at` und das Ende des Zugangs bleiben vor bezahltem Start offen.
 
 ## D2 – WhatsApp-Ansicht, 8. November 2026

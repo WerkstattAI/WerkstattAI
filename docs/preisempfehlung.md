@@ -1,5 +1,9 @@
 # WerkstattAI: Einschätzung des Pilotangebots
 
+Historischer Stand. Die am 8. November freigegebenen Preise und aktuellen
+Annahmen stehen unter [C1 – Kostenmodell](c1-kosten-und-angebot-2026-11-08.md).
+Die unten genannten 99 €/199 € sind nicht mehr die aktuelle Preisentscheidung.
+
 Stand: 12. September 2026. Bewertet wurde die Startseite im lokalen Projekt, einschließlich der dort angebotenen WhatsApp- und Web-Annahme, Tickets und des Werkstatt-Dashboards.
 
 ## Empfehlung
