@@ -143,6 +143,7 @@ class ArbeitsplatzTests(unittest.TestCase):
     def test_whatsapp_navigation_formulare_und_fragebezug_bleiben_erreichbar(self):
         response = self.client.get('/dashboard/whatsapp',params={'workshop_id':self.wid,'phone':self.phone})
         self.assertEqual(response.status_code,200)
+        self.assertIn('<span class="contact-name">WhatsApp Test</span>', response.text)
         elements = Elemente(response.text).elemente
         ids = [a['id'] for _,a in elements if 'id' in a]
         self.assertEqual(len(ids),len(set(ids)))

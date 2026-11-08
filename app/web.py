@@ -1485,6 +1485,7 @@ def dashboard_whatsapp(
         item["active_ticket_id"] = control.get("active_ticket_id")
         item["conversation_state"] = control["conversation_state"]
         active_ticket = find_ticket_by_id(item["active_ticket_id"], wid) if item["active_ticket_id"] else None
+        item["customer_name"] = str((active_ticket or {}).get("name") or "").strip()
         item["open_customer_questions"] = open_customer_questions(active_ticket or {})
         item.update(dispatch_recovery_context(workshop_id=wid, customer_phone=item["customer_phone"]))
         item["mode_label"] = (

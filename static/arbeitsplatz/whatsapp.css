@@ -1285,8 +1285,8 @@ a.stat-pill:hover {
 }
 
 .whatsapp-seite .thread {
-  min-height:320px;
-  max-height:530px;
+  min-height:240px;
+  max-height:clamp(280px, 42vh, 480px);
   flex:initial;
   gap:15px;
   padding:24px;
@@ -1313,13 +1313,63 @@ a.stat-pill:hover {
 }
 
 .whatsapp-seite .bubble-meta {
+  font-size:12px;
   text-transform:none;
   letter-spacing:0;
   font-weight:600;
 }
 
 .whatsapp-seite .message-footer {
-  font-size:10px;
+  font-size:11px;
+}
+
+.whatsapp-seite .message-text {
+  font-size:15px;
+  line-height:1.6;
+}
+
+.whatsapp-seite .thread:focus-visible {
+  outline:2px solid #257a4a;
+  outline-offset:-3px;
+}
+
+.whatsapp-seite .verlauf-navigation {
+  padding:8px 18px;
+  text-align:right;
+  background:var(--wa-chat);
+}
+
+.whatsapp-seite .neueste-nachricht {
+  border:1px solid #c9dece;
+  border-radius:20px;
+  padding:8px 14px;
+  background:white;
+  color:#205b38;
+  font:inherit;
+  font-size:13px;
+  cursor:pointer;
+}
+
+.whatsapp-seite .antwort-hinweis {
+  font-size:12px;
+  color:var(--wa-sekundaer);
+}
+
+.whatsapp-seite .kundenfoto {
+  margin:10px 0 4px;
+  width:min(320px, 100%);
+}
+
+.whatsapp-seite .kundenfoto img {
+  display:block;
+  width:100%;
+  max-height:280px;
+  border-radius:10px;
+}
+
+.whatsapp-seite .kundenfoto figcaption {
+  margin-top:8px;
+  line-height:1.5;
 }
 
 .whatsapp-seite .composer {
@@ -1328,18 +1378,25 @@ a.stat-pill:hover {
 }
 
 .whatsapp-seite .composer-actions {
-  flex-wrap:wrap;
+  flex-direction:column;
+  flex-wrap:nowrap;
+  align-items:stretch;
+}
+
+.whatsapp-seite .composer-buttons {
   justify-content:flex-end;
 }
 
 .whatsapp-seite .composer-note {
-  flex:1 1 100%;
+  flex:initial;
   font-size:11px;
 }
 
 .whatsapp-seite .reply-input {
   background:#fbfcfb;
   min-height:84px;
+  font-size:16px;
+  line-height:1.5;
 }
 
 .whatsapp-seite .communication-controls {
@@ -1410,7 +1467,7 @@ a.stat-pill:hover {
   }
   .whatsapp-seite .thread {
     padding:18px 12px;
-    max-height:450px;
+    max-height:42vh;
   }
   .whatsapp-seite .bubble {
     max-width:95%;
