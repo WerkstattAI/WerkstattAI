@@ -1,5 +1,15 @@
 # WerkstattAI – Projektstand und nächste Schritte
 
+## C1 – Kosten und Preise, 8. November 2026
+
+Aktuelle Nutzerpriorität: Kosten und Angebot festlegen, danach Website und
+Präsentation; Anschluss einer echten Werkstatt erst mit dem ersten Kunden.
+Der [C1-Entwurf](c1-kosten-und-angebot-2026-11-08.md) enthält Kosten für
+1/5/10 Betriebe, aktuelle Meta-Tarife, Preisvorschlag und Pilotbedingungen.
+149 €/Monat, 299 € Einrichtung und 99 € für drei Pilotmonate sind Vorschläge,
+noch nicht freigegeben. Meta separat. Keine Website- oder Zahlungsänderung.
+`subscription_ends_at` und das Ende des Zugangs bleiben vor bezahltem Start offen.
+
 ## D2 – WhatsApp-Ansicht, 8. November 2026
 
 Ergänzung nach Sichtprüfung: Der Chatkopf zeigt den Kundennamen aus dem
