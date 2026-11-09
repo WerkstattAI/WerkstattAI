@@ -6,7 +6,7 @@
 <p>Exportieren Sie Ihren Datenbestand oder prüfen Sie eine konkrete Kundenanfrage auf Auskunft und Löschung.</p>
 <a href="/dashboard/settings?workshop_id={{ workshop_id|urlencode }}">← Zurück zu den Einstellungen</a>
 {% if error %}<p class="notice error" role="alert">{{ error }}</p>{% endif %}
-{% if deleted %}<div class="notice success" role="status"><strong>Löschung durchgeführt.</strong> Die bestätigten Datensätze wurden aus der aktiven WerkstattAI-Datenbank entfernt. Backups, Hosting-Protokolle, WhatsApp und bereits heruntergeladene Dateien müssen gesondert bearbeitet werden.</div>{% endif %}
+{% if deleted %}<div class="notice success" role="status"><strong>Löschung durchgeführt.</strong> Die bestätigten Datensätze wurden aus der aktiven WerkSora-Datenbank entfernt. Backups, Hosting-Protokolle, WhatsApp und bereits heruntergeladene Dateien müssen gesondert bearbeitet werden.</div>{% endif %}
 <section>
   <h2>Werkstattdaten exportieren</h2>
   <p>Sie erhalten eine JSON-Datei mit Betriebsdaten, Benutzerstammdaten, Tickets, Notizen, Gesprächsständen und WhatsApp-Daten Ihrer Werkstatt. Passwörter und Zugangsschlüssel sind ausgeschlossen.</p>

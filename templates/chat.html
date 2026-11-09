@@ -3,14 +3,14 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width,initial-scale=1" />
-  <meta name="description" content="Digitale Fahrzeugannahme mit WerkstattAI – Anliegen schnell und vollständig an die Werkstatt übermitteln." />
-  <title>WerkstattAI – Digitale Fahrzeugannahme</title>
+  <meta name="description" content="Digitale Fahrzeugannahme mit WerkSora – Anliegen schnell und vollständig an die Werkstatt übermitteln." />
+  <title>WerkSora – Digitale Fahrzeugannahme</title>
   <link rel="stylesheet" href="/static/arbeitsplatz/grundlagen.css" />
   <link rel="stylesheet" href="/static/arbeitsplatz/kundenchat.css" />
 </head>
 <body class="produkt kundenchat">
   <a class="skip-link" href="#main-content">Zum Kundenchat springen</a>
-  <header class="markenzeile"><a class="wortmarke" href="/"><img src="/static/arbeitsplatz/symbole/wrench.svg" width="24" height="24" alt="" />WerkstattAI</a><span class="werkstattname">Kundenservice<span>Digitale Fahrzeugannahme</span></span></header>
+  <header class="markenzeile"><a class="wortmarke" href="/"><img src="/static/arbeitsplatz/symbole/wrench.svg" width="24" height="24" alt="" />WerkSora</a><span class="werkstattname">Kundenservice<span>Digitale Fahrzeugannahme</span></span></header>
   <div class="wrap">
     <header class="top">
       <div class="brand">
@@ -33,7 +33,7 @@
         <div class="chat-header">
           <div class="chat-kontakt"><span class="chat-avatar" aria-hidden="true"><img class="symbol-hell" src="/static/arbeitsplatz/symbole/messages-square.svg" width="23" height="23" alt="" /></span><div>
             <h2 id="customer-chat-title">Kundenchat</h2>
-            <div class="muted">WerkstattAI nimmt Ihre Anfrage auf und erstellt daraus ein übersichtliches Ticket.</div>
+            <div class="muted">WerkSora nimmt Ihre Anfrage auf und erstellt daraus ein übersichtliches Ticket.</div>
           </div>
 
           </div>
@@ -46,7 +46,7 @@
         <div class="messages" id="messages" role="log" aria-live="polite" aria-relevant="additions text"></div>
 
         <div class="typing" id="typing" role="status" aria-live="polite">
-          <span>WerkstattAI schreibt</span>
+          <span>WerkSora schreibt</span>
           <span class="typing-dots" aria-hidden="true">
             <span></span><span></span><span></span>
           </span>
@@ -193,7 +193,7 @@ Wählen Sie einen Bereich aus oder schreiben Sie direkt Ihr Anliegen.`;
 
       const metaEl = document.createElement("div");
       metaEl.className = "meta";
-      metaEl.textContent = meta || (role === "user" ? "Sie" : "WerkstattAI");
+      metaEl.textContent = meta || (role === "user" ? "Sie" : "WerkSora");
 
       inner.appendChild(bubble);
       inner.appendChild(metaEl);
@@ -299,7 +299,7 @@ Wählen Sie einen Bereich aus oder schreiben Sie direkt Ihr Anliegen.`;
       messagesEl.innerHTML = "";
       doneBoxEl.style.display = "none";
       doneBoxEl.textContent = "";
-      addMessage("bot", WELCOME_MESSAGE, "WerkstattAI");
+      addMessage("bot", WELCOME_MESSAGE, "WerkSora");
       renderQuickActions();
     }
 
@@ -357,7 +357,7 @@ Wählen Sie einen Bereich aus oder schreiben Sie direkt Ihr Anliegen.`;
         renderCommunication(data);
 
         if (data.reply) {
-          addMessage("bot", data.reply, "WerkstattAI");
+          addMessage("bot", data.reply, "WerkSora");
         }
 
         if (data.done) {

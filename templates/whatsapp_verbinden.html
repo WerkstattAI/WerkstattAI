@@ -2,7 +2,7 @@
 <html lang="de">
 <head>
   <meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
-  <title>WhatsApp verbinden – WerkstattAI</title>
+  <title>WhatsApp verbinden – WerkSora</title>
   <style>
     body{font:17px/1.6 "Segoe UI",sans-serif;background:#f3f6f5;color:#182522;margin:0}
     main{max-width:760px;margin:50px auto;padding:28px;background:white;border:1px solid #dfe6e3;border-radius:16px}
@@ -17,8 +17,8 @@
   <a href="/dashboard/settings?workshop_id={{ workshop_id | urlencode }}">← Einstellungen</a>
   <h1>WhatsApp verbinden</h1><p>{{ workshop.name }}</p>
   <p>Verbinden Sie Ihre bestehende WhatsApp Business-App. Ihre Nummer und die App bleiben erhalten. Löschen Sie Ihr WhatsApp-Konto nicht.</p>
-  <ol><li>Verbindung in Meta und Ihrer Business-App erlauben.</li><li>WerkstattAI prüft den Kundenzugang, die Nummer und das Kontoabonnement.</li><li>Autorisierung anzeigen; die Automatik bleibt vorerst gesperrt.</li></ol>
-  <p class="hinweis">Bis zur betrieblichen Freigabe bearbeitet WerkstattAI keine neuen WhatsApp-Eingänge automatisch. Zurückgehaltene Eingänge werden nicht später automatisch nachverarbeitet. Verwenden Sie weiterhin Ihre Business-App.</p>
+  <ol><li>Verbindung in Meta und Ihrer Business-App erlauben.</li><li>WerkSora prüft den Kundenzugang, die Nummer und das Kontoabonnement.</li><li>Autorisierung anzeigen; die Automatik bleibt vorerst gesperrt.</li></ol>
+  <p class="hinweis">Bis zur betrieblichen Freigabe bearbeitet WerkSora keine neuen WhatsApp-Eingänge automatisch. Zurückgehaltene Eingänge werden nicht später automatisch nachverarbeitet. Verwenden Sie weiterhin Ihre Business-App.</p>
   <p>Zurückgehaltene Eingänge: <strong>{{ zurueckgehalten.anzahl }}</strong>{% if zurueckgehalten.zuletzt %} · Zuletzt: {{ zurueckgehalten.zuletzt }}{% endif %}. Von diesen Eingängen werden nur Ereigniskennungen und Sperrgrund gespeichert. Der ausdrücklich angeforderte Verlaufsimport ist davon getrennt.</p>
   {% if eingerichtet %}
   <p id="fortschritt" role="status" aria-live="polite">Meta-Anmeldung wird geladen …</p>

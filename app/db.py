@@ -326,7 +326,7 @@ def init_db() -> None:
                 id, name, address, email, opening_hours, services,
                 pricing_info, towing_info, subscription_status, is_demo
             )
-            VALUES (?, 'WerkstattAI Demo', 'Musterstraße 1, 12345 Musterstadt',
+            VALUES (?, 'WerkSora Demo', 'Musterstraße 1, 12345 Musterstadt',
                 'kontakt@example.invalid',
                 'Montag bis Freitag: 09:00-17:00; Samstag: 09:00-14:00; Sonntag: geschlossen',
                 'Inspektion, Reifenwechsel, Autoreparaturen',

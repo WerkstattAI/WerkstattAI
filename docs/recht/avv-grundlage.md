@@ -1,4 +1,4 @@
-# WerkstattAI – Grundlage einer Vereinbarung zur Auftragsverarbeitung
+# WerkSora – Grundlage einer Vereinbarung zur Auftragsverarbeitung
 
 **Entwurf vom 15. September 2026 · nicht unterschriftsreif**
 
@@ -18,7 +18,7 @@ fachlich prüfen lassen. Die Vorlage wird nicht durch einen Download abgeschloss
 
 **Auftragsverarbeiter / Auftragnehmer:**
 
-- WerkstattAI; bisher hinterlegter Betreibername: Mikolaj Olszewski [BESTÄTIGEN]
+- WerkSora; bisher hinterlegter Betreibername: Mikolaj Olszewski [BESTÄTIGEN]
 - Rechtlicher Name, Rechtsform, vollständige Anschrift, Vertretung: [ERGÄNZEN]
 - Kontakt: kontakt.werkstattai.de@outlook.com [BESTÄTIGEN]
 - Datenschutzbeauftragter, sofern erforderlich oder bestellt: [PRÜFEN / ERGÄNZEN]

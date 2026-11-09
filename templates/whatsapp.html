@@ -4,7 +4,7 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width,initial-scale=1" />
-  <title>WerkstattAI – WhatsApp</title>
+  <title>WerkSora – WhatsApp</title>
   <link rel="stylesheet" href="/static/arbeitsplatz/grundlagen.css" />
   <link rel="stylesheet" href="/static/arbeitsplatz/whatsapp.css" />
   <style nonce="{{ request.state.csp_nonce }}">{{ communication.styles() }}</style>
@@ -342,7 +342,7 @@
               </div>
               <div class="field">
                 <label class="field-label" for="testText">Testnachricht</label>
-                <textarea class="test-text" id="testText" name="test_text">WerkstattAI-Testnachricht: Die WhatsApp-Verbindung funktioniert.</textarea>
+                <textarea class="test-text" id="testText" name="test_text">WerkSora-Testnachricht: Die WhatsApp-Verbindung funktioniert.</textarea>
               </div>
               <div class="test-actions">
                 <button class="test-btn" type="submit" data-test-send data-original-label="Freitext im offenen Fenster testen" data-retry-label="Freitext erneut testen">{% if test_status == 'failed' %}Freitext erneut testen{% else %}Freitext im offenen Fenster testen{% endif %}</button>

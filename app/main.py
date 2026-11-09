@@ -192,7 +192,7 @@ def process_chat_message(
     if not is_subscription_active(workshop_id):
         raise HTTPException(
             status_code=402,
-            detail="WerkstattAI ist fuer diese Werkstatt nicht aktiv.",
+            detail="WerkSora ist fuer diese Werkstatt nicht aktiv.",
         )
 
     verified_phone = normalize_customer_phone(phone) if channel == "whatsapp" else None
@@ -553,7 +553,7 @@ def root():
     return {
         "ok": True,
         "app": settings.app_name,
-        "message": "WerkstattAI läuft 🚀",
+        "message": "WerkSora läuft 🚀",
     }
 
 
