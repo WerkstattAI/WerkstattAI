@@ -1554,7 +1554,7 @@ def dashboard_whatsapp_test(
     request: Request,
     test_phone: str | None = Form(None, max_length=32),
     customer_phone: str | None = Form(None, max_length=32),
-    test_text: str = Form("WerkstattAI Testnachricht. WhatsApp Verbindung funktioniert.", max_length=4096),
+    test_text: str = Form("WerkSora Testnachricht. WhatsApp Verbindung funktioniert.", max_length=4096),
     workshop_id: str | None = Form(None, max_length=128),
     message_id: str | None = Form(None, max_length=128),
 ):
@@ -1562,7 +1562,7 @@ def dashboard_whatsapp_test(
     submitted_customer_phone = customer_phone if isinstance(customer_phone, str) else ""
     submitted_test_phone = test_phone if isinstance(test_phone, str) else ""
     phone = _normalize_whatsapp_recipient(submitted_customer_phone or submitted_test_phone)
-    text = (test_text or "").strip() or "WerkstattAI Testnachricht. WhatsApp Verbindung funktioniert."
+    text = (test_text or "").strip() or "WerkSora Testnachricht. WhatsApp Verbindung funktioniert."
 
     def redirect(status: str, detail: str) -> RedirectResponse:
         query = urlencode(

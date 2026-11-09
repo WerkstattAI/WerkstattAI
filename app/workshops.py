@@ -29,10 +29,17 @@ def _normalize_workshop_id(workshop_id: str | None = None) -> str:
     return (workshop_id or default_workshop_id()).strip() or default_workshop_id()
 
 
+def _anzeigename(row: Any) -> str:
+    """Historischen Demomarkennamen anzeigen, ohne Kundendaten umzubenennen."""
+    if row["is_demo"] and row["name"] == "WerkstattAI Demo":
+        return "WerkSora Demo"
+    return row["name"]
+
+
 def _row_to_workshop(row: Any) -> dict[str, Any]:
     return {
         "id": row["id"],
-        "name": row["name"],
+        "name": _anzeigename(row),
         "address": row["address"],
         "phone": row["phone"],
         "email": row["email"],
@@ -57,7 +64,7 @@ def get_workshop_identity(workshop_id: str) -> dict[str, Any] | None:
             "SELECT id, name, is_demo FROM workshops WHERE id = ? LIMIT 1",
             (workshop_id,),
         ).fetchone()
-    return {"id": row["id"], "name": row["name"], "is_demo": bool(row["is_demo"])} if row else None
+    return {"id": row["id"], "name": _anzeigename(row), "is_demo": bool(row["is_demo"])} if row else None
 
 
 def get_workshop(workshop_id: str | None = None) -> dict[str, Any]:

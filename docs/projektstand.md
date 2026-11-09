@@ -1,4 +1,22 @@
-# WerkstattAI – Projektstand und nächste Schritte
+# WerkSora – Projektstand und nächste Schritte
+
+## N1 – Markenname WerkSora, 9. November 2026
+
+Der Nutzer hat WerkSora gewählt und die Umbenennung der bestehenden Anwendung
+beauftragt. Öffentliche Seite, Arbeitsbereich, Anmeldung, Kundenchat, Rechtstexte,
+Downloadnamen und Standardtexte tragen jetzt WerkSora. Historische Einträge unten
+bleiben als Verlauf erhalten. Der bisherige öffentliche Demodatensatz erhält den
+neuen Anzeigenamen, ohne reale Werkstattnamen oder gespeicherte Daten zu ändern.
+
+Bestehende URLs, Kontaktadresse, technische Kennungen, Sitzungen, WhatsApp- und
+Meta-Konfiguration bleiben erhalten. APP_NAME auf Railway wird auf WerkSora gesetzt.
+Eine neue Domain wurde weder gekauft noch angeschlossen. Die Websuche fand keine
+offensichtliche identische Produktmarke; eine Markenregisterprüfung steht noch aus.
+
+S1 wurde auf ausdrücklichen Wunsch bereits veröffentlicht: PR #8, Commit
+896c2a672217aaf4a5c50e96d5865cddb9c37118, Railway SUCCESS am 9. November.
+Nach N1 folgt R1: deutsche Präsentation, kurze Demoprobe, anschließend fünf Gespräche.
+Offene Anbieterangaben und Angebotsdetails bleiben gesonderte Aufgaben.
 
 ## S1 – Startseite und freigegebene Preise, 8. November 2026
 

@@ -85,7 +85,7 @@ def privacy_export(request: Request, workshop_id: str = Form(..., max_length=128
                               selection=checked.get("selection") if scope == "customer" else None,
                               expected_digest=checked.get("digest"))
         return Response(content, media_type="application/json", headers={
-            "Content-Disposition": 'attachment; filename="werkstattai-datenexport.json"', "Cache-Control": "no-store"})
+            "Content-Disposition": 'attachment; filename="werksora-datenexport.json"', "Cache-Control": "no-store"})
     except PrivacyError as error:
         return render(request, user, workshop, status=409, error=str(error))
 
@@ -116,4 +116,4 @@ def privacy_avv(request: Request, workshop_id: str | None = None):
     identity(request, workshop_id)
     content = (Path(__file__).resolve().parents[1] / "docs/recht/avv-grundlage.md").read_bytes()
     return Response(content, media_type="text/markdown; charset=utf-8",
-                    headers={"Content-Disposition": 'attachment; filename="WerkstattAI-AVV-Entwurf.md"'})
+                    headers={"Content-Disposition": 'attachment; filename="WerkSora-AVV-Entwurf.md"'})

@@ -13,7 +13,7 @@ def _env(key: str, default: str | None = None) -> str | None:
 class Settings:
     """Central configuration via environment variables."""
 
-    app_name: str = _env("APP_NAME", "WerkstattAI Intake API") or "WerkstattAI Intake API"
+    app_name: str = _env("APP_NAME", "WerkSora Intake API") or "WerkSora Intake API"
     log_level: str = _env("LOG_LEVEL", "INFO") or "INFO"
     app_env: str = _env("APP_ENV", _env("RAILWAY_ENVIRONMENT_NAME", "development")) or "development"
     railway_environment: str = _env("RAILWAY_ENVIRONMENT_NAME", "") or ""
