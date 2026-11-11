@@ -1,5 +1,21 @@
 # WerkSora – Projektstand und nächste Schritte
 
+## Bedienoberfläche ausgerichtet, 11. November 2026
+
+Die Hauptnavigation verwendet seitenübergreifend dieselbe Höhe und Grundlinie.
+Admin-Tabellenaktionen stehen in festen Spalten; Ticketaktionen sind einheitlich
+ausgerichtet. Neue Eingänge liegen auf Dashboard, Ticket und WhatsApp in einem
+geschlossenen Kopfmenü mit Zähler. Papierkorbtasten stehen rechts in einer festen
+Spalte und blenden ausschließlich Hinweise aus, ohne Aufgaben zu erledigen.
+Escape und Klick außerhalb schließen das Menü; der Tastaturfokus bleibt beim
+Ausblenden erhalten. WhatsApp-Sprechblasen sind kompakter, Absender/Zweck liegen
+unter „Details“; Versandstatus und offene Aufgaben bleiben sichtbar. Das Feld
+„Anliegen oder Auftrag“ in der Direktannahme bietet neun Zeilen statt zwei.
+
+Geprüft: 42 bestehende Python-Tests für Oberfläche, Dashboard und Kommunikation,
+8 JavaScript-Tests sowie lokale Sichtprüfung mit fiktiven Daten auf Desktop und
+Mobil. Keine Kunden angeschrieben und keine produktiven Datensätze verändert.
+
 ## Kontaktadresse WerkSora, 11. November 2026
 
 Der Nutzer hat die neue Outlook-Mailbox selbst angelegt und bestätigt.

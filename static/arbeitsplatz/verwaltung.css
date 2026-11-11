@@ -25,6 +25,11 @@ body.verwaltung {background:var(--wa-hintergrund);color:var(--wa-text);font-fami
 .verwaltung .wortmarke {color:white}
 .verwaltung>main {width:calc(100% - 48px);max-width:960px;margin:32px auto;background:white;border:1px solid var(--wa-linie);border-radius:20px;padding:28px}
 .verwaltung .table-wrap {max-width:100%;overflow:auto}
+.verwaltung .werkstatt-aktionen {display:grid;grid-template-columns:repeat(2,minmax(112px,1fr));gap:8px;align-items:stretch}
+.verwaltung .werkstatt-aktionen .table-link {display:flex;align-items:center;justify-content:center;margin:0;min-height:40px;padding:8px 10px;line-height:20px;white-space:nowrap}
+.verwaltung .actions,.verwaltung .form-actions {align-items:center;gap:12px}
+.verwaltung .form-actions .button {display:inline-flex;align-items:center;justify-content:center;min-height:44px;margin:0;line-height:20px}
+.verwaltung .intake-form #problem {min-height:180px;line-height:1.5;resize:vertical}
 @media(max-width:700px) {
   .verwaltung .workspace,.verwaltung .wrap {padding:24px 16px}
   .verwaltung :is(.content-grid,.grid,.row,.field-row,.form-grid,.vehicle-grid) {grid-template-columns:minmax(0,1fr)}
