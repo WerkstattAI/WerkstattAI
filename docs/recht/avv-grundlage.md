@@ -20,7 +20,7 @@ fachlich prüfen lassen. Die Vorlage wird nicht durch einen Download abgeschloss
 
 - WerkSora; bisher hinterlegter Betreibername: Mikolaj Olszewski [BESTÄTIGEN]
 - Rechtlicher Name, Rechtsform, vollständige Anschrift, Vertretung: [ERGÄNZEN]
-- Kontakt: kontakt.werkstattai.de@outlook.com [BESTÄTIGEN]
+- Kontakt: kontakt.werksora@outlook.com
 - Datenschutzbeauftragter, sofern erforderlich oder bestellt: [PRÜFEN / ERGÄNZEN]
 
 Hauptvertrag / Bestellnummer, Beginn und vereinbarte Leistungen: [ERGÄNZEN].

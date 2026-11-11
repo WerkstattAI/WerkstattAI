@@ -1,5 +1,14 @@
 # WerkSora – Projektstand und nächste Schritte
 
+## Kontaktadresse WerkSora, 11. November 2026
+
+Der Nutzer hat die neue Outlook-Mailbox selbst angelegt und bestätigt.
+Öffentliche Kontaktadresse: **kontakt.werksora@outlook.com**. Startseitenlinks,
+Fußzeile und Standardkontakt der Anbieter-/Datenschutzseiten verwenden die neue
+Adresse; Konfigurationsvorlage und AVV-Entwurf sind abgeglichen. Das Passwort
+wurde nicht übernommen. Veröffentlichung und öffentliche Nachprüfung gehören
+zu diesem Auftrag.
+
 ## S2 – Bildsprache der Präsentation für die Website, 11. November 2026
 
 Zwei neue KI-generierte Werkstattmotive sind im lokalen Startseitenentwurf
