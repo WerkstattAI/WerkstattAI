@@ -1,5 +1,22 @@
 # WerkSora – Projektstand und nächste Schritte
 
+## S2 – Bildsprache der Präsentation für die Website, 11. November 2026
+
+Zwei neue KI-generierte Werkstattmotive sind im lokalen Startseitenentwurf
+eingebunden: Laptopmotiv im Einstieg und Smartphonemotiv bei der persönlichen
+Einrichtung. WebP in zwei Größen, sichtbare Symbolbildkennzeichnung, Desktop-
+und Mobilprüfung bestanden; interaktive Beispielanfragen funktionieren weiterhin.
+Details: [S2-Bericht](s2-werkstatt-fotos-2026-11-11.md). Noch nicht veröffentlicht.
+Der Nutzer hat den Fotoentwurf positiv bewertet. Anschließend wurden Desktop
+und Mobil in [Figma](https://www.figma.com/design/Lah6WK5TUcrf3fLHFmexff?node-id=34-12)
+verfeinert: WerkSora-Marke, Fotokadrierung, Überschriften, FAQ-Breite und mobile
+Ticketdetails. Die Veröffentlichung wurde anschließend ausdrücklich beauftragt.
+Die Verfeinerungen sind im Website-Code umgesetzt; Browserprüfungen bei 1440,
+390 und 320 px sowie drei bestehende Render-/HTTP-/Asset-Tests bestanden.
+Nächster Schritt: Veröffentlichung abschließen und Live-Ergebnis prüfen.
+R1-Präsentation liegt inzwischen in Canva vor; die
+gesonderte Freigabe für vorbereitete Textkorrekturen dort bleibt offen.
+
 ## N1 – Markenname WerkSora, 9. November 2026
 
 Der Nutzer hat WerkSora gewählt und die Umbenennung der bestehenden Anwendung
