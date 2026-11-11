@@ -49,11 +49,26 @@ function installDashboardLive({workshopId, scope, list, initialCursor = 0}) {
   let pendingActions = 0;
   const status = document.getElementById('owner-events-status');
   const eventList = document.getElementById('owner-events-list');
+  const eventCount = document.getElementById('owner-events-count');
+  const eventMenu = document.getElementById('owner-events');
+  document.addEventListener('click', event => {
+    if (eventMenu && !event.composedPath().includes(eventMenu)) eventMenu.open = false;
+  });
+  eventMenu?.addEventListener('keydown', event => {
+    if (event.key === 'Escape') {
+      eventMenu.open = false;
+      eventMenu.querySelector('summary').focus();
+    }
+  });
   function renderEvents() {
     if (!eventList) return;
     const retained = new Set(state.items.map(item => String(item.id)));
     for (const li of [...eventList.children]) if (!retained.has(li.dataset.eventId)) li.remove();
     eventList.hidden = !state.items.length;
+    if (eventCount) {
+      eventCount.textContent = String(state.items.length);
+      eventCount.hidden = !state.items.length;
+    }
     status.textContent = state.items.length ? state.items.length + ' neue Eingänge in diesem Tab.' : 'Keine neuen Eingänge seit Öffnen dieses Tabs.';
     for (const item of state.items) {
       if ([...eventList.children].some(li => li.dataset.eventId === String(item.id))) continue;
@@ -63,9 +78,17 @@ function installDashboardLive({workshopId, scope, list, initialCursor = 0}) {
       if (list) target.searchParams.set('return_to', here());
       link.href = target.pathname + target.search + target.hash;
       link.textContent = item.label + ' · ' + item.ticket_id + ': ' + item.text;
-      dismiss.type = 'button'; dismiss.textContent = 'Hinweis ausblenden';
+      dismiss.type = 'button'; dismiss.className = 'eingang-ausblenden';
+      dismiss.title = 'Hinweis ausblenden';
+      dismiss.setAttribute('aria-label', 'Hinweis ausblenden: ' + item.ticket_id);
+      const icon = document.createElement('img');
+      icon.src = '/static/arbeitsplatz/symbole/trash-2.svg';
+      icon.alt = ''; icon.width = 18; icon.height = 18;
+      dismiss.append(icon);
       dismiss.addEventListener('click', () => {
+        const next = li.nextElementSibling?.querySelector('button') || li.previousElementSibling?.querySelector('button');
         state.items = state.items.filter(e => e.id !== item.id); write(storeKey, state); renderEvents();
+        (next || eventMenu?.querySelector('summary'))?.focus();
       });
       li.append(link, dismiss); eventList.append(li);
     }

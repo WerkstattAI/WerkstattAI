@@ -200,6 +200,69 @@
   flex-shrink:0;
 }
 
+/* Gleiche Grundlinie auf allen Seiten, unabhängig von alten Formularstilen. */
+.arbeitsplatz-kopf .hauptnavigation .nav-btn {
+  box-sizing:border-box;
+  display:inline-flex;
+  align-items:center;
+  justify-content:center;
+  flex:0 0 auto;
+  width:auto;
+  height:40px;
+  min-height:40px;
+  margin:0;
+  padding:10px 12px;
+  font:500 12px/20px Inter,Arial,sans-serif;
+  transform:none;
+}
+.arbeitsplatz-kopf .hauptnavigation form {display:flex;align-items:center;margin:0 0 0 auto;padding:0}
+.arbeitsplatz-kopf .hauptnavigation img {display:block;flex:none;width:17px;height:17px}
+.kopf-rechts {display:flex;align-items:center;gap:24px;min-width:0}
+.arbeitsplatz-kopf .eingang-menue {position:relative;flex:none;border:0;padding:0;margin:0;background:transparent}
+.arbeitsplatz-kopf .eingang-menue>summary {
+  display:flex;align-items:center;gap:8px;min-height:40px;padding:8px 12px;
+  border:1px solid #ffffff40;border-radius:9px;list-style:none;cursor:pointer;
+  color:#fff;background:transparent;font:500 12px/20px Inter,Arial,sans-serif;
+}
+.eingang-menue>summary::-webkit-details-marker {display:none}
+.eingang-menue>summary:hover,.eingang-menue[open]>summary {background:#ffffff15}
+.eingang-anzahl {display:inline-grid;place-items:center;min-width:22px;height:22px;padding:0 5px;border-radius:12px;background:#d9f2df;color:#183c32;font-variant-numeric:tabular-nums}
+.eingang-anzahl[hidden],.owner-events [hidden] {display:none!important}
+.arbeitsplatz-kopf .owner-events {
+  position:absolute;z-index:50;top:calc(100% + 10px);right:0;width:min(440px,calc(100vw - 32px));
+  padding:18px;border:1px solid #dce6e0;border-radius:14px;background:#fff;color:#20352f;
+  box-shadow:0 16px 48px #183c3226;text-align:left;overflow-wrap:anywhere;font:13px/1.5 Inter,Arial,sans-serif;
+}
+.owner-events>strong {font-size:15px}
+.owner-events p {margin:6px 0;color:#61746c}
+.owner-events ul {list-style:none;padding:0;margin:12px 0;max-height:min(360px,50vh);overflow:auto;overscroll-behavior:contain}
+.owner-events li {display:grid;grid-template-columns:minmax(0,1fr) 36px;align-items:center;gap:12px;margin:0;padding:12px 0;border-top:1px solid #e8eeea}
+.owner-events li>a {color:#17685d;text-decoration:none;line-height:1.5}
+.owner-events li>a:hover {text-decoration:underline}
+.arbeitsplatz-kopf .owner-events .eingang-ausblenden {
+  display:grid;place-items:center;box-sizing:border-box;width:36px;height:36px;min-height:36px;
+  padding:0;margin:0;border:1px solid #dce6e0;border-radius:8px;background:#f7f9f7;cursor:pointer;transform:none;box-shadow:none;
+}
+.owner-events .eingang-ausblenden:hover {background:#fcecea;border-color:#e5b9b4}
+.owner-events .eingang-hilfe {border:0;background:transparent;padding:0;margin:10px 0 0}
+.owner-events .eingang-hilfe summary {padding:0;color:#61746c;cursor:pointer;font-size:12px}
+.owner-events .eingang-hilfe p {font-size:12px}
+.eingang-menue :focus-visible {outline:3px solid #69af94;outline-offset:3px}
+.action-feedback {display:block;white-space:normal;max-width:360px;padding:8px;color:#245b44}
+.action-feedback.error {color:#9b2727}
+#work-summary a,#attention-region a:not(.attention-card),.pagination a {color:#17685d;font-weight:600}
+.pagination {display:flex;gap:18px;justify-content:center;flex-wrap:wrap;padding:24px}
+.toolbar input {max-width:100%}
+@media(max-width:700px) {
+  .arbeitsplatz-kopf .markenzeile {position:relative;height:auto;min-height:68px;flex-wrap:wrap;padding:12px 16px;gap:10px}
+  .kopf-rechts {gap:10px}
+  .kopf-rechts .werkstattname {display:none}
+  .arbeitsplatz-kopf .eingang-menue {position:static}
+  .arbeitsplatz-kopf .owner-events {top:calc(100% - 4px);left:16px;right:16px;width:auto}
+  .toolbar input[name=q] {min-width:0!important;width:100%}
+  .pagination {gap:10px}
+}
+
 @media (max-width:640px) {
   .produkt .markenzeile {
     height:auto;

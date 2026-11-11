@@ -926,14 +926,14 @@
                       <span class="muted">Nicht gesetzt</span>
                     {% endif %}
                   </td>
-                  <td>
+                  <td><div class="werkstatt-aktionen">
                     <a class="table-link" href="/dashboard?workshop_id={{ w.id }}">Dashboard</a>
                     <a class="table-link" href="/dashboard/settings?workshop_id={{ w.id }}">Einstellungen</a>
                     <a class="table-link" href="/dashboard/whatsapp?workshop_id={{ w.id }}">WhatsApp</a>
                     <a class="table-link" href="/dashboard/billing?workshop_id={{ w.id }}">Abo</a>
                     <a class="table-link" href="/dashboard/admin/workshops/{{ w.id }}">Bearbeiten</a>
                     <a class="table-link" href="/assistant?workshop_id={{ w.id|urlencode }}">Kundenchat</a>
-                  </td>
+                  </div></td>
                 </tr>
               {% endfor %}
             </tbody>

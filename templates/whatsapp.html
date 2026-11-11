@@ -32,7 +32,6 @@
         </div>
       </header>
 
-      {% include '_dashboard_events.html' %}
 
 
       <div class="inbox">
@@ -129,14 +128,11 @@
           <div class="thread" id="messageThread" tabindex="0" role="region" aria-label="Nachrichtenverlauf">
             {% for m in messages %}
               <div id="communication-{{ m.message_id }}" class="bubble {{ m.direction }}">
-                <div class="bubble-meta">
-                  <span>{{ communication.sender_label(m.sender_role) }}</span>
-                  <span class="{{ m.status_class }}">{{ m.status_label }}</span>
-                </div>
+                {% if m.requires_human_action %}
                 <div class="communication-message-heading">
-                  <span>{{ communication.purpose_label(m.purpose) }}</span>
                   {{ communication.action_label(m) }}
                 </div>
+                {% endif %}
                 <div class="message-text">{{ m.text or "-" }}</div>
                 {% if m.echo_zuordnung_offen %}<div role="status">Die Echo-Zuordnung ist offen. Automatische Antworten bleiben gesperrt. Bitte einen laufenden Versand zuerst klären; andernfalls den Verlauf prüfen und den Assistenten bewusst fortsetzen.</div>{% endif %}
                 {% with nachricht=m %}{% include '_whatsapp_bild.html' %}{% endwith %}
@@ -147,6 +143,8 @@
                 {% endif %}
                 <div class="message-footer">
                   <span>{{ m.created_at_display }}</span>
+                  <span class="{{ m.status_class }}">{{ m.status_label }}</span>
+                  <details class="nachricht-details"><summary>Details</summary><span>{{ communication.sender_label(m.sender_role) }} · {{ communication.purpose_label(m.purpose) }}</span></details>
                   {% if m.historisch %}<span>Importierter Verlauf · keine aktuelle Anfrage</span>{% endif %}
                   {% if m.message_type == 'media_placeholder' %}<span>Medieninhalt fehlt oder ist nicht mehr verfügbar.</span>{% endif %}
                   {% if m.historisch and m.message_type not in ['text', 'image', 'media_placeholder'] %}<span>Importierter Medien- oder Sonderinhalt · hier nicht darstellbar.</span>{% endif %}
