@@ -1,6 +1,6 @@
 # S2 – Werkstattbilder für die Startseite
 
-Stand: 11. November 2026. Lokaler Entwurf, nicht veröffentlicht.
+Stand: 11. November 2026. Veröffentlicht nach ausdrücklichem Nutzerauftrag.
 
 Auf Wunsch des Nutzers übertragen zwei neue Motive die warme Bildsprache der
 Canva-Präsentation auf die bestehende Website. Das Einstiegsbild zeigt eine
@@ -47,7 +47,7 @@ eine passende Auflösung; das zweite Motiv wird verzögert geladen.
 Privater dauerhafter Vorschau-Export: `artifacts/WerkSora-Startseite-Fotovorschau.html`.
 Die Produktdemo, Preise, Kontaktziele und Anwendungsfunktionen bleiben vorhanden.
 Der bisherige Einstiegs-Ticketblock wird durch das Foto ersetzt; die interaktive
-Ticketdarstellung bleibt im Produktabschnitt. Noch kein Commit, Push oder Deployment.
+Ticketdarstellung bleibt im Produktabschnitt.
 
 ## Figma-Verfeinerung
 
@@ -85,3 +85,18 @@ Anliegen und nächsten Schritt korrekt. Drei bestehende Tests für öffentliches
 Rendern, Sicherheitsheader/Nonce und statische Asset-Isolation bestanden.
 Der erste Sandbox-Lauf scheiterte an lokalem SQLite-/HTTP-Zugriff; der isolierte
 Testlauf mit freigegebenen lokalen Prozessrechten war erfolgreich.
+
+## Veröffentlichung
+
+[PR #10](https://github.com/WerkstattAI/WerkstattAI/pull/10) veröffentlicht den
+geprüften Quellstand als `40a8cf4bde8cbfc198a697c6a8ae390752bd15a3`.
+Die bestehende Railway-Quellbranch `codex/kundenkommunikation-2026-09-26`
+wurde ohne Force auf diesen Stand vorgezogen. Keine Änderung an Railway-
+Konfiguration, Datenbank oder Zugangsdaten. Windows blockierte die lokale
+Railway-CLI; Veröffentlichung über die bereits aktive GitHub-Anbindung.
+Das Railway-Panel bestätigte Deployment `7fdc35f2-20b3-4fbb-811c-decd6c95e30e`
+als ACTIVE / Deployment successful. Die öffentliche Seite liefert die neuen
+Fotos und `startseite.css?v=20261111-figma`.
+
+Bei der Live-Endkontrolle wurde ein fehlendes Leerzeichen hinter dem auf Mobil
+ausgeblendeten Zeilenumbruch in „Noch eine Frage?“ festgestellt und ergänzt.
