@@ -449,7 +449,7 @@ body.arbeitsplatz {
   box-shadow:none;
 }
 
-.workspace-head h2 {
+.workspace-head h1 {
   margin:5px 0 7px;
   font-size:29px;
   font-weight:700;
@@ -1917,7 +1917,7 @@ body.arbeitsplatz {
     display:block;
     margin-bottom:18px;
   }
-  .workspace-head h2 {
+  .workspace-head h1 {
     font-size:24px;
   }
   .workspace-head .primary-action {

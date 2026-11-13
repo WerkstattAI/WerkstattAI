@@ -192,7 +192,7 @@ function installDashboardLive({workshopId, scope, list, initialCursor = 0}) {
             const updated = doc.querySelector('[data-kpi="' + kpi.dataset.kpi + '"] .value');
             if (updated) kpi.querySelector('.value').textContent = updated.textContent;
           });
-          for (const selector of ['#attention-region', '.table-count', '#work-summary', '.pagination']) {
+          for (const selector of ['#ticket-ansichten', '.table-count', '.pagination']) {
             const old = document.querySelector(selector), next = doc.querySelector(selector);
             if (old && next) old.replaceWith(next);
           }

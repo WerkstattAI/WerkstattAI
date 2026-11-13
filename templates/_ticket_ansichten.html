@@ -1,0 +1,23 @@
+{% set aktuelle_ansicht = filters.metric or 'all' %}
+<nav id="ticket-ansichten" class="ticket-ansichten" aria-label="Ticketansichten">
+  <div class="ansichten-direkt">
+    {% for wert, name in [('all', 'Alle Tickets'), ('aufgaben', 'Jetzt bearbeiten'), ('wartet', 'Wartet auf Kunden'), ('erledigt', 'Erledigt')] %}
+    <a class="ansicht{% if aktuelle_ansicht == wert %} aktiv{% endif %}" href="{{ kpi_links[wert] }}" {% if aktuelle_ansicht == wert %}aria-current="page"{% endif %}>
+      <span>{{ name }}</span><span class="ansicht-anzahl">{{ stats[wert] or 0 }}</span>
+    </a>
+    {% endfor %}
+  </div>
+  <details class="ansichten-menue">
+    <summary{% if aktuelle_ansicht in ['notfall', 'informationen', 'kostenvoranschlag'] %} class="aktiv"{% endif %}>
+      {{ {'notfall': 'Notfälle', 'informationen': 'Kundeninformationen', 'kostenvoranschlag': 'Kostenvoranschläge'}.get(aktuelle_ansicht, 'Weitere Ansichten') }} <svg aria-hidden="true" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="m6 9 6 6 6-6"/></svg>
+    </summary>
+    <div class="ansichten-auswahl">
+      {% for wert, name in [('notfall', 'Notfälle'), ('informationen', 'Kundeninformationen prüfen'), ('kostenvoranschlag', 'Kostenvoranschläge')] %}
+      <a class="ansicht{% if aktuelle_ansicht == wert %} aktiv{% endif %}" href="{{ kpi_links[wert] }}" {% if aktuelle_ansicht == wert %}aria-current="page"{% endif %}>
+        <span>{{ name }}</span><span class="ansicht-anzahl">{{ stats[wert] or 0 }}</span>
+      </a>
+      {% endfor %}
+      <p>Die Zahlen beziehen sich auf alle Tickets in diesem Bereich.</p>
+    </div>
+  </details>
+</nav>

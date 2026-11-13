@@ -89,3 +89,112 @@
  .ticket-inhalt #communication-history .note-card {max-width:94%}
 }
 @media(prefers-reduced-motion:reduce) {.cards-primary .kpi {transition:none}}
+
+/* Ticketansichten bleiben über derselben Liste sichtbar. */
+.arbeitsplatz .dashboard-summary .kpi {padding:20px;min-height:148px;background:#fff;border-radius:14px;gap:8px}
+.arbeitsplatz .dashboard-summary .kpi .label {font-size:14px;color:#465e54}
+.arbeitsplatz .dashboard-summary .kpi .value {font-size:32px;font-weight:650;letter-spacing:-1px}
+.arbeitsplatz .dashboard-summary .kpi .hint {font-size:13px;line-height:1.5;color:#61746c}
+.arbeitsplatz .kpi[aria-current="page"] {border-color:var(--wa-gruen);box-shadow:inset 0 -3px var(--wa-gruen)}
+.ticket-ansichten {display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap;margin:24px 0 16px;border-bottom:1px solid var(--wa-linie);padding-bottom:8px}
+.ansichten-direkt {display:flex;gap:4px;flex-wrap:wrap;min-width:0}
+.arbeitsplatz .ansicht {display:flex;align-items:center;justify-content:space-between;gap:12px;min-height:44px;padding:10px 14px;border-radius:8px;text-decoration:none;color:#53675e;font-size:14px;font-weight:500;line-height:1.5;transition:background .15s,color .15s}
+.arbeitsplatz .ansicht:hover {background:#e7ede9;color:var(--wa-text)}
+.arbeitsplatz .ansicht.aktiv {background:#e2ede6;color:#183c32;font-weight:650}
+.ansicht-anzahl {display:inline-flex;align-items:center;justify-content:center;min-width:24px;padding:2px 6px;border-radius:6px;background:#e8eeea;color:#53675e;font-size:13px;font-weight:600;font-variant-numeric:tabular-nums;line-height:20px}
+.aktiv .ansicht-anzahl {background:#fff;color:#183c32}
+.ansichten-menue {position:relative}
+.ansichten-menue>summary {display:flex;align-items:center;justify-content:space-between;gap:12px;min-height:44px;padding:10px 14px;border-radius:8px;list-style:none;color:#465e54;font-size:14px;font-weight:500}
+.ansichten-menue>summary::-webkit-details-marker {display:none}
+.ansichten-menue>summary:hover,.ansichten-menue[open]>summary,.ansichten-menue>summary.aktiv {background:#e7ede9;color:var(--wa-text)}
+.ansichten-menue[open]>summary svg {transform:rotate(180deg)}
+.ansichten-auswahl {position:absolute;right:0;top:calc(100% + 8px);width:320px;max-width:calc(100vw - 40px);z-index:8;background:#fff;border:1px solid var(--wa-linie);border-radius:12px;box-shadow:0 12px 32px #183c3214;padding:8px}
+.ansichten-auswahl .ansicht {gap:16px}
+.ansichten-auswahl p {margin:8px;padding:12px 4px 4px;border-top:1px solid var(--wa-linie);color:var(--wa-sekundaer);font-size:13px;line-height:1.5}
+
+/* Suche und Filter mit gleicher Höhe und lesbaren Beschriftungen. */
+.arbeitsplatz .toolbar {padding:20px;border-radius:14px}
+.toolbar .suchleiste {grid-template-columns:minmax(240px,2fr) minmax(150px,1fr) minmax(140px,1fr) auto;gap:16px}
+.toolbar label {font-size:13px;color:#465e54;gap:8px;min-width:0}
+.toolbar input,.toolbar select {height:48px;font-size:15px;border-radius:8px;background:#fff;line-height:1.5}
+.toolbar .suchfeld {position:relative;display:block}
+.suchfeld>svg {position:absolute;left:14px;top:14px;color:#61746c;pointer-events:none}
+.toolbar .suchfeld input {padding-left:44px;font-size:16px;background:#f8faf8}
+.toolbar input::placeholder {color:#61746c;opacity:1}
+.toolbar .suchleiste>button {min-height:48px;font-size:14px;padding:12px 24px;border-radius:8px}
+.filterdetails {margin-top:16px}
+.filterdetails>summary {display:inline-flex;align-items:center;gap:8px;min-height:44px;padding:10px 14px;border:1px solid var(--wa-linie);border-radius:8px;background:#f8faf8;font-size:14px;color:#465e54;list-style:none}
+.filterdetails>summary::-webkit-details-marker {display:none}
+.filterdetails>summary:hover {background:#edf3ef}
+.filter-pfeil {margin-left:8px}
+.filterdetails[open] .filter-pfeil {transform:rotate(180deg)}
+.weitere-filter {margin-top:16px;padding-top:16px;border-top:1px solid var(--wa-linie)}
+.toolbar .filter-zurueck {font-size:14px;min-height:44px;padding:12px 4px;margin:8px 0 0;color:#465e54;text-underline-offset:4px}
+.table-head .table-count {font-size:13px;line-height:1.5}
+
+/* Dieselbe Statusaktion in Liste und Vorschau; Auswahl allein speichert nichts. */
+.arbeitsplatz .actions .quick {gap:12px;align-items:end;padding-top:16px;margin-top:8px;border-top:1px solid var(--wa-linie)}
+.status-schnellwahl {display:grid;gap:8px;flex:1;min-width:150px;color:#465e54;font-size:13px;font-weight:500}
+.arbeitsplatz .status-schnellwahl select {width:100%;min-height:44px;font-size:14px;border-radius:8px;background:#f8faf8;padding:10px 12px}
+.arbeitsplatz .actions .quick>button {min-height:44px;font-size:14px;border-radius:8px}
+.ticket-vorschau .actions .open,.ticket-vorschau .actions>button {min-height:44px;font-size:14px}
+.arbeitsplatz .actions .quick .action-feedback {flex-basis:100%;font-size:13px}
+
+.ticket-hauptbereich>.back-link {display:inline-flex;align-items:center;gap:8px;min-height:44px;padding:10px 14px;margin-bottom:20px;border:1px solid var(--wa-linie);border-radius:8px;background:#fff;color:#465e54;font-size:14px;font-weight:500;text-decoration:none;transition:background .15s,border-color .15s}
+.ticket-hauptbereich>.back-link:hover {background:#edf3ef;border-color:#a9bdb1;color:var(--wa-text)}
+.ticket-hauptbereich>.back-link img {flex-shrink:0}
+.ticket-seitenleiste .statusverwaltung {padding:20px;border-radius:14px}
+.statusverwaltung h3 {font-size:17px;margin:0 0 8px;font-weight:600}
+.statusverwaltung .status-hilfe {font-size:13px;line-height:1.6;color:#61746c;margin:0 0 20px}
+.statusverwaltung .status-form {gap:16px}
+.status-auswahl {margin:0;padding:0;min-width:0;border:0;display:grid;gap:8px}
+.status-option {display:flex;align-items:center;gap:12px;border:1px solid var(--wa-linie);border-radius:10px;padding:14px 12px;min-height:64px;cursor:pointer;transition:background .15s,border-color .15s}
+.status-option:hover {background:#f4f7f4;border-color:#a9bdb1}
+.status-option:has(input:checked) {background:#edf4ef;border-color:#167663}
+.status-option:has(input:focus-visible) {outline:3px solid #167663;outline-offset:3px}
+.arbeitsplatz .status-option input {appearance:auto;accent-color:#167663;flex:0 0 18px;width:18px;height:18px;min-height:0;margin:0;padding:0}
+.status-option>span {display:grid;gap:4px;min-width:0}
+.status-option strong {font-size:14px;font-weight:600;color:#20352f}
+.status-option>span>span {font-size:13px;line-height:1.4;color:#61746c}
+.statusverwaltung .actions button {min-height:44px;font-size:14px;border-radius:8px}
+.statusverwaltung .archive-btn {background:#fff;color:#53675e;border:1px solid var(--wa-linie)}
+.arbeitsplatz :is(.ansicht,.ansichten-menue>summary,.filterdetails>summary,.back-link):focus-visible {outline:3px solid #167663;outline-offset:3px}
+.arbeitsplatz .markenzeile :focus-visible {outline:3px solid #d6eee0;outline-offset:3px}
+.arbeitsplatz .ticket-vorschau .actions :is(button,.open) {min-height:44px}
+.arbeitsplatz .listenaktionen>summary {display:flex;align-items:center;min-height:44px;gap:8px;font-size:13px;color:#53675e}
+.listenaktionen>summary::before {content:'+';font-size:18px}
+.listenaktionen[open]>summary::before {content:'−'}
+.arbeitsplatz :is(.priority.p-normal,.request-type,.channel-badge,.tiny-badge,.date-cell),.karten-nachricht-kopf,.fahrzeugkarte :is(.eyebrow,figcaption,.unbekannt) {color:#53675e}
+.arbeitsplatz .customer-question-badge {color:#78581c}
+.ticket-table .vehicle .muted {color:#53675e}
+@media(max-width:1100px) {
+ .toolbar .suchleiste {grid-template-columns:minmax(0,1fr) minmax(0,1fr) auto}
+ .toolbar .ticketsuche {grid-column:1/-1}
+ .weitere-filter {grid-template-columns:repeat(2,minmax(0,1fr))}
+}
+@media(max-width:640px) {
+ .arbeitsplatz .dashboard-summary .kpi {padding:16px;min-height:156px;gap:8px}
+ .arbeitsplatz .dashboard-summary .kpi .label {font-size:13px;gap:8px}
+ .arbeitsplatz .dashboard-summary .kpi .value {font-size:28px}
+ .arbeitsplatz .dashboard-summary .kpi .hint {font-size:13px}
+ .ticket-ansichten {gap:8px;margin-top:20px}
+ .ansichten-direkt {display:grid;grid-template-columns:repeat(2,minmax(0,1fr));width:100%;gap:4px}
+ .arbeitsplatz .ansicht {font-size:13px;gap:8px;padding:10px}
+ .ansichten-menue {width:100%}
+ .ansichten-menue>summary {padding:10px;font-size:13px}
+ .ansichten-auswahl {position:static;width:auto;max-width:none;margin-top:8px;box-shadow:none}
+ .arbeitsplatz .toolbar {padding:16px}
+ .toolbar .suchleiste {grid-template-columns:repeat(2,minmax(0,1fr));gap:12px}
+ .toolbar .suchleiste>button {grid-column:1/-1;width:100%}
+ .toolbar .suchleiste>label {grid-column:auto}
+ .toolbar .suchleiste>.ticketsuche {grid-column:1/-1}
+ .toolbar select {font-size:14px}
+ .toolbar .suchfeld input {padding-left:40px}
+ .weitere-filter {grid-template-columns:1fr}
+ .arbeitsplatz .actions .quick>button {flex:1}
+ .ticket-seitenleiste .statusverwaltung {padding:16px}
+ .ticket-table .ticket-auswahl {min-height:44px;display:flex;align-items:center}
+}
+@media(prefers-reduced-motion:reduce) {
+ .ansicht,.status-option,.ticket-hauptbereich>.back-link {transition:none}
+}

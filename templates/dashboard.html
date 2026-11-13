@@ -22,7 +22,7 @@
           <div class="workspace-overline">
             {% if archive_mode %}Historie{% else %}Tagesübersicht{% endif %}
           </div>
-          <h2>{% if archive_mode %}Archiv{% else %}Tickets und Aufgaben{% endif %}</h2>
+          <h1>{% if archive_mode %}Archiv{% else %}Tickets und Aufgaben{% endif %}</h1>
           <p>
             {% if archive_mode %}
               Abgeschlossene und archivierte Vorgänge übersichtlich durchsuchen.
@@ -38,111 +38,45 @@
 
       <section class="dashboard-summary" aria-label="Ticket-Kennzahlen">
       <div class="cards cards-primary">
-        <a class="card kpi kpi-primary kpi-order-1" data-kpi="offen" href="{{ kpi_links.offen }}">
+        <a class="card kpi kpi-primary kpi-order-1" data-kpi="offen" {% if filters.metric == "offen" %}aria-current="page"{% endif %} href="{{ kpi_links.offen }}">
           <div class="label">Offen<span class="kennzahl-icon"><img src="/static/arbeitsplatz/symbole/clipboard-list.svg" alt="" width="22" height="22"></span></div>
           <div class="value">{{ stats.offen or 0 }}</div>
-          <div class="hint">Neue oder noch unbehandelte Anfragen</div>
+          <div class="hint">Noch nicht bearbeitet</div>
         </a>
 
-        <a class="card kpi kpi-primary kpi-order-2" data-kpi="in_bearbeitung" href="{{ kpi_links.in_bearbeitung }}">
+        <a class="card kpi kpi-primary kpi-order-2" data-kpi="in_bearbeitung" {% if filters.metric == "in_bearbeitung" %}aria-current="page"{% endif %} href="{{ kpi_links.in_bearbeitung }}">
           <div class="label">In Bearbeitung<span class="kennzahl-icon"><img src="/static/arbeitsplatz/symbole/wrench.svg" alt="" width="22" height="22"></span></div>
           <div class="value">{{ stats.in_bearbeitung or 0 }}</div>
-          <div class="hint">Mechaniker oder Team arbeitet bereits daran</div>
+          <div class="hint">Vom Team übernommen</div>
         </a>
 
-        <a class="card kpi kpi-customer kpi-primary kpi-order-3" data-kpi="kundenfragen_offen" href="{{ kpi_links.kundenfragen_offen }}">
+        <a class="card kpi kpi-customer kpi-primary kpi-order-3" data-kpi="kundenfragen_offen" {% if filters.metric == "kundenfragen_offen" %}aria-current="page"{% endif %} href="{{ kpi_links.kundenfragen_offen }}">
           <div class="label">Antwort erforderlich<span class="kennzahl-icon"><img src="/static/arbeitsplatz/symbole/message-circle-question.svg" alt="" width="22" height="22"></span></div>
           <div class="value">{{ stats.kundenfragen_offen or 0 }}</div>
-          <div class="hint">Kundenfragen ohne Antwort vom Team</div>
+          <div class="hint">Offene Kundenfragen</div>
         </a>
 
-        <a class="card kpi kpi-hot kpi-primary kpi-order-4" data-kpi="hoch" href="{{ kpi_links.hoch }}">
+        <a class="card kpi kpi-hot kpi-primary kpi-order-4" data-kpi="hoch" {% if filters.metric == "hoch" %}aria-current="page"{% endif %} href="{{ kpi_links.hoch }}">
           <div class="label">Hohe Priorität<span class="kennzahl-icon"><img src="/static/arbeitsplatz/symbole/clock-3.svg" alt="" width="22" height="22"></span></div>
           <div class="value">{{ stats.hoch or 0 }}</div>
-          <div class="hint">Sofort prüfen oder zuerst bearbeiten</div>
+          <div class="hint">Dringende Vorgänge</div>
         </a>
       </div>
 
-      <details class="secondary-stats">
-        <summary>
-          <span>Weitere Kennzahlen <span class="secondary-summary-note">Erledigt, Notfälle, Kundeninformationen, Kostenvoranschläge und Gesamt</span></span>
-        </summary>
-        <div class="cards cards-secondary">
-          <a class="card kpi kpi-compact kpi-wide kpi-order-9" data-kpi="all" href="{{ kpi_links.all }}">
-            <div class="label">Alle Tickets</div>
-            <div class="value">{{ stats.all or 0 }}</div>
-            <div class="hint">Alle Tickets dieses Bereichs, unabhängig von Filtern</div>
-          </a>
-
-          <a class="card kpi kpi-compact kpi-order-5" data-kpi="erledigt" href="{{ kpi_links.erledigt }}">
-            <div class="label">Erledigt</div>
-            <div class="value">{{ stats.erledigt or 0 }}</div>
-            <div class="hint">Abgeschlossene oder fertige Fälle</div>
-          </a>
-
-          <a class="card kpi kpi-warn kpi-compact kpi-order-6" data-kpi="notfall" href="{{ kpi_links.notfall }}">
-            <div class="label">Notfall-Typ</div>
-            <div class="value">{{ stats.notfall or 0 }}</div>
-            <div class="hint">Kritische Anfragen mit erhöhter Dringlichkeit</div>
-          </a>
-
-          <a class="card kpi kpi-customer kpi-compact kpi-order-7" data-kpi="informationen" href="{{ kpi_links.informationen }}">
-            <div class="label">Kundeninformationen prüfen</div>
-            <div class="value">{{ stats.informationen or 0 }}</div>
-            <div class="hint">Tickets mit unerledigter Kundeninformation</div>
-          </a>
-
-          <a class="card kpi kpi-quote kpi-compact kpi-order-8" data-kpi="kostenvoranschlag" href="{{ kpi_links.kostenvoranschlag }}">
-            <div class="label">Kostenvoranschläge</div>
-            <div class="value">{{ stats.kostenvoranschlag or 0 }}</div>
-            <div class="hint">Preis- und Angebotsanfragen</div>
-          </a>
-        </div>
-        <p class="kennzahlenhinweis">Kennzahlen zählen Tickets im gesamten Bereich, unabhängig von Listenfiltern. Erledigt bezeichnet den Bearbeitungsstatus, keine Abholfreigabe.</p>
-      </details>
       </section>
 
-      <p id="work-summary"><a href="{{ kpi_links.aufgaben }}">Jetzt bearbeiten: <span data-work-count>{{ stats.aufgaben }}</span> Tickets</a> · {{ stats.nachrichten }} offene Kommunikationsaufgaben · <a href="{{ kpi_links.wartet }}">Wartet auf Kundenantwort: {{ stats.wartet }} Tickets</a></p>
-      <div id="attention-region">
-      {% if not archive_mode and attention_tickets %}
-      <details class="aufgaben-vorschlaege"><summary>Vorgeschlagene Aufgaben · {{ attention_tickets|length }} Tickets</summary><section class="attention">
-        <div class="attention-head">
-          <div>
-            <h3 class="attention-title">Jetzt bearbeiten</h3>
-            <div class="attention-sub">Diese Vorgänge brauchen als Nächstes Ihre Aufmerksamkeit.</div>
-          </div>
-          <a class="aufgabenlink" href="{{ kpi_links.aufgaben }}">Alle Vorgänge →</a>
-        </div>
+      {% include '_ticket_ansichten.html' %}
 
-        <div class="attention-list">
-          {% for t in attention_tickets %}
-            <a class="attention-card" href="/dashboard/ticket/{{ t.ticket_view_id }}?workshop_id={{ workshop_id }}&return_to={{ list_url|urlencode }}#{{ t.attention_anchor }}">
-              <div class="attention-reason">{{ t.attention_reason }}</div>
-              <div class="attention-main">
-                <div class="attention-car">{{ t.fahrzeug or "-" }}</div>
-                <div class="attention-problem">
-                  {{ t.attention_text }}
-                </div>
-              </div>
-              <div class="attention-meta">
-                <span>{{ t.ticket_view_id }}</span>
-                <span>{{ t.status_label or "-" }}</span>
-                <span class="attention-source {{ t.source or 'web_chat' }}">{{ t.source_label or "-" }}</span>
-              </div>
-            </a>
-          {% endfor %}
-        </div>
-      </section></details>
-      {% endif %}
-
-      </div>
       <section class="toolbar" aria-label="Tickets suchen und filtern">
         <form method="get" action="{% if archive_mode %}/dashboard/archive{% else %}/dashboard{% endif %}">
           <input type="hidden" name="workshop_id" value="{{ workshop_id }}" />
           <input type="hidden" name="limit" value="{{ filters.limit }}" />
           <div class="suchleiste">
-            <label>Tickets durchsuchen
-              <input type="search" name="q" aria-label="Tickets durchsuchen" placeholder="Fahrzeug, Kunde oder Ticketnummer …" value="{{ filters.q }}" />
+            <label class="ticketsuche">Tickets durchsuchen
+              <span class="suchfeld">
+                <svg aria-hidden="true" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><circle cx="10.5" cy="10.5" r="6.5"/><path d="m16 16 4.5 4.5"/></svg>
+                <input type="search" name="q" aria-label="Tickets durchsuchen" placeholder="Fahrzeug, Kunde, Ticketnummer" value="{{ filters.q }}" />
+              </span>
             </label>
             <label>Bearbeitungsstatus
               <select name="status" aria-label="Nach Status filtern">
@@ -160,11 +94,11 @@
             </label>
             <button type="submit">Anzeigen</button>
           </div>
-          <details class="filterdetails" {% if filters.metric or filters.task_state != 'all' or filters.question_state != 'all' or filters.sort != 'newest' %}open{% endif %}>
-            <summary>Weitere Filter und Sortierung</summary>
+          <details class="filterdetails" {% if filters.task_state != 'all' or filters.question_state != 'all' %}open{% endif %}>
+            <summary><img src="/static/arbeitsplatz/symbole/sliders-horizontal.svg" alt="" width="18" height="18">Filter und Sortierung <span aria-hidden="true" class="filter-pfeil">⌄</span></summary>
             <div class="weitere-filter">
-              <label>Kennzahl
-                <select name="metric" aria-label="Kennzahlbestand">
+              <label>Ticketansicht
+                <select name="metric" aria-label="Ticketansicht">
                   <option value="">Alle Tickets</option>
                   {% for wert, bezeichnung in [('offen','Offen'),('in_bearbeitung','In Bearbeitung'),('erledigt','Erledigt'),('kundenfragen_offen','Antwort erforderlich'),('hoch','Hohe Priorität'),('all','Alle Tickets'),('notfall','Notfälle'),('informationen','Kundeninformationen prüfen'),('kostenvoranschlag','Kostenvoranschläge'),('aufgaben','Jetzt bearbeiten'),('wartet','Wartet auf Kundenantwort')] %}
                   <option value="{{ wert }}" {% if filters.metric==wert %}selected{% endif %}>{{ bezeichnung }}</option>
@@ -324,12 +258,6 @@
                     {% endif %}
                   </div>
 
-                  {% for task in t.open_tasks %}
-                  <div class="last-note-block">
-                    <a href="/dashboard/ticket/{{ t.ticket_view_id }}?workshop_id={{ workshop_id }}&return_to={{ list_url|urlencode }}#communication-{{ task.message_id }}">{{ task.task_label }}</a>
-                    <div class="last-note-text">{{ task.text }}</div>
-                  </div>
-                  {% endfor %}
                 </td>
 
                 <td class="tel">
@@ -387,11 +315,12 @@
                     <form class="quick" data-context-action method="post" action="/dashboard/ticket/{{ t.ticket_view_id }}/status_quick">
                       <input type="hidden" name="workshop_id" value="{{ workshop_id }}" />
                       <input type="hidden" name="return_to" value="{{ list_url }}" />
+                      <label class="status-schnellwahl"><span>Ticketstatus</span>
                       <select name="status" aria-label="Status für Ticket {{ t.ticket_view_id }} ändern">
                         <option value="offen" {% if t.status_ui=="offen" %}selected{% endif %}>Offen</option>
                         <option value="in_bearbeitung" {% if t.status_ui=="in_bearbeitung" %}selected{% endif %}>In Bearbeitung</option>
                         <option value="erledigt" {% if t.status_ui=="erledigt" %}selected{% endif %}>Erledigt</option>
-                      </select>
+                      </select></label>
                       <button type="submit">Status speichern</button>
                     </form>
 

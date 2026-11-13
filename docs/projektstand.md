@@ -1,5 +1,15 @@
 # WerkSora – Projektstand und nächste Schritte
 
+## Ticketoberfläche verfeinert, 13. November 2026
+
+Direkte Ansichten mit Zählern ersetzen die kleinen Kennzahlen- und Aufgabenklappen.
+Wiederholte grüne Nachrichtenverweise in den Listenkarten entfallen; Suche,
+Statusauswahl und Rückkehr zur Liste sind lesbarer und einheitlich gestaltet.
+Schnellstatus aktualisiert auch die neuen Ansichten-Zähler. 30 bestehende Python-
+und fünf JavaScript-Tests sowie eine lokale Bedienprobe mit fiktiven Tickets bestanden.
+Details und Grenzen des allgemeinen Taste-Checkers stehen im
+[Prüfbericht](dashboard-feinschliff-2026-11-13.md).
+
 ## Bedienoberfläche ausgerichtet, 11. November 2026
 
 Die Hauptnavigation verwendet seitenübergreifend dieselbe Höhe und Grundlinie.
