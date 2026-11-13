@@ -14,7 +14,7 @@
 <a class="skip-link" href="#main-content">Direkt zum Ticket</a>
 {% include '_arbeitsplatz_kopf.html' %}
 <main class="ticket-hauptbereich" id="main-content">
-  <a class="back-link" href="{{ list_url }}" data-list-return>← Zurück zur Liste</a>
+  <a class="back-link" href="{{ list_url }}" data-list-return><img src="/static/arbeitsplatz/symbole/arrow-left.svg" alt="" width="18" height="18">Zurück zur Liste</a>
   {% if reply_detail %}
       <div class="reply-alert {% if reply_status in ['failed', 'unknown'] %}failed{% endif %}" role="{% if reply_status in ['failed', 'unknown'] %}alert{% else %}status{% endif %}">
         <strong>{% if reply_status == 'failed' %}Nachricht nicht gesendet: {% elif reply_status == 'unknown' %}Versandstatus unklar: {% elif reply_status == 'template_sent' %}Startvorlage an Meta übergeben: {% elif reply_status == 'sent' %}An Meta übergeben: {% elif reply_status == 'saved' %}Gespeichert: {% endif %}</strong>{{ reply_detail }}
@@ -411,18 +411,19 @@
 
         </div>
       </div>
-    <section class="card statusverwaltung"><h3>Statusverwaltung</h3><div class="actions">
+    <section class="card statusverwaltung"><h3>Ticketstatus</h3><p class="status-hilfe">Bearbeitungsstand auswählen und speichern.</p><div class="actions">
           <form method="post" action="/dashboard/ticket/{{ ticket.ticket_view_id }}/status" class="status-form">
             <input type="hidden" name="workshop_id" value="{{ workshop_id }}" />
               <input type="hidden" name="return_to" value="{{ list_url }}" />
-            <div class="field">
-              <div class="muted">Status ändern</div>
-              <select name="status" style="margin-top:6px; width:100%;">
-                <option value="offen" {% if ticket.status_ui=="offen" %}selected{% endif %}>Offen</option>
-                <option value="in_bearbeitung" {% if ticket.status_ui=="in_bearbeitung" %}selected{% endif %}>In Bearbeitung</option>
-                <option value="erledigt" {% if ticket.status_ui=="erledigt" %}selected{% endif %}>Erledigt</option>
-              </select>
-            </div>
+            <fieldset class="status-auswahl">
+              <legend class="sr-only">Status ändern</legend>
+              {% for wert, name, hinweis in [('offen', 'Offen', 'Noch nicht begonnen'), ('in_bearbeitung', 'In Bearbeitung', 'Wird vom Team bearbeitet'), ('erledigt', 'Erledigt', 'Bearbeitung abgeschlossen')] %}
+              <label class="status-option">
+                <input type="radio" name="status" value="{{ wert }}" {% if ticket.status_ui == wert %}checked{% endif %} required>
+                <span><strong>{{ name }}</strong><span>{{ hinweis }}</span></span>
+              </label>
+              {% endfor %}
+            </fieldset>
 
             <div>
               <button type="submit">Status speichern</button>

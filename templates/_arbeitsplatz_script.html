@@ -1,4 +1,16 @@
 (() => {
+  // Das Ansichtenmenü funktioniert auch nach einer Aktualisierung der Liste.
+  document.addEventListener('click', event => {
+    const menu = document.querySelector('.ansichten-menue[open]');
+    if (menu && !event.composedPath().includes(menu)) menu.open = false;
+  });
+  document.addEventListener('keydown', event => {
+    const menu = document.querySelector('.ansichten-menue[open]');
+    if (event.key === 'Escape' && menu) {
+      menu.open = false;
+      menu.querySelector('summary').focus();
+    }
+  });
   const preview = document.getElementById('ticket-vorschau');
   const selectionKey = 'werkstattai:ticketauswahl:' + location.pathname + location.search;
   let selected = null;
